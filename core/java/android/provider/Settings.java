@@ -6867,6 +6867,9 @@ public final class Settings {
         @Readable
         public static final String VIBRATE_ON_DISCONNECT = "vibrate_on_disconnect";
 
+        /** @hide */
+        public static final String BACK_GESTURE_HEIGHT = "back_gesture_height";
+
         /**
          * Gesture navbar length mode.
          * Supported modes: 0 for short length, 1 for normal and 2 for long.
