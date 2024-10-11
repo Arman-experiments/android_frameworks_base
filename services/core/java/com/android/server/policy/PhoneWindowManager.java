@@ -115,7 +115,7 @@ import static com.android.server.wm.WindowManagerPolicyProto.WINDOW_MANAGER_DRAW
 
 import static org.lineageos.internal.util.DeviceKeysConstants.*;
 
-import org.rising.server.PocketModeService;
+import org.rising.server.*;
 
 import android.accessibilityservice.AccessibilityService;
 import android.annotation.NonNull;
@@ -879,6 +879,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private boolean mLongSwipeDown;
     private CameraAvailbilityListener mCameraAvailabilityListener;
 
+    private SmartPowerOffService mSmartPowerOffService;
+    private boolean mSmartPowerOffEnabled;
+
     private class PolicyHandler extends Handler {
 
         private PolicyHandler(Looper looper) {
@@ -1156,6 +1159,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(LineageSettings.System.getUriFor(
                     LineageSettings.System.KEY_SHAKE_GESTURE_ACTION), false, this,
+                    UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.System.getUriFor(
+                    "smart_power_off_enabled"), false, this,
                     UserHandle.USER_ALL);
             updateSettings();
         }
@@ -3542,6 +3548,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             mVolUpAndDownMute = LineageSettings.System.getIntForUser(resolver,
                     LineageSettings.System.VOLUME_UP_AND_DOWN_MUTE, 0,
                     UserHandle.USER_CURRENT) == 1;
+
+            boolean smartPowerOffEnabled = Settings.System.getIntForUser(resolver,
+                    "smart_power_off_enabled", 0,
+                    UserHandle.USER_CURRENT) != 0;
+            if (mSmartPowerOffService != null && mSmartPowerOffEnabled != smartPowerOffEnabled) {
+                mSmartPowerOffEnabled = smartPowerOffEnabled;
+                if (mSmartPowerOffEnabled) {
+                    mWindowManagerFuncs.registerPointerEventListener(mSmartPowerOffService, DEFAULT_DISPLAY);
+                } else {
+                    mWindowManagerFuncs.unregisterPointerEventListener(mSmartPowerOffService, DEFAULT_DISPLAY);
+                }
+            }
 
             // Configure wake gesture.
             boolean wakeGestureEnabledSetting = Settings.Secure.getIntForUser(resolver,
@@ -7662,6 +7680,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         mAutofillManagerInternal = LocalServices.getService(AutofillManagerInternal.class);
         mGestureLauncherService = LocalServices.getService(GestureLauncherService.class);
+
+        mSmartPowerOffService = new SmartPowerOffService(mContext);
+        mSmartPowerOffService.start();
     }
 
     /** {@inheritDoc} */
