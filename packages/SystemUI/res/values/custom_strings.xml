@@ -199,4 +199,7 @@
     <string name="usage_data">used today</string>
     <string name="usage_data_default_suffix">Data</string>
     <string name="usage_wifi_default_suffix">Wi-Fi</string>
+
+    <!-- System Theme Re-evaluation Toast -->
+    <string name="reevaluating_system_theme">Re-evaluating system theme.. Please wait for a few seconds</string>
 </resources>
