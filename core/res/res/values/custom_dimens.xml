@@ -11,4 +11,9 @@
 
     <!-- QS styles -->
     <dimen name="qs_corner_radius_top">28dip</dimen>
+    
+    <!-- StatusBarUtils default values -->
+    <dimen name="status_bar_padding_start">8dp</dimen>
+    <dimen name="status_bar_padding_end">4dp</dimen>
+    <dimen name="status_bar_padding_top">0dp</dimen>
 </resources>
