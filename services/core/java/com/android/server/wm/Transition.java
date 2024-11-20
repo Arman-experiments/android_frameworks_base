@@ -745,7 +745,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
         mState = STATE_STARTED;
         if (mPowerManagerInternal != null && mType == TRANSIT_CHANGE) {
-            mPowerManagerInternal.setPowerBoost(Boost.DISPLAY_UPDATE_IMMINENT, 80);
+            mPowerManagerInternal.setPowerBoost(Boost.INTERACTION, 5000);
         }
         ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS, "Starting Transition %d",
                 mSyncId);
