@@ -133,6 +133,8 @@ open class ShadeViewControllerEmptyImpl @Inject constructor() :
     override val udfpsTransitionToFullShadeProgress = MutableStateFlow(0f)
 
     override fun showIsland(show: Boolean) {}
+    override fun getScrollerLayoutController(): com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController? = null
+    override fun getKeyguardBottomAreaView(): com.android.systemui.statusbar.phone.KeyguardBottomAreaView? = null
 }
 
 class ShadeHeadsUpTrackerEmptyImpl : ShadeHeadsUpTracker {
