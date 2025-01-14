@@ -196,7 +196,7 @@ public class AODStyle extends RelativeLayout implements TunerService.Tunable {
                 int targetSize = (int) mContext.getResources().getDimension(R.dimen.custom_aod_image_size);
                 Bitmap scaledBitmap = Bitmap.createScaledBitmap(bitmap, targetSize, targetSize, true);
                 try (java.io.ByteArrayOutputStream stream = new java.io.ByteArrayOutputStream()) {
-                    scaledBitmap.compress(Bitmap.CompressFormat.WEBP_LOSSLESS, 90, stream);
+                    scaledBitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, 90, stream);
                     byte[] byteArray = stream.toByteArray();
                     Bitmap compressedBitmap = BitmapFactory.decodeByteArray(byteArray, 0, byteArray.length);
                     Drawable roundedImg = new CircleFramedDrawable(compressedBitmap, targetSize);
