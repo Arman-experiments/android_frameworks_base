@@ -124,6 +124,8 @@ public class AiAssistantGestureListener implements PointerEventListener {
             mApiKey = Settings.System.getString(mContext.getContentResolver(), "ai_assistant_gemini_key");
             if (mAssistantEnabled) {
                 showOnboardingMessage();
+            } else {
+                AiUtils.sendAssistantActionStateChange(mContext, false);
             }
         }
     }
