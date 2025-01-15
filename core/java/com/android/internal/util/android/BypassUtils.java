@@ -31,7 +31,7 @@ public class BypassUtils {
     private static Set<String> mExemptedUidPkgs;
 
     private static Set<String> getLauncherPkgs() {
-        if (mLauncherPkgs == null) {
+        if (mLauncherPkgs == null || mLauncherPkgs.isEmpty()) {
             Context context = getContext();
             if (context != null) {
                 mLauncherPkgs = new HashSet<>(Arrays.asList(context.getResources()
@@ -44,7 +44,7 @@ public class BypassUtils {
     }
 
     private static Set<String> getExemptedUidPkgs() {
-        if (mExemptedUidPkgs == null) {
+        if (mExemptedUidPkgs == null || mExemptedUidPkgs.isEmpty()) {
             mExemptedUidPkgs = new HashSet<>();
             mExemptedUidPkgs.add("com.google.android.gms");
             mExemptedUidPkgs.addAll(getLauncherPkgs());
