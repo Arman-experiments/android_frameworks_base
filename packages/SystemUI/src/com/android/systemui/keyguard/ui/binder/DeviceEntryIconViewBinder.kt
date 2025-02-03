@@ -192,20 +192,7 @@ object DeviceEntryIconViewBinder {
                     }
                     launch("$TAG#viewModel.useBackgroundProtection") {
                         viewModel.useBackgroundProtection.collect { useBackgroundProtection ->
-                            if (shouldUseCustomUdfpsIcon.value && packageInstalled) {
-                                bgView.visibility = View.GONE
-                            } else {
-                                bgView.visibility = if (useBackgroundProtection) View.VISIBLE else View.GONE
-                            }
-                        }
-                    }
-                    launch("$TAG#shouldUseCustomUdfpsIcon") {
-                        shouldUseCustomUdfpsIcon.collect { useCustomIcon ->
-                            if (useCustomIcon && packageInstalled) {
-                                bgView.visibility = View.GONE
-                            } else {
-                                bgView.visibility = if (viewModel.useBackgroundProtection.value) View.VISIBLE else View.GONE
-                            }
+                            bgView.visibility = View.GONE
                         }
                     }
                     launch("$TAG#viewModel.burnInOffsets") {
@@ -238,6 +225,7 @@ object DeviceEntryIconViewBinder {
                                     )
                             }
                             fgIconView.imageTintList =
+<<<<<<< HEAD
                                 ColorStateList.valueOf(overrideColor?.toArgb() ?: viewModel.tint)
                             if (fgIconView.drawable.current !is UdfpsIconDrawable) {
                                 fgIconView.setPadding(
@@ -249,6 +237,15 @@ object DeviceEntryIconViewBinder {
                             } else {
                                 fgIconView.setPadding(0, 0, 0, 0)
                             }
+=======
+                                ColorStateList.valueOf(viewModel.tint)
+                            fgIconView.setPadding(
+                                viewModel.padding,
+                                viewModel.padding,
+                                viewModel.padding,
+                                viewModel.padding,
+                            )
+>>>>>>> 1722bd7780fd (SystemUI: Redesign UDFPS icon)
                             // Set image state at the end after updating other view state. This
                             // method forces the ImageView to recompute the bounds of the drawable.
                             fgIconView.setImageState(
@@ -270,11 +267,15 @@ object DeviceEntryIconViewBinder {
                     }
                     launch("$TAG#bgViewModel.color") {
                         bgViewModel.color.collect { color ->
+<<<<<<< HEAD
                             if (!shouldUseCustomUdfpsIcon.value || !packageInstalled) {
                             bgView.imageTintList = ColorStateList.valueOf(color)
                             } else {
                                 bgView.imageTintList = null
                             }
+=======
+                            bgView.imageTintList = null
+>>>>>>> 1722bd7780fd (SystemUI: Redesign UDFPS icon)
                         }
                     }
                 }

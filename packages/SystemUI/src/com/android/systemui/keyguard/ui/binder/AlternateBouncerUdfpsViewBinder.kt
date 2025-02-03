@@ -117,14 +117,8 @@ object AlternateBouncerUdfpsViewBinder {
         bgView.repeatWhenAttached {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch("$TAG#viewModel.bgColor") {
-                    if (!shouldUseCustomUdfpsIcon.value || !packageInstalled) {
-                        viewModel.bgColor.collect { color ->
-                            bgView.imageTintList = ColorStateList.valueOf(color)
-                        }
-                    } else {
-                        viewModel.bgColor.collect { color ->
-                            bgView.imageTintList = null
-                        }
+                    viewModel.bgColor.collect { color ->
+                        bgView.imageTintList = null
                     }
                 }
                 launch("$TAG#viewModel.bgAlpha") {
