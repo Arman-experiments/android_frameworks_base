@@ -95,6 +95,11 @@
             android:layout_height="wrap_content"/>
     </com.android.systemui.notifications.ui.PeekDisplayHolderLinearLayout>
 
+      <include layout="@layout/keyguard_widgets_area"
+               android:id="@+id/keyguard_widgets_area"
+               android:layout_width="match_parent"
+               android:layout_height="wrap_content" />
+
       <com.android.systemui.statusbar.phone.NotificationIconContainer
           android:id="@+id/left_aligned_notification_icon_container"
           android:layout_width="match_parent"
