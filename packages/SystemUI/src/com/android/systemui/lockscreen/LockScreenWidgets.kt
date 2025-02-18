@@ -64,4 +64,11 @@ class LockScreenWidgets(context: Context, attrs: AttributeSet) : LinearLayout(co
         )
     }
 
+    fun init() {
+        LockScreenWidgetController.addView(this)
+    }
+
+    fun deInit() {
+        LockScreenWidgetController.removeView(this)
+    }
 }

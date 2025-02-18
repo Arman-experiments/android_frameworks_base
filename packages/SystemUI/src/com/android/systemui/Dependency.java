@@ -67,6 +67,7 @@ import com.android.systemui.qs.QSImpl;
 import com.android.systemui.qs.tiles.dialog.InternetDialogManager;
 import com.android.systemui.media.dialog.MediaOutputDialogManager;
 import com.android.systemui.statusbar.phone.ScrimController;
+
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.FlashlightController;
 
@@ -236,6 +237,13 @@ public class Dependency {
         mProviders.put(FlashlightController.class, mFlashlightController::get);
         mProviders.put(BluetoothTileDialogViewModel.class, mBluetoothTileDialogViewModel::get);
         mProviders.put(ActivityStarter.class, mActivityStarter::get);
+        mProviders.put(MediaOutputDialogManager.class, mMediaOutputDialogManager::get);
+        mProviders.put(AccessPointController.class, mAccessPointController::get);
+        mProviders.put(NetworkController.class, mNetworkController::get);
+        mProviders.put(InternetDialogManager.class, mInternetDialogManager::get);
+        mProviders.put(ConfigurationController.class, mConfigurationController::get);
+        mProviders.put(FlashlightController.class, mFlashlightController::get);
+        mProviders.put(BluetoothTileDialogViewModel.class, mBluetoothTileDialogViewModel::get);
         mProviders.put(HotspotController.class, mHotspotController::get);
 
         Dependency.setInstance(this);
