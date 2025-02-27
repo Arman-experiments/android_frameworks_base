@@ -23,6 +23,7 @@ import static com.android.systemui.statusbar.notification.TransformState.TRANSFO
 
 import android.app.Notification;
 import android.content.Context;
+import android.provider.Settings;
 import android.util.ArraySet;
 import android.view.NotificationHeaderView;
 import android.view.NotificationTopLineView;
@@ -85,7 +86,9 @@ public class NotificationHeaderViewWrapper extends NotificationViewWrapper imple
         mRoundableState = new RoundableState(
                 mView,
                 this,
-                ctx.getResources().getDimension(R.dimen.notification_corner_radius)
+                Settings.System.getInt(ctx.getContentResolver(),
+                        Settings.System.NOTIFICATION_CORNER_RADIUS,
+                        (int)ctx.getResources().getDimension(R.dimen.notification_corner_radius))
         );
         mTransformationHelper = new ViewTransformationHelper();
 
