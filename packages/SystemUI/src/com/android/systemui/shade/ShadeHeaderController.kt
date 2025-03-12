@@ -635,6 +635,7 @@ constructor(
         val padding = resources.getDimensionPixelSize(R.dimen.qs_panel_padding)
         header.setPadding(padding, header.paddingTop, padding, header.paddingBottom)
         updateQQSPaddings()
+        clock.updateClockSize()
     }
 
     private fun updateQQSPaddings() {
