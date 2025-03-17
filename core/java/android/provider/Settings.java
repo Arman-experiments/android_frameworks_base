@@ -7409,6 +7409,11 @@ public final class Settings {
         public static final String QS_SHOW_DATA_USAGE = "qs_show_data_usage";
 
         /**
+         * @hide
+         */
+        public static final String GESTURE_NAVBAR_HEIGHT_MODE = "gesture_navbar_height_mode";
+
+        /**
          * Keys we no longer back up under the current schema, but want to continue to
          * process when restoring historical backup datasets.
          *
