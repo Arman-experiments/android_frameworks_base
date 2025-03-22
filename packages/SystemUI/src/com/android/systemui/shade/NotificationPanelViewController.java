@@ -115,6 +115,7 @@ import com.android.keyguard.dagger.KeyguardQsUserSwitchComponent;
 import com.android.keyguard.dagger.KeyguardStatusBarViewComponent;
 import com.android.keyguard.dagger.KeyguardStatusViewComponent;
 import com.android.keyguard.dagger.KeyguardUserSwitcherComponent;
+import android.service.notification.StatusBarNotification;
 import com.android.systemui.DejankUtils;
 import com.android.systemui.Dumpable;
 import com.android.systemui.Gefingerpoken;
@@ -133,6 +134,7 @@ import com.android.systemui.dump.DumpsysTableLogger;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
 import com.android.systemui.fragments.FragmentService;
+import com.android.systemui.island.NotificationHandler;
 import com.android.systemui.keyguard.KeyguardBottomAreaRefactor;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.keyguard.KeyguardViewConfigurator;
@@ -3149,7 +3151,24 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
     private void setHeadsUpManager(HeadsUpManager headsUpManager) {
         mHeadsUpManager = headsUpManager;
-        mNotifIsland.setHeadsupManager(headsUpManager);
+
+        NotificationHandler notificationHandler = new NotificationHandler() {
+            public StatusBarNotification getTopNotification() {
+                if (mHeadsUpManager != null && mHeadsUpManager.getTopEntry() != null) {
+                    return mHeadsUpManager.getTopEntry().getRow().getEntry().getSbn();
+                }
+                return null;
+            }
+
+            public void removeNotification(String key, boolean releaseImmediately, 
+                                           boolean animate, String reason) {
+                if (mHeadsUpManager != null) {
+                    mHeadsUpManager.removeNotification(key, releaseImmediately, animate, reason);
+                }
+            }
+        };
+
+        mNotifIsland.setNotificationHandler(notificationHandler);
         mHeadsUpManager.addListener(mOnHeadsUpChangedListener);
         mHeadsUpTouchHelper = new HeadsUpTouchHelper(
                 headsUpManager,
