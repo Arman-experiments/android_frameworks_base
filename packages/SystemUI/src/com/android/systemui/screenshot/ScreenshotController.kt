@@ -181,8 +181,14 @@ internal constructor(
         screenshotHandler.resetTimeout()
 
         packageLabel = screenshot.topComponent?.let {
-            val activityInfo = packageManager.getActivityInfo(it, 0)
-            activityInfo.applicationInfo.loadLabel(packageManager).toString()
+            try {
+                val activityInfo = packageManager.getActivityInfo(it, 0)
+                activityInfo.applicationInfo.loadLabel(packageManager).toString().takeIf { label -> label.isNotBlank() }
+                    ?: it.packageName
+            } catch (e: PackageManager.NameNotFoundException) {
+                Log.e(TAG, "handleScreenshot: Activity not found for component $it", e)
+                it.packageName
+            }
         } ?: ""
         scrollCaptureExecutor.longScreenshotHolder.foregroundAppName = packageLabel
 
