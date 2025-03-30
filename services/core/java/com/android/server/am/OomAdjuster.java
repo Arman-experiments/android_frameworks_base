@@ -476,6 +476,7 @@ public class OomAdjuster {
                 }
             }
             Process.setThreadPriority(tid, priority);
+            Process.setThreadAffinity(tid, 2 /* all cores */);
         }
     }
 
@@ -3871,7 +3872,7 @@ public class OomAdjuster {
                 // is not ready when attaching.
                 app.getWindowProcessController().onTopProcChanged();
                 if (app.useFifoUiScheduling()) {
-                    mService.scheduleAsFifoPriority(app.getPid(), true);
+                    mService.scheduleAsFifoPriority(app.getPid(), 99, true);
                 } else {
                     mInjector.setThreadPriority(app.getPid(), THREAD_PRIORITY_TOP_APP_BOOST);
                 }
