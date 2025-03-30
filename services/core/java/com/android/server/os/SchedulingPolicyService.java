@@ -23,6 +23,7 @@ import android.os.ISchedulingPolicyService;
 import android.os.Process;
 import android.util.Log;
 
+import com.android.server.am.ActivityManagerService;
 import com.android.server.SystemServerInitThreadPool;
 
 /**
@@ -110,8 +111,7 @@ public class SchedulingPolicyService extends ISchedulingPolicyService.Stub {
         }
         try {
             // must be in this order or it fails the schedulability constraint
-            Process.setThreadScheduler(tid, Process.SCHED_FIFO | Process.SCHED_RESET_ON_FORK,
-                                       prio);
+            ActivityManagerService.scheduleAsFifoPriority(tid, prio, /*suppressLogs*/ true);
         } catch (RuntimeException e) {
             Log.e(TAG, "Failed setThreadScheduler: " + e);
             return PackageManager.PERMISSION_DENIED;

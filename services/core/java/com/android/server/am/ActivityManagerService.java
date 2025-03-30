@@ -8255,9 +8255,9 @@ public class ActivityManagerService extends IActivityManager.Stub
      *
      * @return {@code true} if this succeeded.
      */
-    public static boolean scheduleAsFifoPriority(int tid, boolean suppressLogs) {
+    public static boolean scheduleAsFifoPriority(int tid, int prio, boolean suppressLogs) {
         try {
-            Process.setThreadScheduler(tid, SCHED_FIFO | SCHED_RESET_ON_FORK, 1);
+            Process.setThreadScheduler(tid, SCHED_FIFO | SCHED_RESET_ON_FORK, prio);
             Process.setThreadAffinity(tid, 0 /* big cores */);
             return true;
         } catch (IllegalArgumentException e) {
@@ -8281,9 +8281,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         final int pid = app.getPid();
         final int renderThreadTid = app.getRenderThreadTid();
         if (enable) {
-            scheduleAsFifoPriority(pid, true /* suppressLogs */);
+            scheduleAsFifoPriority(pid, 99, true /* suppressLogs */);
             if (renderThreadTid != 0) {
-                scheduleAsFifoPriority(renderThreadTid, true /* suppressLogs */);
+                scheduleAsFifoPriority(renderThreadTid, 99, true /* suppressLogs */);
             }
         } else {
             scheduleAsRegularPriority(pid, true /* suppressLogs */);
@@ -8319,7 +8319,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 if (proc.mState.getCurrentSchedulingGroup() == ProcessList.SCHED_GROUP_TOP_APP) {
                     if (DEBUG_OOM_ADJ) Slog.d("UI_FIFO", "Promoting " + tid + "out of band");
                     if (proc.useFifoUiScheduling()) {
-                        scheduleAsFifoPriority(proc.getRenderThreadTid(), true);
+                        scheduleAsFifoPriority(proc.getRenderThreadTid(), 99, true);
                     } else {
                         if (Flags.resetOnForkEnabled()) {
                             if (Process.getThreadScheduler(proc.getRenderThreadTid())
