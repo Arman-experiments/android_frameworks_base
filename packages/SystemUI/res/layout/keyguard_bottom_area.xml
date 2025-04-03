@@ -119,6 +119,30 @@
         android:foreground="@drawable/keyguard_bottom_affordance_selected_border"
         android:visibility="invisible" />
 
+    <FrameLayout
+        android:id="@+id/bottom_area_controls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="@dimen/keyguard_affordance_bottom_margin">
+
+    <FrameLayout
+        android:id="@+id/lock_icon_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal">
+
+        <com.android.systemui.statusbar.phone.LockIcon
+            android:id="@+id/lock_icon"
+            android:layout_width="@dimen/keyguard_lock_width"
+            android:layout_height="@dimen/keyguard_lock_height"
+            android:layout_gravity="center_horizontal"
+            android:contentDescription="@string/accessibility_unlock_button"
+            android:scaleType="center"
+            android:src="@drawable/ic_lock" />
+
+    </FrameLayout>
+
     <LinearLayout
         android:id="@+id/now_bar_area"
         android:layout_width="match_parent"

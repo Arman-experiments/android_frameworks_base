@@ -16,6 +16,16 @@
 */
 -->
 <resources>
+
+    <!-- Shit a* 12am -->
+    <dimen name="keyguard_lock_width">36dp</dimen>
+    <dimen name="keyguard_lock_height">36dp</dimen>
+    <dimen name="keyguard_udfps_width">48dp</dimen>
+    <dimen name="keyguard_udfps_height">48dp</dimen>
+    <dimen name="keyguard_affordance_bottom_margin">48dp</dimen>
+    <dimen name="keyguard_affordance_horizontal_margin">32dp</dimen>
+    <dimen name="keyguard_indication_margin_bottom">16dp</dimen>
+
     <!-- Recommended minimum clickable element dimension -->
     <dimen name="min_clickable_item_size">48dp</dimen>
 
