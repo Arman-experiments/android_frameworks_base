@@ -107,7 +107,6 @@ import com.android.internal.app.IVoiceInteractor;
 import com.android.internal.content.PackageMonitor;
 import com.android.internal.os.BackgroundThread;
 import com.android.internal.util.DumpUtils;
-import com.android.internal.util.android.Utils;
 import com.android.server.FgThread;
 import com.android.server.LocalServices;
 import com.android.server.SoundTriggerInternal;
@@ -615,7 +614,7 @@ public class VoiceInteractionManagerService extends SystemService {
             // If forceInteractorPackage exists, try to apply the interactor from this package if
             // possible and ignore the regular interactor setting.
             String forceInteractorPackage =
-                    getForceVoiceInteractionServicePackage(mContext);
+                    getForceVoiceInteractionServicePackage(mContext.getResources());
             if (forceInteractorPackage != null) {
                 curInteractorInfo = findAvailInteractor(userHandle, forceInteractorPackage);
                 if (curInteractorInfo != null) {
@@ -713,18 +712,17 @@ public class VoiceInteractionManagerService extends SystemService {
             // recognition feature (including low-ram devices where notLowRam="true" takes effect),
             // unless the device's configuration has explicitly set the config flag for a fixed
             // voice interaction service.
-            if (getForceVoiceInteractionServicePackage(context) != null) {
+            if (getForceVoiceInteractionServicePackage(context.getResources()) != null) {
                 return true;
             }
             return context.getPackageManager()
                     .hasSystemFeature(PackageManager.FEATURE_VOICE_RECOGNIZERS);
         }
 
-        private String getForceVoiceInteractionServicePackage(Context context) {
-            String interactorPackage = context.getResources().getString(
+        private String getForceVoiceInteractionServicePackage(Resources res) {
+            String interactorPackage = res.getString(
                     com.android.internal.R.string.config_forceVoiceInteractionServicePackage);
-            return TextUtils.isEmpty(interactorPackage)
-                || !Utils.isPackageInstalled(context, interactorPackage) ? null : interactorPackage;
+            return TextUtils.isEmpty(interactorPackage) ? null : interactorPackage;
         }
 
         public void systemRunning(boolean safeMode) {
@@ -1086,7 +1084,7 @@ public class VoiceInteractionManagerService extends SystemService {
                                 .getString(R.string.config_defaultContextualSearchPackageName);
                         ComponentName currInteractor =
                                 getCurInteractor(Binder.getCallingUserHandle().getIdentifier());
-                        if (currInteractor == null || !Utils.isPackageInstalled(mContext, csPkgName)
+                        if (currInteractor == null
                                 || !csPkgName.equals(currInteractor.getPackageName())) {
                             // Check if the interactor can handle Contextual Search.
                             // If not, return failure.
@@ -2720,7 +2718,7 @@ public class VoiceInteractionManagerService extends SystemService {
         private Intent getContextualSearchIntent(Bundle args) {
             String csPkgName = mContext.getResources()
                     .getString(R.string.config_defaultContextualSearchPackageName);
-            if (csPkgName.isEmpty() || !Utils.isPackageInstalled(mContext, csPkgName)) {
+            if (csPkgName.isEmpty()) {
                 // Return null if csPackageName is not specified.
                 return null;
             }

@@ -34,7 +34,6 @@ import android.app.Notification;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.Resources;
-import android.provider.Settings;
 import android.graphics.Canvas;
 import android.graphics.Path;
 import android.graphics.Point;
@@ -1993,10 +1992,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         super(sysUiContext, attrs);
         mImageResolver = new NotificationInlineImageResolver(userContext,
                 new NotificationInlineImageCache());
-        float mainRadius = Settings.System.getInt(getContext().getContentResolver(),
-	        Settings.System.NOTIFICATION_CORNER_RADIUS,
-	        (int)getResources().getDimension(R.dimen.notification_corner_radius));
-	float radius = mainRadius * 0.5f; // Adjusting for small radius
+        float radius = getResources().getDimension(R.dimen.notification_corner_radius_small);
         mSmallRoundness = radius / getMaxRadius();
         initDimens();
     }

@@ -128,8 +128,6 @@ public class Notifier {
                     -1);
     private static final VibrationAttributes HARDWARE_FEEDBACK_VIBRATION_ATTRIBUTES =
             VibrationAttributes.createForUsage(VibrationAttributes.USAGE_HARDWARE_FEEDBACK);
-    private static final VibrationEffect CHARGING_VIBRATION_DOUBLE_CLICK_EFFECT =
-            VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK);
 
     private final Object mLock = new Object();
 
@@ -1124,8 +1122,7 @@ public class Notifier {
                     Settings.Secure.CHARGING_VIBRATION_ENABLED, 1, userId) != 0;
             if (vibrate) {
                 mVibrator.vibrate(Process.SYSTEM_UID, mContext.getOpPackageName(),
-                        mVibrator.hasAmplitudeControl() ? CHARGING_VIBRATION_EFFECT :
-                        CHARGING_VIBRATION_DOUBLE_CLICK_EFFECT, /* reason= */ "Charging started",
+                        CHARGING_VIBRATION_EFFECT, /* reason= */ "Charging started",
                         HARDWARE_FEEDBACK_VIBRATION_ATTRIBUTES);
             }
 
@@ -1171,7 +1168,6 @@ public class Notifier {
     private void showWiredChargingStarted(int batteryLevel, @UserIdInt int userId) {
         final boolean animationEnabled = Settings.System.getIntForUser(mContext.getContentResolver(),
                 Settings.System.CHARGING_ANIMATION, 1, userId) == 1;
-
         playChargingStartedFeedback(userId, false /* wireless */);
 
         // show animation

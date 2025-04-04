@@ -1159,7 +1159,7 @@ public class RingtoneManager {
         }
 
         if (defaultRingtoneUri.equals(Settings.System.DEFAULT_RINGTONE_URI)
-                    || defaultRingtoneUri.equals(Settings.System.DEFAULT_RINGTONE2_URI)) {
+                     || defaultRingtoneUri.equals(Settings.System.DEFAULT_RINGTONE2_URI)) {
             return TYPE_RINGTONE;
         } else if (defaultRingtoneUri.equals(Settings.System.DEFAULT_NOTIFICATION_URI)) {
             return TYPE_NOTIFICATION;
@@ -1169,7 +1169,7 @@ public class RingtoneManager {
             return -1;
         }
     }
-
+ 
     /**
      * Returns the {@link Uri} for the default ringtone of a particular type.
      * Rather than returning the actual ringtone's sound {@link Uri}, this will

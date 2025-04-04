@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2024 crDroid Android Project
+ * Copyright (C) 2020-2023 crDroid Android Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -186,6 +186,20 @@ class FullCircleBatteryDrawable(private val context: Context, frameColor: Int) :
 
         invalidateSelf()
     }
+    
+    private fun textColorForBatteryLevel(level: Int): Int {
+    	val batteryColor = batteryColorForLevel(level)
+    	return if (isColorDark(batteryColor)) {
+    	    Color.WHITE
+    	} else {
+    	    Color.BLACK
+    	}
+    }
+    
+    private fun isColorDark(color: Int): Boolean {
+    	val darkness = 1 - (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
+    	return darkness >= 0.5
+    }
 
     override fun draw(c: Canvas) {
         if (batteryLevel == -1) return
@@ -234,7 +248,7 @@ class FullCircleBatteryDrawable(private val context: Context, frameColor: Int) :
                 else
                     warningString
             val pctY = (height + textHeight) * 0.45f
-            textPaint.color = batteryColorForLevel(batteryLevel)
+            textPaint.color = textColorForBatteryLevel(batteryLevel)
             c.drawText(pctText, frame.centerX(), pctY, textPaint)
             var textPath = Path()
             textPaint.getTextPath(pctText, 0, pctText.length, frame.centerX(),

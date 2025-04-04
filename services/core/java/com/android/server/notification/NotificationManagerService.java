@@ -415,7 +415,7 @@ import java.util.stream.Collectors;
 /** {@hide} */
 public class NotificationManagerService extends SystemService {
     public static final String TAG = "NotificationService";
-    public static final boolean DBG = Log.isLoggable(TAG, Log.DEBUG);
+    public static final boolean DBG = false;
     public static final boolean ENABLE_CHILD_NOTIFICATIONS
             = SystemProperties.getBoolean("debug.child_notifs", true);
 
@@ -1343,9 +1343,9 @@ public class NotificationManagerService extends SystemService {
                         .addTaggedData(MetricsEvent.NOTIFICATION_SHADE_COUNT, nv.count));
                 mNotificationRecordLogger.log(
                         NotificationRecordLogger.NotificationEvent.NOTIFICATION_CLICKED, r);
-                EventLogTags.writeNotificationClicked(key,
+                /* EventLogTags.writeNotificationClicked(key,
                         r.getLifespanMs(now), r.getFreshnessMs(now), r.getExposureMs(now),
-                        nv.rank, nv.count);
+                        nv.rank, nv.count); */
 
                 StatusBarNotification sbn = r.getSbn();
                 // Notifications should be cancelled on click if they have been lifetime extended,
@@ -1471,7 +1471,7 @@ public class NotificationManagerService extends SystemService {
             MetricsLogger.histogram(getContext(), "note_load", items);
             mNotificationRecordLogger.log(
                     NotificationRecordLogger.NotificationPanelEvent.NOTIFICATION_PANEL_OPEN);
-            EventLogTags.writeNotificationPanelRevealed(items);
+            // EventLogTags.writeNotificationPanelRevealed(items);
             if (clearEffects) {
                 clearEffects();
             }
@@ -1483,7 +1483,7 @@ public class NotificationManagerService extends SystemService {
             MetricsLogger.hidden(getContext(), MetricsEvent.NOTIFICATION_PANEL);
             mNotificationRecordLogger.log(
                     NotificationRecordLogger.NotificationPanelEvent.NOTIFICATION_PANEL_CLOSE);
-            EventLogTags.writeNotificationPanelHidden();
+            // EventLogTags.writeNotificationPanelHidden();
             mAssistants.onPanelHidden();
         }
 
@@ -1901,6 +1901,11 @@ public class NotificationManagerService extends SystemService {
                 }
             }
         }
+
+        @Override
+        public long getNotificationSoundTimeout(String pkg, int uid) {
+            return mPreferencesHelper.getNotificationSoundTimeout(pkg, uid);
+        }
     };
 
     @VisibleForTesting
@@ -2213,8 +2218,6 @@ public class NotificationManagerService extends SystemService {
                         Secure.LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS);
         private final Uri LOCK_SCREEN_SHOW_NOTIFICATIONS
                 = Secure.getUriFor(Secure.LOCK_SCREEN_SHOW_NOTIFICATIONS);
-        private final Uri PEEK_DISPLAY
-                = Secure.getUriFor("peek_display_notifications");
         private final Uri SHOW_NOTIFICATION_SNOOZE
                 = Secure.getUriFor(Secure.SHOW_NOTIFICATION_SNOOZE);
 
@@ -2238,8 +2241,6 @@ public class NotificationManagerService extends SystemService {
             resolver.registerContentObserver(LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS,
                     false, this, USER_ALL);
             resolver.registerContentObserver(LOCK_SCREEN_SHOW_NOTIFICATIONS,
-                    false, this, USER_ALL);
-            resolver.registerContentObserver(PEEK_DISPLAY,
                     false, this, USER_ALL);
 
             resolver.registerContentObserver(SHOW_NOTIFICATION_SNOOZE,
@@ -2279,7 +2280,7 @@ public class NotificationManagerService extends SystemService {
             if (uri == null || LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS.equals(uri)) {
                 mPreferencesHelper.updateLockScreenPrivateNotifications();
             }
-            if (uri == null || LOCK_SCREEN_SHOW_NOTIFICATIONS.equals(uri) || PEEK_DISPLAY.equals(uri)) {
+            if (uri == null || LOCK_SCREEN_SHOW_NOTIFICATIONS.equals(uri)) {
                 mPreferencesHelper.updateLockScreenShowNotifications();
             }
             if (SHOW_NOTIFICATION_SNOOZE.equals(uri)) {
@@ -4013,6 +4014,19 @@ public class NotificationManagerService extends SystemService {
 
             // Outstanding notifications from this package will be cancelled as soon as we get the
             // callback from AppOpsManager.
+        }
+
+        @Override
+        public void setNotificationSoundTimeout(String pkg, int uid, long timeout) {
+            checkCallerIsSystem();
+            mPreferencesHelper.setNotificationSoundTimeout(pkg, uid, timeout);
+            handleSavePolicyFile();
+        }
+
+        @Override
+        public long getNotificationSoundTimeout(String pkg, int uid) {
+            checkCallerIsSystem();
+            return mPreferencesHelper.getNotificationSoundTimeout(pkg, uid);
         }
 
         /**
@@ -7114,7 +7128,7 @@ public class NotificationManagerService extends SystemService {
             }
 
             addAutoGroupAdjustment(r, groupName);
-            EventLogTags.writeNotificationAutogrouped(key);
+            //EventLogTags.writeNotificationAutogrouped(key);
 
             if (!android.app.Flags.checkAutogroupBeforePost() || requestSort) {
                 mRankingHandler.requestSort();
@@ -7140,7 +7154,7 @@ public class NotificationManagerService extends SystemService {
         }
         if (r.getSbn().getOverrideGroupKey() != null) {
             addAutoGroupAdjustment(r, null);
-            EventLogTags.writeNotificationUnautogrouped(key);
+            // EventLogTags.writeNotificationUnautogrouped(key);
             mRankingHandler.requestSort();
         }
     }
@@ -9328,13 +9342,13 @@ public class NotificationManagerService extends SystemService {
                         enqueueStatus = EVENTLOG_ENQUEUE_STATUS_UPDATE;
                     }
                     int appProvided = isAppProvided ? 1 : 0;
-                    EventLogTags.writeNotificationEnqueue(callingUid, callingPid,
+                    /*EventLogTags.writeNotificationEnqueue(callingUid, callingPid,
                             pkg, id, tag, userId, notification.toString(),
-                            enqueueStatus, appProvided);
+                            enqueueStatus, appProvided);*/
                 }
 
                 // tell the assistant service about the notification
-                if (mAssistants.isEnabled() && !notification.isMediaNotification()) {
+                if (mAssistants.isEnabled()) {
                     mAssistants.onNotificationEnqueuedLocked(r);
                     mHandler.postDelayed(
                             new PostNotificationRunnable(r.getKey(), r.getSbn().getPackageName(),
@@ -10663,9 +10677,9 @@ public class NotificationManagerService extends SystemService {
                     .addTaggedData(MetricsEvent.NOTIFICATION_SHADE_COUNT, count);
         }
         MetricsLogger.action(logMaker);
-        EventLogTags.writeNotificationCanceled(canceledKey, reason,
+        /* EventLogTags.writeNotificationCanceled(canceledKey, reason,
                 r.getLifespanMs(now), r.getFreshnessMs(now), r.getExposureMs(now),
-                rank, count, listenerName);
+                rank, count, listenerName); */
         if (wasPosted) {
             mNotificationRecordLogger.logNotificationCancelled(r, reason,
                     r.getStats().getDismissalSurface());
@@ -10875,9 +10889,9 @@ public class NotificationManagerService extends SystemService {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                EventLogTags.writeNotificationCancelAll(callingUid, callingPid,
+              /*  EventLogTags.writeNotificationCancelAll(callingUid, callingPid,
                         pkg, userId, mustHaveFlags, mustNotHaveFlags, reason,
-                        /* listener= */ null);
+                        /* listener=  null); */
 
                 synchronized (mNotificationLock) {
                     FlagChecker flagChecker = (int flags) -> {
@@ -11077,8 +11091,8 @@ public class NotificationManagerService extends SystemService {
                 synchronized (mNotificationLock) {
                     String listenerName =
                             listener == null ? null : listener.component.toShortString();
-                    EventLogTags.writeNotificationCancelAll(callingUid, callingPid,
-                            null, userId, 0, 0, reason, listenerName);
+                    /* EventLogTags.writeNotificationCancelAll(callingUid, callingPid,
+                            null, userId, 0, 0, reason, listenerName); */
 
                     FlagChecker flagChecker = (int flags) -> {
                         int flagsToCheck = mustNotHaveFlags;
@@ -11138,8 +11152,8 @@ public class NotificationManagerService extends SystemService {
             if (grouChildChecker.apply(childR, userId, pkg, groupKey)
                 && (flagChecker == null || flagChecker.apply(childR.getFlags()))
                 && (!childR.getChannel().isImportantConversation() || reason != REASON_CANCEL)) {
-                EventLogTags.writeNotificationCancel(callingUid, callingPid, pkg, childSbn.getId(),
-                        childSbn.getTag(), userId, 0, 0, childReason, listenerName);
+                /*EventLogTags.writeNotificationCancel(callingUid, callingPid, pkg, childSbn.getId(),
+                        childSbn.getTag(), userId, 0, 0, childReason, listenerName);*/
                 notificationList.remove(i);
                 mNotificationsByKey.remove(childR.getKey());
                 cancelNotificationLocked(childR, sendDelete, childReason, wasPosted, listenerName,

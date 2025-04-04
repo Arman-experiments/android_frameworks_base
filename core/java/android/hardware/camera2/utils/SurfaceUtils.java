@@ -22,6 +22,7 @@ import static com.android.internal.util.Preconditions.checkNotNull;
 
 import android.app.ActivityThread;
 import android.compat.annotation.UnsupportedAppUsage;
+import android.content.res.Resources;
 import android.graphics.ImageFormat;
 import android.graphics.PixelFormat;
 import android.hardware.HardwareBuffer;
@@ -32,6 +33,7 @@ import android.util.Range;
 import android.util.Size;
 import android.view.Surface;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -301,6 +303,19 @@ public class SurfaceUtils {
         }
     }
 
+    private static boolean isPrivilegedApp() {
+        String packageName = ActivityThread.currentOpPackageName();
+        List<String> packageList = new ArrayList<>(Arrays.asList(
+                SystemProperties.get("persist.vendor.camera.privapp.list", ",").split(",")));
+
+        // Append packages from lineage-sdk resources
+        Resources res = ActivityThread.currentApplication().getResources();
+        packageList.addAll(Arrays.asList(res.getStringArray(
+                com.android.internal.R.array.config_cameraHFRPrivAppList)));
+
+        return packageList.contains(packageName);
+    }
+
     private static native int nativeDetectSurfaceType(Surface surface);
 
     private static native int nativeDetectSurfaceDataspace(Surface surface);
@@ -311,22 +326,4 @@ public class SurfaceUtils {
             /*out*/int[/*2*/] dimens);
 
     private static native long nativeGetSurfaceId(Surface surface);
-
-    private static boolean isPrivilegedApp() {
-        String packageName = ActivityThread.currentOpPackageName();
-        if (packageName.equals("com.google.android.GoogleCamera")) return true;
-        String packageList = SystemProperties.get("persist.vendor.camera.privapp.list");
-
-        if (packageList.length() > 0) {
-            TextUtils.StringSplitter splitter = new TextUtils.SimpleStringSplitter(',');
-            splitter.setString(packageList);
-            for (String str : splitter) {
-                if (packageName.equals(str)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
 }

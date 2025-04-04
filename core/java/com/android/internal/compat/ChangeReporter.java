@@ -45,6 +45,7 @@ import java.util.function.Function;
 @android.ravenwood.annotation.RavenwoodKeepWholeClass
 public class ChangeReporter {
     private static final String TAG = "CompatChangeReporter";
+    private static final boolean DBG = false;
     private static final Function<Integer, Set<ChangeReport>> NEW_CHANGE_REPORT_SET =
             uid -> Collections.synchronizedSet(new HashSet<>());
     private int mSource;
@@ -259,6 +260,7 @@ public class ChangeReporter {
     }
 
     private void debugLog(int uid, long changeId, int state) {
+        if (!DBG) return;
         String message = formatSimple("Compat change id reported: %d; UID %d; state: %s", changeId,
                 uid, stateToString(state));
         if (mSource == SOURCE_SYSTEM_SERVER) {

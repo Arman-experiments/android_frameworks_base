@@ -49,8 +49,6 @@ public abstract class AbstractBluetoothAddressPreferenceController
 
     private Preference mBtAddress;
 
-    private boolean mTapped = false;
-
     public AbstractBluetoothAddressPreferenceController(Context context, Lifecycle lifecycle) {
         super(context, lifecycle);
     }
@@ -77,14 +75,6 @@ public abstract class AbstractBluetoothAddressPreferenceController
         return CONNECTIVITY_INTENTS;
     }
 
-    @Override
-    public boolean handlePreferenceTreeClick(Preference preference) {
-        if (preference != mBtAddress) return false;
-        mTapped = !mTapped;
-        updateConnectivity();
-        return true;
-    }
-
     @SuppressLint("HardwareIds")
     @Override
     protected void updateConnectivity() {
@@ -95,17 +85,12 @@ public abstract class AbstractBluetoothAddressPreferenceController
             Futures.addCallback(future, new FutureCallback<>() {
                 @Override
                 public void onSuccess(@Nullable String address) {
-                    if (TextUtils.isEmpty(address)) {
-                        mBtAddress.setSummary(R.string.status_unavailable);
-                        mBtAddress.setCopyingEnabled(false);
-                    } else if (mTapped) {
+                    if (!TextUtils.isEmpty(address)) {
                         // Convert the address to lowercase for consistency with the wifi MAC
                         // address.
                         mBtAddress.setSummary(address.toLowerCase());
-                        mBtAddress.setCopyingEnabled(true);
                     } else {
-                        mBtAddress.setSummary(R.string.device_info_protected_single_press);
-                        mBtAddress.setCopyingEnabled(false);
+                        mBtAddress.setSummary(R.string.status_unavailable);
                     }
                 }
 

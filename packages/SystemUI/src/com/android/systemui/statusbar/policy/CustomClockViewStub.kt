@@ -16,6 +16,7 @@
 package com.android.systemui.statusbar.policy
 
 import android.content.Context
+import android.content.res.Configuration
 import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
@@ -67,6 +68,11 @@ class CustomClockViewStub @JvmOverloads constructor(
         }
         visibility = if (clockStyle == 0) View.GONE else View.VISIBLE
         currentClockView?.visibility = if (clockStyle == 0) View.GONE else View.VISIBLE
+    }
+    
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        updateLayout()
     }
 
     override fun onAttachedToWindow() {

@@ -43,6 +43,7 @@ import com.android.systemui.settings.brightness.BrightnessMirrorHandler;
 import com.android.systemui.settings.brightness.BrightnessSliderController;
 import com.android.systemui.settings.brightness.MirrorController;
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager;
+import com.android.systemui.statusbar.policy.BrightnessMirrorController;
 import com.android.systemui.statusbar.policy.SplitShadeStateController;
 import com.android.systemui.tuner.TunerService;
 
@@ -69,7 +70,7 @@ public class QSPanelController extends QSPanelControllerBase<QSPanel>
     private BrightnessMirrorHandler mBrightnessMirrorHandler;
     private final StatusBarKeyguardViewManager mStatusBarKeyguardViewManager;
     private boolean mListening;
-    private MirrorController mBrightnessMirrorController;
+    private BrightnessMirrorController mBrightnessMirrorController;
 
     private final boolean mSceneContainerEnabled;
 
@@ -148,7 +149,6 @@ public class QSPanelController extends QSPanelControllerBase<QSPanel>
         mTunerService.addTunable(mView, QSPanel.QS_SHOW_BRIGHTNESS_SLIDER);
         mTunerService.addTunable(mView, QSPanel.QS_SHOW_AUTO_BRIGHTNESS);
         mTunerService.addTunable(mView, QSPanel.QS_BRIGHTNESS_SLIDER_POSITION);
-        mTunerService.addTunable(mView, QSPanel.QS_SHOW_BRIGHTNESS_PERCENTAGE);
         mTunerService.addTunable(mView, QSPanel.QS_LAYOUT_COLUMNS);
         mTunerService.addTunable(mView, QSPanel.QS_LAYOUT_COLUMNS_LANDSCAPE);
         mTunerService.addTunable(mView, QSPanel.QS_LAYOUT_ROWS);
@@ -169,9 +169,6 @@ public class QSPanelController extends QSPanelControllerBase<QSPanel>
         PagedTileLayout pagedTileLayout= ((PagedTileLayout) mView.getOrCreateTileLayout());
         pagedTileLayout.setOnTouchListener(mTileLayoutTouchListener);
         maybeReinflateBrightnessSlider();
-        if (mBrightnessSliderController != null) {
-            ((QSPanel)mView).setBrightnessSliderController(mBrightnessSliderController);
-        }
         mBrightnessController.addListeners();
     }
 
@@ -186,17 +183,8 @@ public class QSPanelController extends QSPanelControllerBase<QSPanel>
         mTunerService.removeTunable(mView);
         mView.setBrightnessRunnable(null);
         mBrightnessMirrorHandler.onQsPanelDettached();
-        if (mView != null) {
-            ((QSPanel)mView).setBrightnessSliderController(null);
-        }
         mBrightnessController.removeListeners();
         super.onViewDetached();
-    }
-
-    private void updateBrightnessMirror() {
-        if (mBrightnessMirrorController != null) {
-            mBrightnessSliderController.setMirrorControllerAndMirror(mBrightnessMirrorController);
-        }
     }
 
     @Override
@@ -237,6 +225,12 @@ public class QSPanelController extends QSPanelControllerBase<QSPanel>
         mView.setCanCollapse(!shouldUseSplitNotificationShade);
     }
 
+    private void updateBrightnessMirror() {
+        if (mBrightnessMirrorController != null) {
+            mBrightnessSliderController.setMirrorControllerAndMirror(mBrightnessMirrorController);
+        }
+    }
+
     /** */
     public void setVisibility(int visibility) {
         mView.setVisibility(visibility);
@@ -259,8 +253,10 @@ public class QSPanelController extends QSPanelControllerBase<QSPanel>
     }
 
     public void setBrightnessMirror(@Nullable MirrorController brightnessMirrorController) {
-        mBrightnessMirrorController = brightnessMirrorController;
-        mBrightnessMirrorHandler.setController(brightnessMirrorController);
+        if (brightnessMirrorController instanceof BrightnessMirrorController) {
+            mBrightnessMirrorController = (BrightnessMirrorController) brightnessMirrorController;
+            mBrightnessMirrorHandler.setController(brightnessMirrorController);
+        }
     }
 
     /** Update appearance of QSPanel. */

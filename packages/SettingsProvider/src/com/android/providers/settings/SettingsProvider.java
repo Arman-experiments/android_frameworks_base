@@ -2413,7 +2413,7 @@ public class SettingsProvider extends ContentProvider {
                 return;
             }
         }
-        throw new SecurityException("Permission denial: " + resolveCallingPackage() + " must have one of: "
+        throw new SecurityException("Permission denial, must have one of: "
             + Arrays.toString(permissions));
     }
 
@@ -2810,7 +2810,7 @@ public class SettingsProvider extends ContentProvider {
 
     private static boolean isCallerSystemOrShellOrRootOnDebuggableBuild() {
         final int appId = UserHandle.getAppId(Binder.getCallingUid());
-        return appId == SYSTEM_UID || (Build.IS_DEBUGGABLE
+        return appId == SYSTEM_UID || (Build.IS_ENG
                 && (appId == SHELL_UID || appId == ROOT_UID));
     }
 
@@ -4411,19 +4411,17 @@ public class SettingsProvider extends ContentProvider {
                         }
 
                         final SettingsState ssaidSettings = getSsaidSettingsLocked(userId);
-                        if (ssaidSettings != null) {
-                            for (PackageInfo info : packages) {
-                                // Check if the UID already has an entry in the table.
-                                final String uid = Integer.toString(info.applicationInfo.uid);
-                                final Setting ssaid = ssaidSettings.getSettingLocked(uid);
+                        for (PackageInfo info : packages) {
+                            // Check if the UID already has an entry in the table.
+                            final String uid = Integer.toString(info.applicationInfo.uid);
+                            final Setting ssaid = ssaidSettings.getSettingLocked(uid);
 
-                                if (ssaid.isNull() || ssaid.getValue() == null) {
-                                    // Android Id doesn't exist for this package so create it.
-                                    ssaidSettings.insertSettingOverrideableByRestoreLocked(uid,
-                                            legacySsaid, null, true, info.packageName);
-                                    if (DEBUG) {
-                                        Slog.d(LOG_TAG, "Keep the legacy ssaid for uid=" + uid);
-                                    }
+                            if (ssaid.isNull() || ssaid.getValue() == null) {
+                                // Android Id doesn't exist for this package so create it.
+                                ssaidSettings.insertSettingOverrideableByRestoreLocked(uid,
+                                        legacySsaid, null, true, info.packageName);
+                                if (DEBUG) {
+                                    Slog.d(LOG_TAG, "Keep the legacy ssaid for uid=" + uid);
                                 }
                             }
                         }

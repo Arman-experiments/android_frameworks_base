@@ -234,7 +234,7 @@ public class DataSwitchTile extends QSTileImpl<BooleanState> {
 
     @Override
     public int getMetricsCategory() {
-        return MetricsEvent.VIEW_UNKNOWN;
+        return MetricsEvent.INFINITY;
     }
 
     /**

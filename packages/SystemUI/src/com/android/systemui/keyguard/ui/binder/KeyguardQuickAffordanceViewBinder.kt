@@ -242,8 +242,7 @@ constructor(
                             KeyguardBottomAreaVibrations.Shake
                         } else {
                             KeyguardBottomAreaVibrations.ShakeAlt
-                        }
-                    )
+                        })
                     logger.logQuickAffordanceTapped(viewModel.configKey)
                 }
                 view.onLongClickListener =

@@ -57,10 +57,11 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
-import android.content.ContentResolver;
 import android.content.Context;
+import android.content.ContentResolver;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.content.Intent;
 import android.database.ContentObserver;
 import android.graphics.Color;
 import android.graphics.Insets;
@@ -115,8 +116,8 @@ import com.android.keyguard.dagger.KeyguardQsUserSwitchComponent;
 import com.android.keyguard.dagger.KeyguardStatusBarViewComponent;
 import com.android.keyguard.dagger.KeyguardStatusViewComponent;
 import com.android.keyguard.dagger.KeyguardUserSwitcherComponent;
-import android.service.notification.StatusBarNotification;
 import com.android.systemui.DejankUtils;
+import com.android.systemui.Dependency;
 import com.android.systemui.Dumpable;
 import com.android.systemui.Gefingerpoken;
 import com.android.systemui.biometrics.AuthController;
@@ -134,7 +135,6 @@ import com.android.systemui.dump.DumpsysTableLogger;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
 import com.android.systemui.fragments.FragmentService;
-import com.android.systemui.island.NotificationHandler;
 import com.android.systemui.keyguard.KeyguardBottomAreaRefactor;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.keyguard.KeyguardViewConfigurator;
@@ -189,7 +189,6 @@ import com.android.systemui.statusbar.NotificationShadeDepthController;
 import com.android.systemui.statusbar.NotificationShadeWindowController;
 import com.android.systemui.statusbar.PulseExpansionHandler;
 import com.android.systemui.statusbar.StatusBarState;
-import com.android.systemui.statusbar.StatusBarStateControllerImpl;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
 import com.android.systemui.statusbar.VibratorHelper;
 import com.android.systemui.statusbar.notification.AnimatableProperty;
@@ -257,8 +256,9 @@ import kotlinx.coroutines.CoroutineDispatcher;
 import kotlinx.coroutines.flow.Flow;
 import kotlinx.coroutines.flow.StateFlow;
 
-import lineageos.providers.LineageSettings;
-
+import com.android.internal.util.infinity.InfinityUtils;
+import com.android.systemui.infinity.AmbientText;
+import com.android.systemui.infinity.AmbientCustomImage;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -268,7 +268,6 @@ import java.util.function.Consumer;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
-
 
 import com.android.systemui.island.IslandView;
 
@@ -300,9 +299,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     public static final String COUNTER_PANEL_OPEN_QS = "panel_open_qs";
     private static final String COUNTER_PANEL_OPEN_PEEK = "panel_open_peek";
     private static final String DOUBLE_TAP_SLEEP_GESTURE =
-            "lineagesystem:" + LineageSettings.System.DOUBLE_TAP_SLEEP_GESTURE;
-    private static final String QS_HAPTICS_INTENSITY =
-            "system:" + "qs_haptics_intensity";
+            "system:" + Settings.System.DOUBLE_TAP_SLEEP_GESTURE;
+     private static final String DOUBLE_TAP_SLEEP_LOCKSCREEN =
+            "system:" + Settings.System.DOUBLE_TAP_SLEEP_LOCKSCREEN;
     private static final String ISLAND_NOTIFICATION =
             "system:" + Settings.System.ISLAND_NOTIFICATION;
     private static final String HEADS_UP_NOTIFICATIONS_ENABLED =
@@ -539,6 +538,8 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private boolean mDoubleTapToSleepEnabled;
     private GestureDetector mDoubleTapGesture;
 
+    private boolean mIsLockscreenDoubleTapEnabled;
+
     private final KeyguardIndicationController mKeyguardIndicationController;
     private int mHeadsUpInset;
     private boolean mHeadsUpPinnedMode;
@@ -551,6 +552,10 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
     /** Whether a collapse that started on the panel should allow the panel to intercept. */
     private boolean mIsPanelCollapseOnQQS;
+
+    // Ambient Customization
+    private AmbientText mAmbientText;
+    private AmbientCustomImage mAmbientCustomImage;
 
     /** Alpha of the views which only show on the keyguard but not in shade / shade locked. */
     private float mKeyguardOnlyContentAlpha = 1.0f;
@@ -649,9 +654,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private int mDreamingToLockscreenTransitionTranslationY;
     private int mLockscreenToDreamingTransitionTranslationY;
     private int mGoneToDreamingTransitionTranslationY;
-    private int mQsHapticsIntensity = 0;
     private boolean mForceFlingAnimationForTest = false;
     private final SplitShadeStateController mSplitShadeStateController;
+
     private IslandView mNotifIsland;
     private NotificationStackScrollLayout mNotificationStackScroller;
     private boolean mUseIslandNotification;
@@ -801,7 +806,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             MSDLPlayer msdlPlayer,
             BrightnessMirrorShowingInteractor brightnessMirrorShowingInteractor,
             TunerService tunerService,
-            Context context,
             EdgeLightViewController edgeLightViewController) {
         SceneContainerFlag.assertInLegacyMode();
         keyguardStateController.addCallback(new KeyguardStateController.Callback() {
@@ -947,7 +951,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         });
         mBottomAreaShadeAlphaAnimator.setDuration(160);
         mBottomAreaShadeAlphaAnimator.setInterpolator(Interpolators.ALPHA_OUT);
-        mDoubleTapGesture = new GestureDetector(context,
+        mDoubleTapGesture = new GestureDetector(mView.getContext(),
                 new GestureDetector.SimpleOnGestureListener() {
             @Override
             public boolean onDoubleTap(MotionEvent e) {
@@ -1119,6 +1123,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         if (!KeyguardBottomAreaRefactor.isEnabled()) {
             setKeyguardBottomArea(mView.findViewById(R.id.keyguard_bottom_area));
         }
+
+        mAmbientText = (AmbientText) mView.findViewById(R.id.text_container);
+        mAmbientCustomImage = (AmbientCustomImage) mView.findViewById(R.id.image_container);
 
         mNotificationStackScroller = mView.findViewById(R.id.notification_stack_scroller);
         mNotifIsland = mView.findViewById(R.id.notification_island);
@@ -1766,7 +1773,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
     @ClockSize
     private int computeDesiredClockSizeForSingleShade() {
-        if (hasVisibleNotifications(true)) {
+        if (hasVisibleNotifications()) {
             return SMALL;
         }
         return LARGE;
@@ -1796,17 +1803,14 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     }
 
     private boolean shouldForceSmallClock() {
-        boolean customClockEnabled = Settings.Secure.getIntForUser(
-            mContentResolver, "clock_style", 0, UserHandle.USER_CURRENT) != 0;
-        boolean peekDisplayEnabled = Settings.Secure.getIntForUser(
-            mContentResolver, "peek_display_notifications", 0, UserHandle.USER_CURRENT) != 0;
-        boolean lockscreenWidgetsEnabled = Settings.System.getIntForUser(
-            mContentResolver, "lockscreen_widgets_enabled", 0, UserHandle.USER_CURRENT) != 0;
         return mFeatureFlags.isEnabled(Flags.LOCKSCREEN_ENABLE_LANDSCAPE)
                 && !isOnAod()
                 // True on small landscape screens
                 && mResources.getBoolean(R.bool.force_small_clock_on_lockscreen) ||
-                (customClockEnabled || lockscreenWidgetsEnabled || peekDisplayEnabled);
+                (Settings.Secure.getIntForUser(
+                    mContentResolver, "clock_style", 0, UserHandle.USER_CURRENT) != 0 || 
+                 Settings.System.getIntForUser(
+                    mContentResolver, "lockscreen_widgets_enabled", 0, UserHandle.USER_CURRENT) != 0);
     }
 
     private void updateKeyguardStatusViewAlignment(boolean animate) {
@@ -1864,22 +1868,14 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
 
     private boolean hasVisibleNotifications() {
-        return hasVisibleNotifications(false);
-    }
-
-    private boolean hasVisibleNotifications(boolean onKeyguard) {
-        final boolean mediaOnKeyguard = !isOnAod()
+        final boolean mediaVisible = mMediaDataManager.hasActiveMediaOrRecommendation()
                 && mMediaHierarchyManager.getShouldShowOnLockScreen();
-        final boolean isMediaVisibleToUser =
-                mMediaDataManager.hasActiveMediaOrRecommendation()
-                && (mediaOnKeyguard || !onKeyguard);
         if (FooterViewRefactor.isEnabled()) {
             return mActiveNotificationsInteractor.getAreAnyNotificationsPresentValue()
-                    || isMediaVisibleToUser;
+                    || mediaVisible;
         } else {
             return mNotificationStackScrollLayoutController
-                    .getVisibleNotificationCount() != 0
-                    || isMediaVisibleToUser;
+                    .getVisibleNotificationCount() != 0 || mediaVisible;
         }
     }
 
@@ -2004,23 +2000,11 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             mKeyguardUserSwitcherController.setAlpha(alpha);
         }
     }
-    
-    private void boostFrames() {
-        if (mView != null && mView.getViewRootImpl() != null) {
-            mView.getViewRootImpl().notifyRendererOfExpensiveFrame();
-        }
-    }
-    
-    private void boostFramesDuringRelayout() {
-        boostFrames();
-        this.mView.requestLayout();
-        boostFrames();
-    }
 
     @Override
     public void transitionToExpandedShade(long delay) {
         mNotificationStackScrollLayoutController.goToFullShade(delay);
-        boostFramesDuringRelayout();
+        mView.requestLayout();
         mAnimateNextPositionUpdate = true;
     }
 
@@ -2941,7 +2925,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                         }
                     });
             // Make sure a layout really happens.
-            boostFramesDuringRelayout();
+            this.mView.requestLayout();
         }
 
         setListening(true);
@@ -3151,24 +3135,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
     private void setHeadsUpManager(HeadsUpManager headsUpManager) {
         mHeadsUpManager = headsUpManager;
-
-        NotificationHandler notificationHandler = new NotificationHandler() {
-            public StatusBarNotification getTopNotification() {
-                if (mHeadsUpManager != null && mHeadsUpManager.getTopEntry() != null) {
-                    return mHeadsUpManager.getTopEntry().getRow().getEntry().getSbn();
-                }
-                return null;
-            }
-
-            public void removeNotification(String key, boolean releaseImmediately, 
-                                           boolean animate, String reason) {
-                if (mHeadsUpManager != null) {
-                    mHeadsUpManager.removeNotification(key, releaseImmediately, animate, reason);
-                }
-            }
-        };
-
-        mNotifIsland.setNotificationHandler(notificationHandler);
+        mNotifIsland.setHeadsupManager(headsUpManager);
         mHeadsUpManager.addListener(mOnHeadsUpChangedListener);
         mHeadsUpTouchHelper = new HeadsUpTouchHelper(
                 headsUpManager,
@@ -3344,37 +3311,60 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         final float dozeAmount = dozing ? 1 : 0;
         mStatusBarStateController.setAndInstrumentDozeAmount(mView, dozeAmount, animate);
 
-        StatusBarStateControllerImpl mStatusBarStateControllerImpl  = (StatusBarStateControllerImpl) mStatusBarStateController;
-        ValueAnimator animator = mStatusBarStateControllerImpl.mDarkAnimator;
-        if (animator != null && animator.isRunning()) {
-            if (!animate || mStatusBarStateControllerImpl.mDozeAmountTarget != dozeAmount) {
-                mStatusBarStateControllerImpl.mDarkAnimator.cancel();
-            }
-            updateKeyguardStatusViewAlignment(animate);
-        }
-
-        final View view = mStatusBarStateControllerImpl.mView;
-        if ((view == null || !view.isAttachedToWindow()) && mView.isAttachedToWindow()) {
-            mStatusBarStateControllerImpl.mView = mView;
-        }
-        mStatusBarStateControllerImpl.mDozeAmountTarget = dozeAmount;
-        if (animate) {
-            final float mStatusBarStateDozeAmount = mStatusBarStateControllerImpl.mDozeAmount;
-            if (mStatusBarStateDozeAmount == 0 || mStatusBarStateDozeAmount == 1) {
-                mStatusBarStateControllerImpl.mDozeInterpolator = 
-                    mStatusBarStateControllerImpl.mIsDozing
-                        ? Interpolators.FAST_OUT_SLOW_IN
-                        : Interpolators.TOUCH_RESPONSE_REVERSE;
-            }
-            if (mStatusBarStateDozeAmount == 1 && !mStatusBarStateControllerImpl.mIsDozing) {
-                mStatusBarStateControllerImpl.setDozeAmountInternal(0.99f);
-            }
-            mStatusBarStateControllerImpl.mDarkAnimator = mStatusBarStateControllerImpl.createDarkAnimator();
-        } else {
-            mStatusBarStateControllerImpl.setDozeAmountInternal(dozeAmount);
-        }
-
         updateKeyguardStatusViewAlignment(animate);
+
+        if (mAmbientText != null) {
+            updateAmbientTextState(dozing);
+        }
+        if (mAmbientCustomImage != null) {
+            updateAmbientCustomImageState(dozing);
+        }
+    }
+
+    private void updateAmbientTextState(boolean dozing) {
+        boolean mAmbientTextEnable = Settings.System.getIntForUser(
+                mView.getContext().getContentResolver(), Settings.System.AMBIENT_TEXT,
+                0, UserHandle.USER_CURRENT) != 0;
+        boolean ambientTextAnimated = Settings.System.getIntForUser(mView.getContext().getContentResolver(),
+                Settings.System.AMBIENT_TEXT_ANIMATION, 0, UserHandle.USER_CURRENT) != 0;
+
+        if (mAmbientTextEnable) {
+            if (dozing) {
+                // TODO on screen off should we restart pulse?
+                // if that should work we need to decide at this point
+                // if the current notifications "would" turn the screen on
+                // just checking hasActiveClearableNotifications is obviusly not
+                // enough here - so for now dont even try to do it
+                mAmbientText.animateText(ambientTextAnimated);
+                mAmbientText.update();
+                mAmbientText.setVisibility(View.VISIBLE);
+            } else {
+                // screen on!
+                mAmbientText.setVisibility(View.GONE);
+            }
+        }
+    }
+
+    private void updateAmbientCustomImageState(boolean dozing) {
+        boolean mAmbientCustomImageEnable = Settings.System.getIntForUser(
+                mView.getContext().getContentResolver(), Settings.System.AMBIENT_IMAGE,
+                0, UserHandle.USER_CURRENT) != 0;
+
+        if (mAmbientCustomImageEnable) {
+            if (dozing) {
+                // TODO on screen off should we restart pulse?
+                // if that should work we need to decide at this point
+                // if the current notifications "would" turn the screen on
+                // just checking hasActiveClearableNotifications is obviusly not
+                // enough here - so for now dont even try to do it
+                mAmbientCustomImage.update();
+                mAmbientCustomImage.setVisibility(View.VISIBLE);
+            } else {
+                // screen on!
+                mAmbientCustomImage.setVisibility(View.GONE);
+                mAmbientCustomImage.update();
+            }
+        }
     }
 
     @Override
@@ -3383,6 +3373,15 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         final boolean
                 animatePulse =
                 !mDozeParameters.getDisplayNeedsBlanking() && mDozeParameters.getAlwaysOn();
+                
+        ContentResolver resolver = mView.getContext().getContentResolver();
+        boolean ambientText = Settings.System.getIntForUser(resolver,
+                Settings.System.AMBIENT_TEXT, 0, UserHandle.USER_CURRENT) != 0;
+        boolean ambientTextAnimated = Settings.System.getIntForUser(resolver,
+                Settings.System.AMBIENT_TEXT_ANIMATION, 0, UserHandle.USER_CURRENT) != 0;
+        boolean ambientImage = Settings.System.getIntForUser(resolver,
+                Settings.System.AMBIENT_IMAGE, 0, UserHandle.USER_CURRENT) != 0;
+
         if (animatePulse) {
             mAnimateNextPositionUpdate = true;
         }
@@ -3390,6 +3389,43 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         // The height callback will take care of pushing the clock to the right position.
         if (!mPulsing && !mDozing) {
             mAnimateNextPositionUpdate = false;
+        }
+
+        if (mAmbientText != null && ambientText) {
+           if (mPulsing) {
+               mAmbientText.animateText(ambientTextAnimated);
+               mAmbientText.update();
+               mAmbientText.setVisibility(View.VISIBLE);
+           } else {
+              if (mDozing) {
+                  mAmbientText.animateText(ambientTextAnimated);
+                  mAmbientText.update();
+                  mAmbientText.setVisibility(View.VISIBLE);
+              } else {
+                  mAmbientText.update();
+                  mAmbientText.setVisibility(View.GONE);
+              }
+           }
+        } else {
+            mAmbientText.update();
+            mAmbientText.setVisibility(View.GONE);
+        }
+        if (mAmbientCustomImage != null && ambientImage) {
+            if (mPulsing) {
+                mAmbientCustomImage.setVisibility(View.VISIBLE);
+                mAmbientCustomImage.update();
+            } else {
+                if (mDozing) {
+                    mAmbientCustomImage.update();
+                    mAmbientCustomImage.setVisibility(View.VISIBLE);
+                } else {
+                    mAmbientCustomImage.update();
+                    mAmbientCustomImage.setVisibility(View.GONE);
+                }
+            }
+        } else {
+            mAmbientCustomImage.setVisibility(View.GONE);
+            mAmbientCustomImage.update();
         }
         mNotificationStackScrollLayoutController.setPulsing(pulsing, animatePulse);
 
@@ -3896,7 +3932,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private void maybeVibrateOnOpening(boolean openingWithTouch) {
         if (mVibrateOnOpening && mBarState != KEYGUARD && mBarState != SHADE_LOCKED) {
             if (!openingWithTouch || !mHasVibratedOnOpen) {
-                com.android.internal.util.android.VibrationUtils.triggerVibration(mView.getContext(), mQsHapticsIntensity);
+                performHapticFeedback(HapticFeedbackConstants.GESTURE_START);
                 mHasVibratedOnOpen = true;
                 mShadeLog.v("Vibrating on opening, mHasVibratedOnOpen=true");
             }
@@ -4406,7 +4442,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         //A layout will ensure that onComputeInternalInsets will be called and after that we can
         // resize the layout. Make sure that the window stays small for one frame until the
         // touchableRegion is set.
-        boostFramesDuringRelayout();
+        mView.requestLayout();
         mNotificationShadeWindowController.setForceWindowCollapsed(true);
         postToView(() -> {
             mNotificationShadeWindowController.setForceWindowCollapsed(false);
@@ -4618,7 +4654,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         @Override
         public void onUiModeChanged() {
             if (DEBUG_LOGCAT) Log.d(TAG, "onUiModeChanged");
-            resetViews(true);
             mNotifIsland.setIslandBackgroundColorTint();
         }
 
@@ -4832,7 +4867,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             }
             mConfigurationController.addCallback(mConfigurationListener);
             mTunerService.addTunable(this, DOUBLE_TAP_SLEEP_GESTURE);
-            mTunerService.addTunable(this, QS_HAPTICS_INTENSITY);
+            mTunerService.addTunable(this, DOUBLE_TAP_SLEEP_LOCKSCREEN);
             mTunerService.addTunable(this, ISLAND_NOTIFICATION);
             mTunerService.addTunable(this, HEADS_UP_NOTIFICATIONS_ENABLED);
             // Theme might have changed between inflating this view and attaching it to the
@@ -4855,28 +4890,31 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             mFalsingManager.removeTapListener(mFalsingTapListener);
         }
 
-	@Override
-	public void onTuningChanged(String key, String newValue) {
-	    switch (key) {
-	        case DOUBLE_TAP_SLEEP_GESTURE:
-		            mDoubleTapToSleepEnabled =
-        	            TunerService.parseIntegerSwitch(newValue,
-	                        mResources.getBoolean(org.lineageos.platform.internal.R.bool.
-        	                config_dt2sGestureEnabledByDefault));
-	            break;
-        	case QS_HAPTICS_INTENSITY:
-                    mQsHapticsIntensity = TunerService.parseInteger(newValue, 0);
+        @Override
+        public void onTuningChanged(String key, String newValue) {
+            switch (key) {
+                case DOUBLE_TAP_SLEEP_GESTURE:
+                    mDoubleTapToSleepEnabled =
+                            TunerService.parseIntegerSwitch(newValue,
+                                mResources.getBoolean(com.android.internal.R.bool.
+                                config_dt2sGestureEnabledByDefault));
                     break;
-        	case ISLAND_NOTIFICATION:
-            	    mUseIslandNotification = TunerService.parseIntegerSwitch(newValue, false);
+                case DOUBLE_TAP_SLEEP_LOCKSCREEN:
+                    mIsLockscreenDoubleTapEnabled =
+                            TunerService.parseIntegerSwitch(newValue,
+                                mResources.getBoolean(com.android.internal.R.bool.
+                                config_dt2sGestureEnabledByDefault));
+                    break;
+                case ISLAND_NOTIFICATION:
+                    mUseIslandNotification = TunerService.parseIntegerSwitch(newValue, true);
                     break;
                 case HEADS_UP_NOTIFICATIONS_ENABLED:
                     mUseHeadsUp = TunerService.parseIntegerSwitch(newValue, true);
-	            break;
-	        default:
-	            break;
-	    }
-	}
+                    break;
+                default:
+                    break;
+            }
+        }
     }
 
     private final class ShadeLayoutChangeListener implements View.OnLayoutChangeListener {
@@ -5254,7 +5292,10 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                 return false;
             }
 
-            if (mDoubleTapToSleepEnabled && !mPulsing && !mDozing) {
+            if ((mIsLockscreenDoubleTapEnabled && !mPulsing && !mDozing
+                    && mBarState == StatusBarState.KEYGUARD) ||
+                    (!mQsController.getExpanded() && mDoubleTapToSleepEnabled
+                    && event.getY() < mStatusBarHeaderHeightKeyguard)) {
                 mDoubleTapGesture.onTouchEvent(event);
             }
 
@@ -5563,7 +5604,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     }
 
     private boolean useIslandNotification() {
-        return mUseIslandNotification || mView.getContext().getResources().getConfiguration().orientation 
-            == Configuration.ORIENTATION_LANDSCAPE;
+        return mUseIslandNotification;
     }
 }

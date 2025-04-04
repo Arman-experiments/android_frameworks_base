@@ -87,6 +87,7 @@ import android.os.RemoteException;
 import android.os.StrictMode;
 import android.os.SystemProperties;
 import android.os.Trace;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
@@ -3256,11 +3257,11 @@ public class WallpaperManager {
             throw e.rethrowFromSystemServer();
         }
     }
-
+    
     private boolean isDepthWallpaperEnabled() {
-        boolean depthWallpaperEnabled = android.provider.Settings.System.getInt(mContext.getContentResolver(), 
+        boolean depthWallpaperEnabled = Settings.System.getInt(mContext.getContentResolver(), 
                 "depth_wallpaper_enabled", 0) == 1;
-        String depthWallpaperUri = android.provider.Settings.System.getString(mContext.getContentResolver(),
+        String depthWallpaperUri = Settings.System.getString(mContext.getContentResolver(),
                 "depth_wallpaper_subject_image_uri");
         return depthWallpaperEnabled && depthWallpaperUri != null && !depthWallpaperUri.isEmpty();
     }

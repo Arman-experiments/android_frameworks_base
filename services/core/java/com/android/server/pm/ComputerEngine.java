@@ -68,6 +68,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
+import android.app.ActivityManagerInternal;
 import android.app.admin.DevicePolicyManagerInternal;
 import android.companion.virtual.VirtualDeviceManager;
 import android.content.ComponentName;
@@ -164,8 +165,6 @@ import com.android.server.utils.WatchedSparseBooleanArray;
 import com.android.server.utils.WatchedSparseIntArray;
 import com.android.server.wm.ActivityTaskManagerInternal;
 
-import org.rising.server.QuickSwitchService;
-
 import libcore.util.EmptyArray;
 
 import java.io.BufferedOutputStream;
@@ -185,8 +184,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-
-import com.android.internal.util.android.HideAppListUtils;
 
 /**
  * This class contains the implementation of the Computer functions.  It
@@ -594,13 +591,17 @@ public class ComputerEngine implements Computer {
                 final boolean resolveForStartNonExported = resolveForStart
                                 && !ai.exported
                                 && !isCallerSameApp(pkgName, filterCallingUid);
+                final boolean shouldRemove = !mInjector.getLocalService(ActivityManagerInternal.class)
+                        .queryActivityAllowed(new ComponentName(ai.packageName, ai.name), intent,
+                        Binder.getCallingUid(), Binder.getCallingPid(), resolvedType,
+                        ai.applicationInfo, userId);
                 final boolean blockNormalResolution =
                         (!resolveForStart || resolveForStartNonExported)
                                 && !isTargetInstantApp
                                 && !isCallerInstantApp
-                                && shouldFilterApplication(
+                                && (shouldRemove || shouldFilterApplication(
                                 getPackageStateInternal(ai.applicationInfo.packageName,
-                                        Process.SYSTEM_UID), filterCallingUid, userId);
+                                        Process.SYSTEM_UID), filterCallingUid, userId));
                 if (!blockInstantResolution && !blockNormalResolution) {
                     final ResolveInfo ri = new ResolveInfo();
                     ri.activityInfo = ai;
@@ -630,6 +631,18 @@ public class ComputerEngine implements Computer {
                     lockedResult.result.sort(RESOLVE_PRIORITY_SORTER);
                 }
                 list = lockedResult.result;
+            }
+            for (int i = list.size() - 1; i >= 0; i--) {
+                boolean shouldRemove = false;
+                ResolveInfo ri = list.get(i);
+                ActivityInfo info = ri.activityInfo;
+
+                shouldRemove = !mInjector.getLocalService(ActivityManagerInternal.class)
+                    .queryActivityAllowed(new ComponentName(info.packageName, info.name), intent, Binder.getCallingUid(),
+                    Binder.getCallingPid(), resolvedType, info.applicationInfo, userId);
+
+                if (shouldRemove)
+                    list.remove(i);
             }
             SaferIntentUtils.blockNullAction(args, list);
         }
@@ -717,11 +730,14 @@ public class ComputerEngine implements Computer {
                                 && ((!matchInstantApp && !isCallerInstantApp && isTargetInstantApp)
                                 || (matchVisibleToInstantAppOnly && isCallerInstantApp
                                 && isTargetHiddenFromInstantApp));
+                final boolean shouldRemove = !mInjector.getLocalService(ActivityManagerInternal.class)
+                        .queryServiceAllowed(new ComponentName(si.packageName, si.name), intent, Binder.getCallingUid(),
+                        Binder.getCallingPid(), resolvedType, si.applicationInfo, userId);
 
                 final boolean blockNormalResolution = !isTargetInstantApp && !isCallerInstantApp
-                        && shouldFilterApplication(
+                        && (shouldRemove || shouldFilterApplication(
                         getPackageStateInternal(si.applicationInfo.packageName,
-                                Process.SYSTEM_UID), callingUid, userId);
+                                Process.SYSTEM_UID), callingUid, userId));
                 if (!blockInstantResolution && !blockNormalResolution) {
                     final ResolveInfo ri = new ResolveInfo();
                     ri.serviceInfo = si;
@@ -733,6 +749,17 @@ public class ComputerEngine implements Computer {
         } else {
             list = queryIntentServicesInternalBody(intent, resolvedType, flags,
                     userId, callingUid, instantAppPkgName);
+            for (int i = list.size() - 1; i >= 0; i--) {
+                ResolveInfo ri = list.get(i);
+                ServiceInfo info = ri.serviceInfo;
+
+                final boolean shouldRemove = !mInjector.getLocalService(ActivityManagerInternal.class)
+                        .queryServiceAllowed(new ComponentName(info.packageName, info.name), intent, Binder.getCallingUid(),
+                        Binder.getCallingPid(), resolvedType, info.applicationInfo, userId);
+
+                if (shouldRemove)
+                    list.remove(i);
+            }
             SaferIntentUtils.blockNullAction(args, list);
         }
 
@@ -1002,11 +1029,6 @@ public class ComputerEngine implements Computer {
 
     public final ApplicationInfo getApplicationInfo(String packageName,
             @PackageManager.ApplicationInfoFlagsBits long flags, int userId) {
-        if ((canHideApp(Binder.getCallingUid(), packageName) &&
-             HideAppListUtils.shouldHideAppList(mContext, packageName)) ||
-            QuickSwitchService.shouldHide(userId, packageName)) {
-            return null;
-        }
         return getApplicationInfoInternal(packageName, flags, Binder.getCallingUid(), userId);
     }
 
@@ -1020,13 +1042,6 @@ public class ComputerEngine implements Computer {
             @PackageManager.ApplicationInfoFlagsBits long flags,
             int filterCallingUid, int userId) {
         if (!mUserManager.exists(userId)) return null;
-
-        if ((canHideApp(Binder.getCallingUid(), packageName) &&
-             HideAppListUtils.shouldHideAppList(mContext, packageName)) ||
-            QuickSwitchService.shouldHide(userId, packageName)) {
-            return null;
-        }
-
         flags = updateFlagsForApplication(flags, userId);
 
         if (!isRecentsAccessingChildProfiles(Binder.getCallingUid(), userId)) {
@@ -1036,64 +1051,6 @@ public class ComputerEngine implements Computer {
         }
 
         return getApplicationInfoInternalBody(packageName, flags, filterCallingUid, userId);
-    }
-    
-     private boolean canHideApp(int callingUid, String packageName) {
-        if (!isBootCompleted() || mContext == null || mContext.getPackageManager() == null) {
-            return false;
-        }
-
-        String callingPackage = mContext.getPackageManager().getNameForUid(callingUid);
-
-        if (callingPackage == null || TextUtils.isEmpty(callingPackage)) {
-            return false;
-        }
-
-        // app can be always hidden if calling package is play store
-        boolean isFinsky = callingPackage.contains("com.android.vending");
-
-        if (isFinsky) return true;
-        
-        if (packageName == null || TextUtils.isEmpty(packageName)) {
-            return false;
-        }
-        
-        // the calling package is itself, no need to hide
-        if (callingPackage.contains(packageName)) return false;
-
-        // we only want to hide these apps from playstore 
-        // to avoid these apps from being updated, so abort if
-        // calling package is not finsky
-        if (packageName.contains("youtube") 
-            || packageName.contains("microg")
-            || packageName.contains("revanced")
-            || packageName.contains("gms")) {
-            return false;
-        }
-
-        // this is for banking apps, but we need to make sure first that 
-        // we arent hiding app infos from sandbox/system processes
-        return !isCallerSystem(callingUid) 
-            && !Process.isIsolated(callingUid)
-            && !Process.isSdkSandboxUid(callingUid);
-    }
-    
-    public ParceledListSlice<PackageInfo> recreatePackageList(
-            int callingUid, Context context, int userId, ParceledListSlice<PackageInfo> list) {
-        List<PackageInfo> appList = new ArrayList<>(list.getList());
-        if (!canHideApp(callingUid, null)) return new ParceledListSlice<>(appList);
-        Set<String> hiddenApps = HideAppListUtils.getApps(context);
-        appList.removeIf(info -> hiddenApps.contains(info.packageName));
-        return new ParceledListSlice<>(appList);
-    }
-
-    public List<ApplicationInfo> recreateApplicationList(
-            int callingUid, Context context, int userId, List<ApplicationInfo> list) {
-        List<ApplicationInfo> appList = new ArrayList<>(list);
-        if (!canHideApp(callingUid, null)) return appList;
-        Set<String> hiddenApps = HideAppListUtils.getApps(context);
-        appList.removeIf(info -> hiddenApps.contains(info.packageName));
-        return appList;
     }
 
     protected ApplicationInfo getApplicationInfoInternalBody(String packageName,
@@ -1727,12 +1684,6 @@ public class ComputerEngine implements Computer {
 
     public final PackageInfo getPackageInfo(String packageName,
             @PackageManager.PackageInfoFlagsBits long flags, int userId) {
-        if ((canHideApp(Binder.getCallingUid(), packageName) &&
-             HideAppListUtils.shouldHideAppList(mContext, packageName)) ||
-            QuickSwitchService.shouldHide(userId, packageName)) {
-            return null;
-        }
-
         return getPackageInfoInternal(packageName, PackageManager.VERSION_CODE_HIGHEST,
                 flags, Binder.getCallingUid(), userId);
     }
@@ -1852,11 +1803,11 @@ public class ComputerEngine implements Computer {
         }
         if (!mUserManager.exists(userId)) return ParceledListSlice.emptyList();
         flags = updateFlagsForPackage(flags, userId);
-        enforceCrossUserPermission(callingUid, userId, false /* requireFullPermission */,
-                                  false /* checkShell */, "get installed packages");
 
-        return QuickSwitchService.recreatePackageList(
-                userId, getInstalledPackagesBody(flags, userId, callingUid));
+        enforceCrossUserPermission(callingUid, userId, false /* requireFullPermission */,
+                false /* checkShell */, "get installed packages");
+
+        return getInstalledPackagesBody(flags, userId, callingUid);
     }
 
     protected ParceledListSlice<PackageInfo> getInstalledPackagesBody(long flags, int userId,
@@ -2703,7 +2654,7 @@ public class ComputerEngine implements Computer {
             return false;
         }
         // if the target is included in Settings.Secure.HIDE_APPLIST, do filter
-        if (canHideApp(Binder.getCallingUid(), packageName) && HideAppListUtils.shouldHideAppList(
+        if (com.android.internal.util.infinity.HideAppListUtils.shouldHideAppList(
                 mContext, packageName)) {
             return true;
         }
@@ -4966,7 +4917,7 @@ public class ComputerEngine implements Computer {
             }
         }
 
-        return QuickSwitchService.recreateApplicationList(userId, list);
+        return list;
     }
 
     @Nullable
@@ -5067,7 +5018,10 @@ public class ComputerEngine implements Computer {
             final PackageStateInternal ps = mSettings.getPackage(providerInfo.packageName);
             final ComponentName component =
                     new ComponentName(providerInfo.packageName, providerInfo.name);
-            if (!shouldFilterApplication(ps, Binder.getCallingUid(), component,
+            boolean shouldRemove = !mInjector.getLocalService(ActivityManagerInternal.class)
+                .queryProviderAllowed(new ComponentName(providerInfo.packageName, providerInfo.name), null, Binder.getCallingUid(),
+                Binder.getCallingPid(), null, providerInfo.applicationInfo, callingUserId);
+            if (!shouldRemove && !shouldFilterApplication(ps, Binder.getCallingUid(), component,
                     TYPE_PROVIDER, callingUserId)) {
                 continue;
             }
@@ -5108,7 +5062,10 @@ public class ComputerEngine implements Computer {
             final PackageStateInternal ps = mSettings.getPackage(providerInfo.packageName);
             final ComponentName component =
                     new ComponentName(providerInfo.packageName, providerInfo.name);
-            if (shouldFilterApplication(
+            boolean shouldRemove = !mInjector.getLocalService(ActivityManagerInternal.class)
+                .queryProviderAllowed(new ComponentName(providerInfo.packageName, providerInfo.name), null, Binder.getCallingUid(),
+                Binder.getCallingPid(), null, providerInfo.applicationInfo, userId);
+            if (shouldRemove || shouldFilterApplication(
                     ps, callingUid, component, TYPE_PROVIDER, userId)) {
                 continue;
             }

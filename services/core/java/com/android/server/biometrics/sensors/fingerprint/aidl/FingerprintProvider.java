@@ -138,7 +138,7 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
     @Nullable private String mHalInstanceNameCurrent;
 
     private boolean mCleanup;
-
+    
     private final class BiometricTaskStackListener extends TaskStackListener {
         @Override
         public void onTaskStackChanged() {
@@ -209,8 +209,8 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
         mBiometricHandlerProvider = biometricHandlerProvider;
 
         mCleanup = context.getResources().getBoolean(
-                org.lineageos.platform.internal.R.bool.config_cleanupUnusedFingerprints);
-
+                com.android.internal.R.bool.config_cleanupUnusedFingerprints);
+        
         initAuthenticationBroadcastReceiver();
         initFingerprintDanglingBroadcastReceiver();
         initSensors(resetLockoutRequiresHardwareAuthToken, props, gestureAvailabilityDispatcher);
@@ -234,10 +234,8 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
             GestureAvailabilityDispatcher gestureAvailabilityDispatcher) {
         if (!resetLockoutRequiresHardwareAuthToken) {
             Slog.d(getTag(), "Adding HIDL configs");
-            final List<SensorLocationInternal> workaroundLocations =
-                    getWorkaroundSensorProps(mContext);
             for (SensorProps sensorConfig: props) {
-                addHidlSensors(sensorConfig, gestureAvailabilityDispatcher, workaroundLocations,
+                addHidlSensors(sensorConfig, gestureAvailabilityDispatcher,
                         resetLockoutRequiresHardwareAuthToken);
             }
         } else {
@@ -253,12 +251,10 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
 
     private void addHidlSensors(@NonNull SensorProps prop,
             @NonNull GestureAvailabilityDispatcher gestureAvailabilityDispatcher,
-            @NonNull List<SensorLocationInternal> workaroundLocations,
             boolean resetLockoutRequiresHardwareAuthToken) {
         final int sensorId = prop.commonProps.sensorId;
         final Sensor sensor = new HidlToAidlSensorAdapter(this, mContext, mHandler, prop,
-                mLockoutResetDispatcher, mBiometricContext, workaroundLocations,
-                resetLockoutRequiresHardwareAuthToken,
+                mLockoutResetDispatcher, mBiometricContext, resetLockoutRequiresHardwareAuthToken,
                 () -> scheduleInternalCleanup(sensorId, ActivityManager.getCurrentUser(),
                         null /* callback */));
         sensor.init(gestureAvailabilityDispatcher, mLockoutResetDispatcher);
@@ -685,7 +681,7 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
             @Nullable ClientMonitorCallback callback, boolean favorHalEnrollments) {
         if (!mCleanup) {
             return;
-        }
+        }        
         mHandler.post(() -> {
             final FingerprintInternalCleanupClient client =
                     new FingerprintInternalCleanupClient(mContext,
@@ -762,6 +758,9 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
 
     @Override
     public void onPointerDown(long requestId, int sensorId, PointerContext pc) {
+        if (mFingerprintSensors.get(sensorId).getSensorProperties().halHandlesDisplayTouches) {
+            return;
+        }
         mFingerprintSensors.get(sensorId).getScheduler().getCurrentClientIfMatches(
                 requestId, (client) -> {
                     if (!(client instanceof Udfps)) {
@@ -774,6 +773,9 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
 
     @Override
     public void onPointerUp(long requestId, int sensorId, PointerContext pc) {
+        if (mFingerprintSensors.get(sensorId).getSensorProperties().halHandlesDisplayTouches) {
+            return;
+        }
         mFingerprintSensors.get(sensorId).getScheduler().getCurrentClientIfMatches(
                 requestId, (client) -> {
                     if (!(client instanceof Udfps)) {

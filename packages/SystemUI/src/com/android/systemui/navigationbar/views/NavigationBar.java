@@ -28,6 +28,7 @@ import static android.app.WindowConfiguration.ROTATION_UNDEFINED;
 import static android.view.InsetsSource.FLAG_SUPPRESS_SCRIM;
 import static android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL;
 
@@ -1265,15 +1266,29 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
         if (!mView.isRecentsButtonVisible() && mScreenPinningActive) {
             return onLongPressBackHome(v);
         }
-        if (v instanceof KeyButtonView) {
-            KeyButtonView keyButtonView = (KeyButtonView) v;
-            keyButtonView.sendEvent(KeyEvent.ACTION_DOWN, KeyEvent.FLAG_LONG_PRESS);
-            keyButtonView.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_LONG_CLICKED);
-            return true;
-        } else {
-            Log.d(TAG, "Unexpected view type: " + v.getClass().getSimpleName());
+        if (shouldDisableNavbarGestures()) {
             return false;
         }
+        mMetricsLogger.action(MetricsEvent.ACTION_ASSIST_LONG_PRESS);
+        mUiEventLogger.log(NavBarActionEvent.NAVBAR_ASSIST_LONGPRESS);
+        Bundle args = new Bundle();
+        args.putInt(
+                AssistManager.INVOCATION_TYPE_KEY,
+                AssistManager.INVOCATION_TYPE_HOME_BUTTON_LONG_PRESS);
+        // If Launcher has requested to override long press home, add a delay for the ripple.
+        // TODO(b/304146255): Remove this delay once we can exclude 3-button nav from screenshot.
+        boolean delayAssistInvocation = mAssistManagerLazy.get().shouldOverrideAssist(
+                AssistManager.INVOCATION_TYPE_HOME_BUTTON_LONG_PRESS);
+        // In practice, I think v should always be a KeyButtonView, but just being safe.
+        if (delayAssistInvocation && v instanceof KeyButtonView) {
+            ((KeyButtonView) v).setOnRippleInvisibleRunnable(
+                    () -> mAssistManagerLazy.get().startAssist(args));
+        } else {
+            mAssistManagerLazy.get().startAssist(args);
+        }
+        mCentralSurfacesOptionalLazy.get().ifPresent(CentralSurfaces::awakenDreams);
+        mView.abortCurrentGesture();
+        return true;
     }
 
     // additional optimization when we have software system buttons - start loading the recent
@@ -1384,15 +1399,10 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
                         // should stop lock task.
                         stopLockTaskMode = true;
                         return true;
-                    } else if (v.getId() == R.id.recent_apps) {
-                        // Send long press key event so that Lineage button handling can intercept
-                        KeyButtonView keyButtonView = (KeyButtonView) v;
-                        keyButtonView.sendEvent(KeyEvent.ACTION_DOWN, KeyEvent.FLAG_LONG_PRESS);
-                        keyButtonView.sendAccessibilityEvent(
-                                AccessibilityEvent.TYPE_VIEW_LONG_CLICKED);
-                        return true;
-                    } else {
-                        onHomeLongClick(mView.getHomeButton().getCurrentView());
+                    } else if (v.getId() == btnId2) {
+                        return btnId2 == R.id.recent_apps
+                                ? false
+                                : onHomeLongClick(mView.getHomeButton().getCurrentView());
                     }
                 }
             } finally {
@@ -1740,10 +1750,6 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
         updateButtonLocation(
                 region, touchRegionCache, mView.getAccessibilityButton(), inScreenSpace,
                 useNearestRegion);
-        updateButtonLocation(region, touchRegionCache, mView.getCursorLeftButton(), inScreenSpace,
-                useNearestRegion);
-        updateButtonLocation(region, touchRegionCache, mView.getCursorRightButton(), inScreenSpace,
-                useNearestRegion);
         if (mView.getFloatingRotationButton().isVisible()) {
             // Note: this button is floating so the nearest region doesn't apply
             updateButtonLocation(
@@ -1854,6 +1860,7 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
             setNavBarMode(mode);
             repositionNavigationBar(mCurrentRotation);
 
+            setNavBarMode(mode);
             mView.setShouldShowSwipeUpUi(mOverviewProxyService.shouldShowSwipeUpUI());
         }
     };

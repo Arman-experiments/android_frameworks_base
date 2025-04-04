@@ -288,10 +288,10 @@ public class QSIconViewImpl extends QSIconView {
                 return Color.rgb((float) 
                     (randomColor.nextInt(256) / 2f + 0.5),
                     randomColor.nextInt(256), randomColor.nextInt(256));
-            } else if (qsPanelStyle == 4 || qsPanelStyle == 6 || qsPanelStyle == 9) {
+            } else if (qsPanelStyle == 6 || qsPanelStyle == 9) {
                 return Color.WHITE;
             } else {
-                return Utils.getColorAttrDefaultColor(context, R.attr.onShadeActive);
+                return Utils.getColorAttrDefaultColor(context, R.attr.onShadeActiveVariant);
             }
         } else {
             Log.e("QSIconView", "Invalid state " + state);

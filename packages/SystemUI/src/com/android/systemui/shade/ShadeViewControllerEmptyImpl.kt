@@ -114,7 +114,6 @@ open class ShadeViewControllerEmptyImpl @Inject constructor() :
     override fun handleExternalInterceptTouch(event: MotionEvent): Boolean {
         return false
     }
-
     override fun fling(vel: Float, expand: Boolean, expandBecauseOfFalsing: Boolean) {}
 
     override fun startInputFocusTransfer() {}
@@ -131,7 +130,6 @@ open class ShadeViewControllerEmptyImpl @Inject constructor() :
     @Deprecated("Use SceneInteractor.currentScene instead.")
     override val legacyPanelExpansion = flowOf(0f)
     override val udfpsTransitionToFullShadeProgress = MutableStateFlow(0f)
-
     override fun showIsland(show: Boolean) {}
 }
 

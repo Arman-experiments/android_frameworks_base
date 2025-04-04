@@ -20,19 +20,24 @@ import android.annotation.Nullable;
 import android.annotation.SuppressLint;
 import android.app.Fragment;
 import android.content.Context;
+import android.graphics.drawable.Drawable;
+import android.graphics.Paint;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.os.Trace;
+import android.provider.AlarmClock;
 import android.provider.Settings;
 import android.telephony.SubscriptionManager;
 import android.util.ArrayMap;
 import android.util.IndentingPrintWriter;
 import android.util.SparseArray;
 import android.view.Display;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import androidx.annotation.VisibleForTesting;
@@ -63,14 +68,13 @@ import com.android.systemui.statusbar.core.StatusBarRootModernization;
 import com.android.systemui.statusbar.disableflags.DisableFlagsLogger;
 import com.android.systemui.statusbar.events.SystemStatusAnimationCallback;
 import com.android.systemui.statusbar.events.SystemStatusAnimationScheduler;
-import com.android.systemui.statusbar.notification.icon.ui.viewbinder.NotificationIconContainerStatusBarViewBinder;
 import com.android.systemui.statusbar.phone.ClockController;
-import com.android.systemui.statusbar.phone.LyricViewController;
+import com.android.systemui.statusbar.notification.icon.ui.viewbinder.NotificationIconContainerStatusBarViewBinder;
 import com.android.systemui.statusbar.phone.NotificationIconContainer;
 import com.android.systemui.statusbar.phone.PhoneStatusBarView;
-import com.android.systemui.statusbar.phone.PhoneStatusBarViewController;
 import com.android.systemui.statusbar.phone.StatusBarHideIconsForBouncerManager;
 import com.android.systemui.statusbar.phone.StatusBarLocation;
+import com.android.systemui.statusbar.phone.StatusIconContainer;
 import com.android.systemui.statusbar.phone.fragment.dagger.HomeStatusBarComponent;
 import com.android.systemui.statusbar.phone.fragment.dagger.HomeStatusBarComponent.Startable;
 import com.android.systemui.statusbar.phone.ongoingcall.OngoingCallController;
@@ -88,6 +92,7 @@ import com.android.systemui.tuner.TunerService;
 import com.android.systemui.util.CarrierConfigTracker;
 import com.android.systemui.util.CarrierConfigTracker.CarrierConfigChangedListener;
 import com.android.systemui.util.CarrierConfigTracker.DefaultDataSubscriptionChangedListener;
+import com.android.systemui.tuner.TunerService;
 
 import kotlin.Unit;
 
@@ -113,6 +118,10 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
         StatusBarStateController.StateListener,
         SystemStatusAnimationCallback, Dumpable, TunerService.Tunable {
 
+    private static final String STATUS_BAR_BATTERY_STYLE =
+            "system:" + Settings.System.STATUS_BAR_BATTERY_STYLE;
+    private static final String STATUSBAR_CLOCK_CHIP =
+            "system:" + Settings.System.STATUSBAR_CLOCK_CHIP;
     private static final String STATUS_BAR_SHOW_VIBRATE_ICON =
             Settings.Secure.STATUS_BAR_SHOW_VIBRATE_ICON;
 
@@ -166,18 +175,19 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
     private final NotificationIconContainerStatusBarViewBinder mNicViewBinder;
     private final DemoModeController mDemoModeController;
 
+    private StatusIconContainer mStatusIcons;
+    private int mSignalClusterEndPadding = 0;
     private ClockController mClockController;
 
-    private PhoneStatusBarViewController mStatusBarViewController;
-
-    private LyricController mLyricController;
+    private int mShowSBClockBg;
+    private int[] mClockPaddingStartArray = new int[3];
+    private int[] mClockPaddingEndArray = new int[3];
+    private boolean mShowVibrateIcon;   
+    private View mStatusBarLogo;
 
     private List<String> mBlockedIcons = new ArrayList<>();
     private Map<Startable, Startable.State> mStartableStates = new ArrayMap<>();
 
-    private boolean mShowVibrateIcon;
-
-    private View mLeftLogo;
     private View mBatteryBar;
 
     private final OngoingCallListener mOngoingCallListener = new OngoingCallListener() {
@@ -278,7 +288,7 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
             CarrierConfigTracker carrierConfigTracker,
             CollapsedStatusBarFragmentLogger collapsedStatusBarFragmentLogger,
             OperatorNameViewController.Factory operatorNameViewControllerFactory,
-            TunerService tunerService,
+	    TunerService tunerService,
             @Main Executor mainExecutor,
             DumpManager dumpManager,
             StatusBarWindowStateController statusBarWindowStateController,
@@ -301,7 +311,7 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
         mCarrierConfigTracker = carrierConfigTracker;
         mCollapsedStatusBarFragmentLogger = collapsedStatusBarFragmentLogger;
         mOperatorNameViewControllerFactory = operatorNameViewControllerFactory;
-        mTunerService = tunerService;
+	mTunerService = tunerService;
         mMainExecutor = mainExecutor;
         mDumpManager = dumpManager;
         mStatusBarWindowStateController = statusBarWindowStateController;
@@ -367,11 +377,7 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
             mStartableStates.put(startable, Startable.State.STARTED);
         }
 
-        mStatusBarViewController = mHomeStatusBarComponent
-                .getPhoneStatusBarViewController();
-        mClockController = mStatusBarViewController.getClockController();
         mStatusBar = (PhoneStatusBarView) view;
-        mBatteryBar = mStatusBar.findViewById(R.id.battery_bar);
         if (savedInstanceState != null && savedInstanceState.containsKey(EXTRA_PANEL_STATE)) {
             mStatusBar.restoreHierarchyState(
                     savedInstanceState.getSparseParcelableArray(EXTRA_PANEL_STATE));
@@ -382,27 +388,29 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
                         StatusBarLocation.HOME,
                         mHomeStatusBarComponent.getDarkIconDispatcher());
         mDarkIconManager.setShouldLog(true);
+        updateBlockedIcons();
         mStatusBarIconController.addIconGroup(mDarkIconManager);
         mEndSideContent = mStatusBar.findViewById(R.id.status_bar_end_side_content);
         mEndSideAlphaController = new MultiSourceMinAlphaController(mEndSideContent);
+        mSignalClusterEndPadding = getResources().getDimensionPixelSize(R.dimen.signal_cluster_battery_padding);
+        mStatusIcons = mStatusBar.findViewById(R.id.statusIcons);
+        mBatteryBar = mStatusBar.findViewById(R.id.battery_bar);
+        mClockController = mStatusBar.getClockController();
         mPrimaryOngoingActivityChip = mStatusBar.findViewById(R.id.ongoing_activity_chip_primary);
-        mSecondaryOngoingActivityChip =
-                mStatusBar.findViewById(R.id.ongoing_activity_chip_secondary);
         mClockView = mStatusBar.findViewById(R.id.clock);
         mCenterClockView = mStatusBar.findViewById(R.id.clock_center);
         mRightClockView = mStatusBar.findViewById(R.id.clock_right);
-        mLeftLogo = mStatusBar.findViewById(R.id.statusbar_logo);
+        mStatusBarLogo = mStatusBar.findViewById(R.id.statusbar_logo);
+        mSecondaryOngoingActivityChip =
+                mStatusBar.findViewById(R.id.ongoing_activity_chip_secondary);
         if (!StatusBarRootModernization.isEnabled()) {
             showEndSideContent(false);
             showClock(false);
         }
         initOperatorName();
         initNotificationIconArea();
-
-        mLyricController = new LyricController(getContext(), mStatusBar);
-        mHomeStatusBarComponent.getHeadsUpAppearanceController().setLyricViewController(mLyricController);
-
         mSystemEventAnimator = getSystemEventAnimator();
+
         mCarrierConfigTracker.addCallback(mCarrierConfigCallback);
         mCarrierConfigTracker.addDefaultDataSubscriptionChangedListener(mDefaultDataListener);
 
@@ -413,6 +421,7 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
                 /* systemEventChipAnimateIn */ null,
                 /* systemEventChipAnimateOut */ null,
                 mStatusBarVisibilityChangeListener);
+        mTunerService.addTunable(this, STATUS_BAR_BATTERY_STYLE);        
     }
 
     private String getDumpableName() {
@@ -483,9 +492,8 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
         initOngoingCallChip();
         mAnimationScheduler.addCallback(this);
 
+        mTunerService.addTunable(this, STATUSBAR_CLOCK_CHIP);
         mTunerService.addTunable(this, STATUS_BAR_SHOW_VIBRATE_ICON);
-        mTunerService.addTunable(this, Settings.Secure.STATUS_BAR_SHOW_LYRIC);
-        updateStatusBarClock();
     }
 
     @Override
@@ -493,8 +501,6 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
         super.onPause();
         mCommandQueue.removeCallback(this);
         mStatusBarStateController.removeCallback(this);
-        mTunerService.removeTunable(this);
-        mClockController.removeTunable();
         if (!StatusBarRootModernization.isEnabled()) {
             mOngoingCallController.removeCallback(mOngoingCallListener);
         }
@@ -504,7 +510,7 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        
+        mTunerService.removeTunable(this);
         mStatusBarIconController.removeIconGroup(mDarkIconManager);
         mCarrierConfigTracker.removeCallback(mCarrierConfigCallback);
         mCarrierConfigTracker.removeDataSubscriptionChangedListener(mDefaultDataListener);
@@ -524,55 +530,96 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
     @Override
     public void onTuningChanged(String key, String newValue) {
         switch (key) {
+            case STATUS_BAR_BATTERY_STYLE:
+                int batteryStyle =
+                        TunerService.parseInteger(newValue, 0);
+                mStatusIcons.setPadding(mStatusIcons.getPaddingLeft(), mStatusIcons.getPaddingTop(),
+                        (batteryStyle == 5/*hidden*/ ? 0 : mSignalClusterEndPadding),
+                        mStatusIcons.getPaddingBottom());
+                break;
+            case STATUSBAR_CLOCK_CHIP:
+                mShowSBClockBg =
+                        TunerService.parseInteger(newValue, 0);
+                updateStatusBarClock();
+                break;
             case STATUS_BAR_SHOW_VIBRATE_ICON:
-                mShowVibrateIcon =
+                mShowVibrateIcon = 
                         TunerService.parseIntegerSwitch(newValue, true);
                 updateBlockedIcons();
                 break;
             default:
                 break;
-        }
-        if (key.equals(Settings.Secure.STATUS_BAR_SHOW_LYRIC)) {
-            if (mLyricController != null) {
-                mLyricController.setEnabled(TunerService.parseIntegerSwitch(newValue, false));
-            }
-        }
+         }
     }
 
     private void updateStatusBarClock() {
-        int sbClockBgStyle = Settings.System.getIntForUser(
-            getContext().getContentResolver(),
-            Settings.System.STATUSBAR_CLOCK_CHIP,
-            0,
-            android.os.UserHandle.USER_CURRENT
-        );
-        if (sbClockBgStyle == 0) return;
-        int[] clockBackgrounds = {
-            R.drawable.sb_date_bg1,
-            R.drawable.sb_date_bg2,
-            R.drawable.sb_date_bg3,
-            R.drawable.sb_date_bg4,
-            R.drawable.sb_date_bg5,
-            R.drawable.sb_date_bg6,
-            R.drawable.sb_date_bg7,
-            R.drawable.sb_date_bg8,
-            R.drawable.sb_date_bg9,
-            R.drawable.sb_date_bg10,
-            R.drawable.sb_date_bg11,
-            R.drawable.sb_date_bg12
-        };
-        View[] clockViews = {mClockView, mCenterClockView, mRightClockView};
-        for (int i = 0; i < clockViews.length; i++) {
-            View clockView = clockViews[i];
-            if (clockView == null) continue;
-            TextView textView = (TextView) clockView;
-            android.graphics.drawable.Drawable backgroundDrawable = getContext().getDrawable(clockBackgrounds[sbClockBgStyle - 1]);
-            int chipTopBottomPadding = getResources().getDimensionPixelSize(R.dimen.status_bar_clock_chip_tb_padding);
-            int chipLeftRightPadding = getResources().getDimensionPixelSize(R.dimen.status_bar_clock_chip_lr_padding);
-            clockView.setPadding(chipLeftRightPadding, chipTopBottomPadding, chipLeftRightPadding, chipTopBottomPadding);
-            textView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-            clockView.setBackground(backgroundDrawable);
-        }
+        if (mClockPaddingStartArray == null || mClockPaddingEndArray == null) {
+		mClockPaddingStartArray = new int[3];
+		mClockPaddingEndArray = new int[3];
+	    }
+	    View[] clockViews = {mClockView, mCenterClockView, mRightClockView};
+	    for (int i = 0; i < clockViews.length; i++) {
+		View clockView = clockViews[i];
+		if (clockView == null) continue;
+		ViewGroup.LayoutParams params = clockView.getLayoutParams();
+		if (!(params instanceof ViewGroup.MarginLayoutParams)) continue;
+		ViewGroup.MarginLayoutParams layoutParams = (ViewGroup.MarginLayoutParams) params;
+		if (!(clockView instanceof TextView)) continue;
+		TextView textView = (TextView) clockView;
+
+		if (mShowSBClockBg > 0) {
+		    if (mClockPaddingStartArray[i] == 0 && mClockPaddingEndArray[i] == 0) {
+		        mClockPaddingStartArray[i] = clockView.getPaddingStart();
+		        mClockPaddingEndArray[i] = clockView.getPaddingEnd();
+		    }
+
+		    String chipStyleUri = "sb_date_bg" + mShowSBClockBg;
+		    int resId = getContext() != null ? getContext().getResources().getIdentifier(chipStyleUri, "drawable", getContext().getPackageName()) : 0;
+		    int chipTopBottomPadding = getResources() != null ? getResources().getDimensionPixelSize(R.dimen.status_bar_clock_chip_tb_padding) : 0;
+		    int chipLeftRightPadding = getResources() != null ? getResources().getDimensionPixelSize(R.dimen.status_bar_clock_chip_lr_padding) : 0;
+
+		    Paint paint = textView.getPaint();
+		    Paint.FontMetrics fontMetrics = paint.getFontMetrics();
+		    int fontHeight = (int) (Math.abs(fontMetrics.ascent) + Math.abs(fontMetrics.descent));
+		    int verticalPadding = Math.max(0, (chipTopBottomPadding - fontHeight) / 2);
+
+		    clockView.setPadding(
+		        chipLeftRightPadding,
+		        verticalPadding,
+		        chipLeftRightPadding,
+		        verticalPadding
+		    );
+
+		    layoutParams.setMarginStart(mClockPaddingStartArray[i]);
+		    layoutParams.setMarginEnd(mClockPaddingEndArray[i]);
+		    textView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+		    if (resId != 0) {
+		        Drawable drawable = getContext().getDrawable(resId);
+                        clockView.setBackground(drawable);
+		    }
+		} else {
+		    Drawable background = clockView.getBackground();
+		    if (background != null) {
+		        background.setCallback(null);
+		        clockView.setBackground(null);
+		    }
+            
+		    layoutParams.setMarginStart(0);
+		    layoutParams.setMarginEnd(0);
+		    clockView.setPaddingRelative(mClockPaddingStartArray[i], 0, mClockPaddingEndArray[i], 0);
+
+		    int viewId = textView.getId();
+		    if (viewId == R.id.clock) {
+		        textView.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
+		    } else if (viewId == R.id.clock_center) {
+		        textView.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+		    } else if (viewId == R.id.clock_right) {
+		        textView.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_END);
+		    }
+		}
+
+		clockView.setLayoutParams(layoutParams);
+	    }
     }
 
     /** Initializes views related to the notification icon area. */
@@ -726,7 +773,17 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
                     && shouldHideStatusBar()
                     && !(mStatusBarStateController.getState() == StatusBarState.KEYGUARD
                     && headsUpVisible)) {
-                return createHiddenModel();
+                View clockView = mClockController.getClock();
+		if (clockView != null) {
+		    boolean isRightClock = clockView.getId() == R.id.clock_right;
+		    // Hide everything
+		    return new StatusBarVisibilityModel(
+		            /* showClock= */ isRightClock,
+		            /* showNotificationIcons= */ false,
+		            /* showPrimaryOngoingCallChip= */ false,
+		            /* showSecondaryOngoingCallChip= */ false,
+		            /* showSystemInfo= */ false);
+		}
             }
         }
 
@@ -747,14 +804,12 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
                         && StatusBarNotifChips.isEnabled()
                         && mHasSecondaryOngoingActivity;
 
-        View clockView = mClockController.getClock();
-        boolean notLeftClock = clockView != null && clockView.getId() != R.id.clock;
         return new StatusBarVisibilityModel(
-                showClock || notLeftClock,
+                showClock,
                 externalModel.getShowNotificationIcons(),
                 showPrimaryOngoingActivityChip && !headsUpVisible,
                 showSecondaryOngoingActivityChip && !headsUpVisible,
-                externalModel.getShowSystemInfo());
+                externalModel.getShowSystemInfo());        
     }
 
     /**
@@ -771,14 +826,8 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
         // Hide notifications if the disable flag is set or we have an ongoing activity.
         if (disableNotifications || hasOngoingActivity) {
             hideNotificationIconArea(animate && !hasOngoingActivity);
-            if (mLyricController != null) {
-                mLyricController.hideLyricView(animate);
-            }
         } else {
             showNotificationIconArea(animate);
-            if (mLyricController != null) {
-                mLyricController.showLyricView(animate);
-            }
         }
 
         // Show the ongoing activity chip only if there is an ongoing activity *and* notification
@@ -942,6 +991,7 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
         StatusBarRootModernization.assertInLegacyMode();
         if (mClockController.getClock() == null)
             return View.GONE;
+
         if (!mShadeExpansionStateManager.isClosed() && !mKeyguardStateController.isShowing()
                 && !mStatusBarStateController.isDozing()
                 && mClockController.getClock().shouldBeVisible()) {
@@ -952,13 +1002,13 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
 
     public void hideNotificationIconArea(boolean animate) {
         StatusBarRootModernization.assertInLegacyMode();
-        animateHide(mLeftLogo, animate);
+        animateHide(mStatusBarLogo, animate);
         animateHide(mNotificationIconAreaInner, animate);
     }
 
     public void showNotificationIconArea(boolean animate) {
         StatusBarRootModernization.assertInLegacyMode();
-        animateShow(mLeftLogo, animate);
+        animateShow(mStatusBarLogo, animate);
         animateShow(mNotificationIconAreaInner, animate);
     }
 
@@ -1011,8 +1061,6 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
      */
     private void animateShow(View v, boolean animate) {
         StatusBarRootModernization.assertInLegacyMode();
-        if (v == null)
-            return;
         v.animate().cancel();
         v.setVisibility(View.VISIBLE);
         if (!animate || !mAnimationsEnabled) {
@@ -1120,36 +1168,6 @@ public class CollapsedStatusBarFragment extends Fragment implements CommandQueue
                 pw.println(startable + ", state: " + startableState);
             }
             pw.decreaseIndent();
-        }
-    }
-    
-    private class LyricController extends LyricViewController {
-        private View mLeftSide;
-
-        public LyricController(Context context, View statusBar) {
-            super(context, statusBar);
-            mLeftSide = statusBar.findViewById(R.id.status_bar_start_side_except_heads_up);
-        }
-
-        public void showLyricView(boolean animate) {
-            StatusBarVisibilityModel visibilityModel = mLastModifiedVisibility;
-
-            boolean disableNotifications = !visibilityModel.getShowNotificationIcons();
-            boolean hasOngoingActivity;
-            if (Flags.statusBarScreenSharingChips()) {
-                hasOngoingActivity = mHasPrimaryOngoingActivity;
-            } else {
-                hasOngoingActivity = mOngoingCallController.hasOngoingCall();
-            }
-            if (!disableNotifications && !hasOngoingActivity && isLyricStarted()) {
-                animateHide(mLeftSide, animate);
-                animateShow(getView(), animate);
-            }
-        }
-
-        public void hideLyricView(boolean animate) {
-            animateHide(getView(), animate);
-            animateShow(mLeftSide, animate);
         }
     }
 }

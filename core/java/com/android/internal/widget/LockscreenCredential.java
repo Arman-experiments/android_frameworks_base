@@ -124,8 +124,7 @@ public class LockscreenCredential implements Parcelable, AutoCloseable {
     public static LockscreenCredential createPattern(@NonNull List<LockPatternView.Cell> pattern,
             byte gridSize) {
         return new LockscreenCredential(CREDENTIAL_TYPE_PATTERN,
-                LockPatternUtils.patternToByteArray(pattern, gridSize),
-                /* hasInvalidChars= */ false);
+                LockPatternUtils.patternToByteArray(pattern, gridSize), /* hasInvalidChars= */ false);
     }
 
     /**

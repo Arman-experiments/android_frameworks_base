@@ -24,8 +24,7 @@
         coreApp="true">
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-
-    <uses-permission android:name="com.google.restricted_assist_gesture.permission.RESTRICTED_ASSIST_GESTURE_PROVIDER" />
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
 
     <!-- Used to read wallpaper -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
@@ -51,7 +50,6 @@
     <uses-permission android:name="android.permission.MANAGE_USERS" />
     <uses-permission android:name="android.permission.READ_PROFILE" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
-    <uses-permission android:name="android.permission.CONFIGURE_WIFI_DISPLAY" />
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
     <uses-permission android:name="android.permission.GET_APP_OPS_STATS" />
     <uses-permission android:name="android.permission.USE_RESERVED_DISK" />
@@ -60,6 +58,7 @@
     <uses-permission android:name="android.permission.MANAGE_CONTENT_SUGGESTIONS"/>
 
     <!-- Networking and telephony -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"
@@ -398,9 +397,6 @@
     <!-- To be able to decipher default applications for certain roles in shortcut helper -->
     <uses-permission android:name="android.permission.MANAGE_DEFAULT_APPLICATIONS" />
 
-    <!-- Kill button in notification guts -->
-    <uses-permission android:name="android.permission.FORCE_STOP_PACKAGES" />
-
     <!-- DataSwitch tile -->
     <uses-permission android:name="android.permission.WRITE_APN_SETTINGS" />
 
@@ -418,18 +414,6 @@
     <protected-broadcast android:name="com.android.settings.flashlight.action.FLASHLIGHT_CHANGED" />
     <protected-broadcast android:name="com.android.systemui.action.ACTION_LAUNCH_MEDIA_OUTPUT_BROADCAST_DIALOG" />
     <protected-broadcast android:name="com.android.systemui.STARTED" />
-    <protected-broadcast android:name="com.android.systemui.doze.pulse" />
-    <protected-broadcast android:name="org.rising.server.action.AOD_STATE_CHANGED" />
-
-    <!-- Smartspace -->
-    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
-    <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS_FULL"/>
-    <permission android:name="com.android.systemui.permission.SEND_ALERT_BROADCASTS" android:protectionLevel="preinstalled|signature"/>
-    <uses-permission android:name="com.google.android.deskclock.permission.RECEIVE_ALERT_BROADCASTS"/>
-    <uses-permission android:name="com.google.android.apps.nexuslauncher.permission.QSB"/>
-    <protected-broadcast android:name="com.google.android.systemui.smartspace.CLICK_EVENT"/>
-    <protected-broadcast android:name="com.google.android.systemui.smartspace.ENABLE_UPDATE"/>
-    <protected-broadcast android:name="com.google.android.systemui.smartspace.EXPIRE_EVENT"/>
 
     <application
         android:name=".SystemUIApplication"
@@ -488,22 +472,6 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.android.systemui.screenshot.SHOW_ERROR" />
-            </intent-filter>
-        </receiver>
-        
-        <receiver android:name=".pocket.PocketStateReceiver"
-            android:process=":pocketmode"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="org.rising.server.action.POCKET_STATE_CHANGED" />
-            </intent-filter>
-        </receiver>
-        
-        <receiver android:name=".assistant.AssistantOverlayReceiver"
-            android:process=":aiassistant"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.android.server.policy.ASSISTANT_STATE_CHANGED" />
             </intent-filter>
         </receiver>
 
@@ -587,7 +555,7 @@
                  android:foregroundServiceType="systemExempted"/>
 
         <!-- started from PhoneWindowManager -->
-        <service android:name=".android.onthego.OnTheGoService"
+        <service android:name=".infinity.onthego.OnTheGoService"
             android:process=":onthego"
             android:exported="true" />
 
@@ -599,16 +567,12 @@
                 <data android:scheme="package" />
             </intent-filter>
         </receiver>
-
+        
         <!-- Smart Pixels -->
         <service android:name=".smartpixels.SmartPixelsService"
-                android:enabled="true"
-                android:exported="true" />
+            android:enabled="true" />
 
         <service android:name="com.android.systemui.CPUInfoService"
-                android:exported="true" />
-
-        <service android:name="com.android.systemui.FPSInfoService"
                 android:exported="true" />
 
         <receiver android:name=".BootReceiver" android:exported="true">
@@ -685,6 +649,15 @@
 
         <!-- started from UsbDeviceSettingsManager -->
         <activity android:name=".usb.UsbResolverActivity"
+            android:exported="true"
+            android:permission="android.permission.MANAGE_USB"
+            android:theme="@style/Theme.SystemUI.Dialog.Alert"
+            android:finishOnCloseSystemDialogs="true"
+            android:excludeFromRecents="true">
+        </activity>
+
+        <!-- started from UsbDeviceSettingsManager -->
+        <activity android:name=".usb.UsbFunctionActivity"
             android:exported="true"
             android:permission="android.permission.MANAGE_USB"
             android:theme="@style/Theme.SystemUI.Dialog.Alert"
@@ -1143,8 +1116,7 @@
         <provider android:name=".keyguard.KeyguardSliceProvider"
                   android:authorities="com.android.systemui.keyguard"
                   android:grantUriPermissions="true"
-                  android:exported="true"
-                  android:enabled="false">
+                  android:exported="true">
         </provider>
 
         <receiver

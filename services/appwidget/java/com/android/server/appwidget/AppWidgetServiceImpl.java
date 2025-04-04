@@ -1462,7 +1462,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
 
             final ActivityOptions options =
                     ActivityOptions.makeBasic().setPendingIntentCreatorBackgroundActivityStartMode(
-                            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
+                            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_DENIED);
 
             // All right, create the sender.
             final long identity = Binder.clearCallingIdentity();
@@ -4498,7 +4498,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         return new AtomicFile(new File(Environment.getUserSystemDirectory(userId), STATE_FILENAME));
     }
 
-    void onUserStopping(int userId) {
+    void onUserStopped(int userId) {
         if (DEBUG) {
             Slog.i(TAG, "onUserStopped() " + userId);
         }
@@ -4518,10 +4518,6 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 // as we do not want to make host callbacks and provider broadcasts
                 // as the host and the provider will be killed.
                 if (hostInUser && (!hasProvider || providerInUser)) {
-                    // The user's app widget host (i.e. the launcher) is usually still running at
-                    // this point. Don't notify it that the widget is removed to avoid affecting
-                    // homescreen configuration
-                    widget.host.callbacks = null;
                     removeWidgetLocked(widget);
                     widget.host.widgets.remove(widget);
                     widget.host = null;
@@ -6065,7 +6061,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         IAppWidgetHost callbacks;
         boolean zombie; // if we're in safe mode, don't prune this just because nobody references it
 
-        private static final boolean DEBUG = true;
+        private static final boolean DEBUG = false;
 
         private static final String TAG = "AppWidgetServiceHost";
 
@@ -6393,7 +6389,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
     final class BackupRestoreController {
         private static final String TAG = "BackupRestoreController";
 
-        private static final boolean DEBUG = AppWidgetServiceImpl.DEBUG;
+        private static final boolean DEBUG = false;
 
         // Version of backed-up widget state.
         private static final int WIDGET_STATE_VERSION = 2;

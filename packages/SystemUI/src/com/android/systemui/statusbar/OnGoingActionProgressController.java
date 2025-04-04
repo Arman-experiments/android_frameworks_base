@@ -39,9 +39,10 @@ import android.widget.ProgressBar;
 import com.android.systemui.res.R;
 import com.android.systemui.util.IconFetcher;
 import com.android.systemui.statusbar.OnGoingActionProgressGroup;
+import com.android.systemui.statusbar.policy.KeyguardStateController;
 
 /** Controls the ongoing progress chip based on notifcations @LineageExtension */
-public class OnGoingActionProgressController implements NotificationListener.NotificationHandler {
+public class OnGoingActionProgressController implements NotificationListener.NotificationHandler, KeyguardStateController.Callback {
     private static final String TAG = "OngoingActionProgressController";
     private static final String ONGOING_ACTION_CHIP_ENABLED = "ongoing_action_chip";
 
@@ -55,8 +56,12 @@ public class OnGoingActionProgressController implements NotificationListener.Not
     private final View mProgressRootView;
     private final ImageView mIconView;
 
+    // Keyguard state
+    private final KeyguardStateController mKeyguardStateController;
+
     // Progress tracking variables
     private boolean mIsTrackingProgress = false;
+    private boolean mIsForceHidden = false;
     private int mCurrentProgress = 0;
     private int mCurrentProgressMax = 0;
     private Drawable mCurrentDrawable = null;
@@ -65,8 +70,6 @@ public class OnGoingActionProgressController implements NotificationListener.Not
     private final IconFetcher mIconFetcher;
     private final NotificationListener mNotificationListener;
     private boolean mIsEnabled;
-
-    private boolean mPreviousTrackingProgress = false;
 
     private static int getThemeColor(Context context, int attrResId) {
         TypedValue typedValue = new TypedValue();
@@ -107,7 +110,8 @@ public class OnGoingActionProgressController implements NotificationListener.Not
      */
     public OnGoingActionProgressController(
             Context context, OnGoingActionProgressGroup progressGroup,
-            NotificationListener notificationListener) {
+            NotificationListener notificationListener,
+			KeyguardStateController keyguardStateController) {
         if (progressGroup == null) {
             Log.wtf(TAG, "progressGroup is null");
         }
@@ -115,6 +119,8 @@ public class OnGoingActionProgressController implements NotificationListener.Not
         if (mNotificationListener == null) {
             Log.wtf(TAG, "mNotificationListener is null");
         }
+        mKeyguardStateController = keyguardStateController;
+        keyguardStateController.addCallback(this);
         mContext = context;
         mContentResolver = context.getContentResolver();
         mHandler = new Handler(Looper.getMainLooper());
@@ -155,6 +161,7 @@ public class OnGoingActionProgressController implements NotificationListener.Not
         mCurrentProgress = notification.extras.getInt(Notification.EXTRA_PROGRESS, 0);
         IconFetcher.AdaptiveDrawableResult drawable =
                 mIconFetcher.getMonotonicPackageIcon(sbn.getPackageName());
+        mCurrentDrawable = drawable.drawable;
         updateIconImageView(drawable);
         updateViews();
     }
@@ -189,36 +196,24 @@ public class OnGoingActionProgressController implements NotificationListener.Not
 
     /** Updates progress views @AsyncUnsafe */
     private void updateViews() {
-        // Check if tracking state changed or if we're not tracking/enabled
+        if(mIsForceHidden){ // Keyguard locked, user-disabled, etc.
+            mProgressRootView.setVisibility(View.GONE);
+            return;
+        }
         if (!mIsEnabled || !mIsTrackingProgress) {
             mProgressRootView.setVisibility(View.GONE);
-            mPreviousTrackingProgress = mIsTrackingProgress;
             return;
         }
-
-        // Update previous tracking state
-        mPreviousTrackingProgress = mIsTrackingProgress;
-
-        // Show and update progress
+        // TODO: make it a bit faster by checking wether mIsTrackingProgress has changed between
+        // calls
         mProgressRootView.setVisibility(View.VISIBLE);
-        if (mCurrentProgressMax == 0) {
-            Log.w(TAG, "updateViews: max progress is 0. Guessing it as 100");
+        if (mCurrentProgressMax <= 0) {
+            Log.w(TAG, "updateViews: invalid max progress " + mCurrentProgressMax + ", using 100");
             mCurrentProgressMax = 100;
         }
-        
-        // Hide if progress is complete
-        if (mCurrentProgress >= mCurrentProgressMax) {
-            mIsTrackingProgress = false;
-            mProgressRootView.setVisibility(View.GONE);
-            return;
-        }
-
         Log.d(TAG, "updateViews: " + mCurrentProgress + "/" + mCurrentProgressMax);
         mProgressBar.setMax(mCurrentProgressMax);
         mProgressBar.setProgress(mCurrentProgress);
-        if (mCurrentDrawable != null) {
-            mIconView.setImageDrawable(mCurrentDrawable);
-        }
     }
 
     /**
@@ -230,11 +225,12 @@ public class OnGoingActionProgressController implements NotificationListener.Not
         Notification notification = sbn.getNotification();
         if (!hasProgress(notification)) {
             // Log.d(TAG, "Got notification without progress");
-            if (sbn.getKey() == mTrackedNotificationKey) {
+            if (mTrackedNotificationKey != null && mTrackedNotificationKey.equals(sbn.getKey())) {
                 // The notification we track has no progress anymore
                 Log.d(TAG, "Tracked notification has lost progress");
                 synchronized (this) {
                     mIsTrackingProgress = false;
+                    mCurrentDrawable = null;
                     updateViews();
                 }
             }
@@ -261,11 +257,20 @@ public class OnGoingActionProgressController implements NotificationListener.Not
             }
             if (sbn.getKey().equals(mTrackedNotificationKey)) {
                 mIsTrackingProgress = false;
-                mPreviousTrackingProgress = false;
                 mCurrentDrawable = null;
                 updateViews();
             }
         }
+    }
+
+    /**
+     * Sets hide chip override
+     * @param forceHidden if setted to true the chip would not be visible under any cricumctances
+     */
+    public void setForceHidden(final boolean forceHidden){
+            Log.d(TAG, "setForceHidden " + forceHidden);
+        mIsForceHidden = forceHidden;
+        updateViews();
     }
 
     // Implementation of notification handler
@@ -299,6 +304,12 @@ public class OnGoingActionProgressController implements NotificationListener.Not
         /*stub*/
     }
 
+    // Callback from keyguard state
+    @Override
+    public void onKeyguardShowingChanged(){
+        setForceHidden(mKeyguardStateController.isShowing());
+    }
+
     private void updateSettings() {
         mIsEnabled = Settings.System.getIntForUser(mContentResolver,
             ONGOING_ACTION_CHIP_ENABLED, 1, UserHandle.USER_CURRENT) == 1;
@@ -308,7 +319,6 @@ public class OnGoingActionProgressController implements NotificationListener.Not
     public void destroy() {
         mSettingsObserver.unregister();
         mIsTrackingProgress = false;
-        mPreviousTrackingProgress = false;
         mCurrentDrawable = null;
         mCurrentProgress = 0;
         mCurrentProgressMax = 0;

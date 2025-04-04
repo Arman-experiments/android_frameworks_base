@@ -167,17 +167,13 @@ public class RuntimeInit {
                 }
 
                 // Bring up crash dialog, wait for it to be dismissed
-                final IActivityManager am = ActivityManager.getService();
-                if (am != null) {
-                    am.handleApplicationCrash(
-                            mApplicationObject, new ApplicationErrorReport.ParcelableCrashInfo(e));
-                }
+                ActivityManager.getService().handleApplicationCrash(
+                        mApplicationObject, new ApplicationErrorReport.ParcelableCrashInfo(e));
             } catch (Throwable t2) {
                 if (t2 instanceof DeadObjectException) {
                     // System process is dead; ignore
                 } else {
                     try {
-                        Clog_e(TAG, "Error reporting original crash", e);
                         Clog_e(TAG, "Error reporting crash", t2);
                     } catch (Throwable t3) {
                         // Even Clog_e() fails!  Oh well.

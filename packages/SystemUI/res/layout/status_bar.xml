@@ -72,8 +72,6 @@
                 android:layout_gravity="center_vertical|start"
                 android:clipChildren="false">
 
-                <include layout="@layout/status_bar_lyric" />
-
                 <include layout="@layout/heads_up_status_bar_layout" />
 
                 <!-- The alpha of the start side is controlled by PhoneStatusBarTransitions, and the
@@ -93,7 +91,7 @@
                         android:layout_height="match_parent"
                         android:layout="@layout/operator_name" />
 
-                    <com.android.systemui.statusbar.logo.LogoImageView
+                    <com.android.systemui.infinity.logo.LogoImageView
                         android:id="@+id/statusbar_logo"
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
@@ -114,6 +112,7 @@
                         android:paddingStart="@dimen/status_bar_left_clock_starting_padding"
                         android:paddingEnd="@dimen/status_bar_left_clock_end_padding"
                         android:gravity="center_vertical|start"
+                        android:includeFontPadding="false"
                         systemui:isStatusBar="true"
                     />
 
@@ -186,10 +185,10 @@
     <com.android.keyguard.AlphaOptimizedLinearLayout
         android:id="@+id/centered_area"
         android:gravity="center"
+        android:paddingTop="@dimen/status_bar_padding_top"
         android:orientation="horizontal"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:paddingTop="@dimen/status_bar_padding_top"
         >
         <com.android.systemui.statusbar.policy.Clock
             android:id="@+id/clock_center"
@@ -199,13 +198,15 @@
             android:singleLine="true"
             android:gravity="center"
             android:visibility="gone"
+            android:includeFontPadding="false"
             systemui:isStatusBar="true"
         />
     </com.android.keyguard.AlphaOptimizedLinearLayout>
-
-    <com.android.systemui.crdroid.batterybar.BatteryBarController
+    
+    <com.android.systemui.infinity.batterybar.BatteryBarController
         android:id="@+id/battery_bar"
         android:layout_width="match_parent"
-        android:layout_height="1dp" />
+        android:layout_height="1dp"
+        android:layout_gravity="top" />
 
 </com.android.systemui.statusbar.phone.PhoneStatusBarView>

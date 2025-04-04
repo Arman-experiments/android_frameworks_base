@@ -2233,11 +2233,7 @@ public class AlarmManagerService extends SystemService {
                         + " tElapsed=" + triggerElapsed + " maxElapsed=" + maxElapsed
                         + " interval=" + interval + " flags=0x" + Integer.toHexString(flags));
             }
-            boolean validCallingPackage = callingPackage.equals("com.google.android.gms")
-                                            || callingPackage.equals("com.google.android.keep")
-                                            || callingPackage.equals("com.google.android.deskclock")
-                                            || callingPackage.equals("com.android.deskclock");
-            if (mAlarmsPerUid.get(callingUid, 0) >= mConstants.MAX_ALARMS_PER_UID && !validCallingPackage) {
+            if (mAlarmsPerUid.get(callingUid, 0) >= mConstants.MAX_ALARMS_PER_UID) {
                 final String errorMsg =
                         "Maximum limit of concurrent alarms " + mConstants.MAX_ALARMS_PER_UID
                                 + " reached for uid: " + UserHandle.formatUid(callingUid)
@@ -2670,7 +2666,7 @@ public class AlarmManagerService extends SystemService {
      * <b> Note: This should not be called with {@link #mLock} held.</b>
      */
     boolean isExemptFromExactAlarmPermissionNoLock(int uid) {
-        if (Build.IS_DEBUGGABLE && Thread.holdsLock(mLock)) {
+        if (Build.IS_ENG && Thread.holdsLock(mLock)) {
             Slog.wtfStack(TAG, "Alarm lock held while calling into DeviceIdleController");
         }
         return (UserHandle.isSameApp(mSystemUiUid, uid)

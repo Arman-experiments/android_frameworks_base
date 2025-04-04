@@ -179,7 +179,7 @@ public class GlobalSettingsValidators {
         VALIDATORS.put(Global.POWER_BUTTON_SHORT_PRESS, new InclusiveIntegerRangeValidator(0, 7));
         VALIDATORS.put(Global.POWER_BUTTON_DOUBLE_PRESS, new InclusiveIntegerRangeValidator(0, 3));
         VALIDATORS.put(Global.POWER_BUTTON_TRIPLE_PRESS, new InclusiveIntegerRangeValidator(0, 3));
-        VALIDATORS.put(Global.POWER_BUTTON_LONG_PRESS, new InclusiveIntegerRangeValidator(0, 6));
+        VALIDATORS.put(Global.POWER_BUTTON_LONG_PRESS, new InclusiveIntegerRangeValidator(0, 5));
         VALIDATORS.put(
                 Global.POWER_BUTTON_VERY_LONG_PRESS, new InclusiveIntegerRangeValidator(0, 1));
         VALIDATORS.put(Global.KEY_CHORD_POWER_VOLUME_UP, new InclusiveIntegerRangeValidator(0, 2));
@@ -211,6 +211,37 @@ public class GlobalSettingsValidators {
         VALIDATORS.put(Global.MUTE_ALARM_STREAM_WITH_RINGER_MODE, BOOLEAN_VALIDATOR);
         VALIDATORS.put(
                 Global.MUTE_ALARM_STREAM_WITH_RINGER_MODE_USER_PREFERENCE, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(Global.WIFI_OFF_TIMEOUT,
+                new DiscreteValueValidator(new String[] {
+                        "0",
+                        "15000",
+                        "30000",
+                        "60000",
+                        "120000",
+                        "300000",
+                        "600000",
+                        "1800000",
+                        "3600000",
+                        "7200000",
+                        "14400000",
+                        "28800000"
+                }));
+        VALIDATORS.put(Global.BLUETOOTH_OFF_TIMEOUT,
+                new DiscreteValueValidator(new String[] {
+                        "0",
+                        "15000",
+                        "30000",
+                        "60000",
+                        "120000",
+                        "300000",
+                        "600000",
+                        "1800000",
+                        "3600000",
+                        "7200000",
+                        "14400000",
+                        "28800000"
+                }));
+
 
         VALIDATORS.put(Global.Wearable.HAS_PAY_TOKENS, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Global.Wearable.GMS_CHECKIN_TIMEOUT_MIN, ANY_INTEGER_VALIDATOR);
@@ -457,6 +488,7 @@ public class GlobalSettingsValidators {
         VALIDATORS.put(Global.ADD_USERS_WHEN_LOCKED, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Global.REMOVE_GUEST_ON_EXIT, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Global.USER_SWITCHER_ENABLED, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(Global.BATTERY_LIGHT_ENABLED, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Global.Wearable.PHONE_SWITCHING_REQUEST_SOURCE,
             new InclusiveIntegerRangeValidator(
                 Global.Wearable.PHONE_SWITCHING_REQUEST_SOURCE_NONE,

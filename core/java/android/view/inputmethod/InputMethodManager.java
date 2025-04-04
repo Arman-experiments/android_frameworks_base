@@ -3310,7 +3310,6 @@ public final class InputMethodManager {
             @Nullable IBinder windowGainingFocus, @StartInputFlags int startInputFlags,
             @SoftInputModeFlags int softInputMode, int windowFlags) {
         final View view;
-        final ViewRootImpl viewRoot;
         synchronized (mH) {
             view = getServedViewLocked();
 
@@ -3349,14 +3348,13 @@ public final class InputMethodManager {
 
         if (windowGainingFocus == null) {
             windowGainingFocus = view.getWindowToken();
-            viewRoot = view.getViewRootImpl();
-            if (windowGainingFocus == null && viewRoot == null) {
+            if (windowGainingFocus == null) {
                 Log.e(TAG, "ABORT input: ServedView must be attached to a Window");
                 return false;
             }
             startInputFlags = getStartInputFlags(view, startInputFlags);
-            softInputMode = viewRoot.mWindowAttributes.softInputMode;
-            windowFlags = viewRoot.mWindowAttributes.flags;
+            softInputMode = view.getViewRootImpl().mWindowAttributes.softInputMode;
+            windowFlags = view.getViewRootImpl().mWindowAttributes.flags;
         }
 
         // Okay we are now ready to call into the served view and have it

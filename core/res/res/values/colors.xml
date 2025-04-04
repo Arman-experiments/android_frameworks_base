@@ -177,7 +177,7 @@
     <color name="system_notification_accent_color">#00000000</color>
 
     <!-- Default user icon colors -->
-    <color name="user_icon_1">@color/system_accent1_600</color>
+    <color name="user_icon_1">#ffe46962</color><!-- red -->
     <color name="user_icon_2">#ffaf5cf7</color><!-- purple -->
     <color name="user_icon_3">#ff4c8df6</color><!-- blue -->
     <color name="user_icon_4">#fff439a0</color><!-- pink -->
@@ -577,9 +577,6 @@
     <color name="language_picker_item_selected_bg">#E8F0FE</color>
     <color name="language_picker_item_selected_stroke">#4C8DF6</color>
 
-    <!-- Accent TwoTone notification color-->
-    <color name="qs_color_inactive">@color/system_neutral2_10</color>
-
     <!-- Color for side fps toast light theme -->
     <color name="side_fps_toast_background">#F7F9FA</color>
     <color name="side_fps_text_color">#191C1D</color>
@@ -591,5 +588,6 @@
          color is set by the framework or not. -->
     <color name="navigation_bar_default">#00808080</color>
     
-    <color name="toast_color_background">@*android:color/system_neutral1_10</color>
+    <!-- QS brightness slider -->
+    <color name="qs_translucent_brightness_bg">#33FFFFFF</color>
 </resources>

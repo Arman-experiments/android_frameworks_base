@@ -64,7 +64,11 @@ constructor(
         }
 
     private fun getColor(usingBackgroundProtection: Boolean): Int {
-        return android.graphics.Color.WHITE
+        return if (usingBackgroundProtection) {
+            Utils.getColorAttrDefaultColor(context, android.R.attr.textColorPrimary)
+        } else {
+            Utils.getColorAttrDefaultColor(context, R.attr.wallpaperTextColorAccent)
+        }
     }
 
     // While dozing, the display can show the AOD UI; show the AOD udfps when dozing
@@ -96,7 +100,7 @@ constructor(
     private val padding: Flow<Int> =
         deviceEntryUdfpsInteractor.isUdfpsSupported.flatMapLatest { udfpsSupported ->
             if (udfpsSupported) {
-                flowOf(0)
+                udfpsOverlayInteractor.iconPadding.debounce(udfpsPaddingDebounceDuration.toLong())
             } else {
                 configurationInteractor.scaleForResolution.map { scale ->
                     (context.resources.getDimensionPixelSize(R.dimen.lock_icon_padding) * scale)

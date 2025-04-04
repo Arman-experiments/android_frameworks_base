@@ -27,14 +27,16 @@ import android.os.Handler;
 import android.os.Looper;
 import android.service.quicksettings.Tile;
 import android.util.Log;
+import android.view.View;
 
 import androidx.annotation.Nullable;
 
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
-import com.android.internal.util.android.OmniJawsClient;
-import com.android.internal.util.android.Utils;
+import com.android.internal.util.infinity.OmniJawsClient;
+import com.android.internal.util.infinity.InfinityUtils;
 import com.android.systemui.animation.Expandable;
+import com.android.systemui.res.R;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.plugins.ActivityStarter;
@@ -45,8 +47,8 @@ import com.android.systemui.qs.QSHost;
 import com.android.systemui.qs.QsEventLogger;
 import com.android.systemui.qs.logging.QSLogger;
 import com.android.systemui.qs.tileimpl.QSTileImpl;
-import com.android.systemui.res.R;
 
+import java.util.Calendar;
 import javax.inject.Inject;
 
 public class WeatherTile extends QSTileImpl<BooleanState> implements OmniJawsClient.OmniJawsObserver {
@@ -92,7 +94,7 @@ public class WeatherTile extends QSTileImpl<BooleanState> implements OmniJawsCli
 
     @Override
     public int getMetricsCategory() {
-        return MetricsEvent.VIEW_UNKNOWN;
+        return MetricsEvent.INFINITY;
     }
 
     @Override
@@ -151,14 +153,14 @@ public class WeatherTile extends QSTileImpl<BooleanState> implements OmniJawsCli
         } else {
             PackageManager pm = mContext.getPackageManager();
             for (String app: ALTERNATIVE_WEATHER_APPS) {
-                if (Utils.isPackageInstalled(mContext, app)) {
+                if (InfinityUtils.isPackageInstalled(mContext, app)) {
                     Intent intent = pm.getLaunchIntentForPackage(app);
                     if (intent != null) {
                         mActivityStarter.postStartActivityDismissingKeyguard(intent, 0);
                     }
                 }
             }
-            if (Utils.isPackageInstalled(mContext, "com.google.android.googlequicksearchbox")) {
+            if (InfinityUtils.isPackageInstalled(mContext, "com.google.android.googlequicksearchbox")) {
                 Intent intent = new Intent(Intent.ACTION_VIEW);
                 intent.setData(Uri.parse("dynact://velour/weather/ProxyActivity"));
                 intent.setComponent(new ComponentName("com.google.android.googlequicksearchbox",
@@ -212,6 +214,9 @@ public class WeatherTile extends QSTileImpl<BooleanState> implements OmniJawsCli
         try {
             mWeatherData = null;
             if (mEnabled) {
+
+                int hourOfDay = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+
                 mWeatherClient.queryWeather();
                 mWeatherData = mWeatherClient.getWeatherInfo();
                 mFormattedCondition = mWeatherData.condition;
@@ -220,7 +225,11 @@ public class WeatherTile extends QSTileImpl<BooleanState> implements OmniJawsCli
                 } else if (mFormattedCondition.toLowerCase().contains("rain")) {
                     mFormattedCondition = mContext.getResources().getString(R.string.weather_condition_rain);
                 } else if (mFormattedCondition.toLowerCase().contains("clear")) {
+                if (hourOfDay >= 7 && hourOfDay < 18) {
                     mFormattedCondition = mContext.getResources().getString(R.string.weather_condition_clear);
+                } else {
+                    mFormattedCondition = mContext.getResources().getString(R.string.weather_condition_clear_evening);
+                }
                 } else if (mFormattedCondition.toLowerCase().contains("storm")) {
                     mFormattedCondition = mContext.getResources().getString(R.string.weather_condition_storm);
                 } else if (mFormattedCondition.toLowerCase().contains("snow")) {

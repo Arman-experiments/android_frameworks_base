@@ -8,7 +8,7 @@ package {
 }
 
 runtime_resource_overlay {
-    name: "NotchBarKillerLeftOverlay",
+    name: "NotchBarKillerLeftrOverlay",
     theme: "NotchBarKillerLeft",
     product_specific: true,
 }

@@ -36,7 +36,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 
 import androidx.annotation.VisibleForTesting;
 
@@ -51,8 +50,6 @@ import com.android.systemui.settings.brightness.BrightnessSliderController;
 import com.android.systemui.tuner.TunerService;
 import com.android.systemui.tuner.TunerService.Tunable;
 
-import lineageos.providers.LineageSettings;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -60,19 +57,20 @@ import java.util.List;
 public class QSPanel extends LinearLayout implements Tunable {
 
     public static final String QS_SHOW_AUTO_BRIGHTNESS =
-            "lineagesecure:" + LineageSettings.Secure.QS_SHOW_AUTO_BRIGHTNESS;
+            Settings.Secure.QS_SHOW_AUTO_BRIGHTNESS;
     public static final String QS_SHOW_BRIGHTNESS_SLIDER =
-            "lineagesecure:" + LineageSettings.Secure.QS_SHOW_BRIGHTNESS_SLIDER;
+            Settings.Secure.QS_SHOW_BRIGHTNESS_SLIDER;
     public static final String QS_BRIGHTNESS_SLIDER_POSITION =
-            "lineagesecure:" + LineageSettings.Secure.QS_BRIGHTNESS_SLIDER_POSITION;
-    public static final String QS_SHOW_BRIGHTNESS_PERCENTAGE =
-            "lineagesecure:" + LineageSettings.Secure.QS_SHOW_BRIGHTNESS_PERCENTAGE;
+            Settings.Secure.QS_BRIGHTNESS_SLIDER_POSITION;
+
     public static final String QS_TILE_VERTICAL_LAYOUT =
             "system:" + Settings.System.QS_TILE_VERTICAL_LAYOUT;
     public static final String QS_TILE_LABEL_HIDE =
             "system:" + Settings.System.QS_TILE_LABEL_HIDE;
     public static final String QS_TILE_LABEL_SIZE =
             "system:" + Settings.System.QS_TILE_LABEL_SIZE;
+    public static final String QS_TILE_SEC_LABEL_SIZE =
+            "system:" + Settings.System.QS_TILE_SEC_LABEL_SIZE;
     public static final String QS_LAYOUT_COLUMNS =
             "system:" + Settings.System.QS_LAYOUT_COLUMNS;
     public static final String QS_LAYOUT_COLUMNS_LANDSCAPE =
@@ -102,7 +100,6 @@ public class QSPanel extends LinearLayout implements Tunable {
     @Nullable
     protected View mBrightnessView;
     protected View mAutoBrightnessView;
-    protected TextView mPercentageView;
 
     @Nullable
     protected BrightnessSliderController mToggleSliderController;
@@ -123,7 +120,6 @@ public class QSPanel extends LinearLayout implements Tunable {
 
     @Nullable
     protected View mFooter;
-    private View mQsControlsLayoutShade;
 
     @Nullable
     private PageIndicator mFooterPageIndicator;
@@ -174,7 +170,7 @@ public class QSPanel extends LinearLayout implements Tunable {
                 com.android.internal.R.bool.config_automatic_brightness_available);
 
         TunerService tunerService = Dependency.get(TunerService.class);
-        mTop = tunerService.getValue(QS_BRIGHTNESS_SLIDER_POSITION, 0) == 0;
+        mTop = tunerService.getValue(QS_BRIGHTNESS_SLIDER_POSITION, 1) == 0;
     }
 
     void initialize(QSLogger qsLogger, boolean usingMediaPlayer) {
@@ -255,7 +251,6 @@ public class QSPanel extends LinearLayout implements Tunable {
         }
         mBrightnessView = view;
         mAutoBrightnessView = view.findViewById(R.id.brightness_icon);
-        mPercentageView = view.findViewById(R.id.brightness_percentage);
         setBrightnessViewMargin(mTop);
         if (mBrightnessView != null) {
             addView(mBrightnessView);
@@ -263,7 +258,7 @@ public class QSPanel extends LinearLayout implements Tunable {
         }
     }
 
-    protected void setBrightnessViewMargin(boolean top) {
+    private void setBrightnessViewMargin(boolean top) {
         if (mBrightnessView != null) {
             MarginLayoutParams lp = (MarginLayoutParams) mBrightnessView.getLayoutParams();
             // For Brightness Slider to extend its boundary to draw focus background
@@ -271,14 +266,14 @@ public class QSPanel extends LinearLayout implements Tunable {
                     .getDimensionPixelSize(R.dimen.rounded_slider_boundary_offset);
             if (top) {
                 lp.topMargin = mContext.getResources()
-                        .getDimensionPixelSize(R.dimen.qs_top_brightness_margin_top) - offset;
+                        .getDimensionPixelSize(R.dimen.qs_top_brightness_margin_top);
                 lp.bottomMargin = mContext.getResources()
-                        .getDimensionPixelSize(R.dimen.qs_top_brightness_margin_bottom) - offset;
+                        .getDimensionPixelSize(R.dimen.qs_top_brightness_margin_bottom);
             } else {
                 lp.topMargin = mContext.getResources()
-                        .getDimensionPixelSize(R.dimen.qs_bottom_brightness_margin_top) - offset;
+                        .getDimensionPixelSize(R.dimen.qs_bottom_brightness_margin_top);
                 lp.bottomMargin = mContext.getResources()
-                        .getDimensionPixelSize(R.dimen.qs_bottom_brightness_margin_bottom) - offset;
+                        .getDimensionPixelSize(R.dimen.qs_bottom_brightness_margin_bottom);
             }
             mBrightnessView.setLayoutParams(lp);
         }
@@ -365,17 +360,6 @@ public class QSPanel extends LinearLayout implements Tunable {
         updateViewPositions();
     }
 
-    @Override
-    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
-        if (mToggleSliderController != null) {
-            mToggleSliderController.setLayoutSize();
-        }
-    }
-
-    public void setBrightnessSliderController(BrightnessSliderController sliderController) {
-        mToggleSliderController = sliderController;
-    }
-
     private void updateViewPositions() {
         if (mChildrenLayoutTop == null || mChildrenLayoutTop.isEmpty() || mTileLayout == null) {
             return;
@@ -421,25 +405,19 @@ public class QSPanel extends LinearLayout implements Tunable {
         switch (key) {
             case QS_SHOW_BRIGHTNESS_SLIDER:
                 boolean value =
-                       TunerService.parseInteger(newValue, 1) >= 1;
+                       TunerService.parseInteger(newValue, 2) >= 1;
                 if (mBrightnessView != null) {
                     mBrightnessView.setVisibility(value ? VISIBLE : GONE);
                 }
                 break;
             case QS_BRIGHTNESS_SLIDER_POSITION:
-                mTop = TunerService.parseInteger(newValue, 0) == 0;
+                mTop = TunerService.parseInteger(newValue, 1) == 0;
                 updateBrightnessSliderPosition();
                 break;
             case QS_SHOW_AUTO_BRIGHTNESS:
                 if (mAutoBrightnessView != null) {
                     mAutoBrightnessView.setVisibility(mIsAutomaticBrightnessAvailable &&
                             TunerService.parseIntegerSwitch(newValue, true) ? View.VISIBLE : View.GONE);
-                }
-                break;
-            case QS_SHOW_BRIGHTNESS_PERCENTAGE:
-                if (mPercentageView != null) {
-                    mPercentageView.setVisibility(
-                            TunerService.parseIntegerSwitch(newValue, false) ? View.VISIBLE : View.GONE);
                 }
                 break;
             case QS_LAYOUT_COLUMNS:
@@ -508,9 +486,7 @@ public class QSPanel extends LinearLayout implements Tunable {
 
     protected void updatePadding() {
         final Resources res = mContext.getResources();
-        int paddingTop = res.getDimensionPixelSize(TileUtils.canShowQsWidgets(mContext)
-            ? R.dimen.qs_controls_padding_top
-            : R.dimen.qs_panel_padding_top);
+        int paddingTop = res.getDimensionPixelSize(R.dimen.qs_panel_padding_top);
         int paddingBottom = res.getDimensionPixelSize(R.dimen.qs_panel_padding_bottom);
         setPaddingRelative(getPaddingStart(),
                 mSceneContainerEnabled ? 0 : paddingTop,
@@ -535,17 +511,8 @@ public class QSPanel extends LinearLayout implements Tunable {
         mOnConfigurationChangedListeners.forEach(
                 listener -> listener.onConfigurationChange(newConfig));
         needsDynamicRowsAndColumns();
-        updateControlsLayoutVisibility();
-    }
-    
-    private void updateControlsLayoutVisibility() {
-        if (mQsControlsLayoutShade != null) {
-            boolean isLandscape = mContext.getResources().getConfiguration().orientation 
-                == Configuration.ORIENTATION_LANDSCAPE;
-            if (mQsControlsLayoutShade != null) {
-                mQsControlsLayoutShade.setVisibility(TileUtils.isQsWidgetsEnabled(mContext) && isLandscape ? View.VISIBLE : View.GONE);
-            }
-        }
+        updateBrightnessSliderPosition();
+        updateAutoBrightnessIconVisibility();
     }
 
     final boolean hadConfigurationChangeWhileDetached() {
@@ -562,7 +529,6 @@ public class QSPanel extends LinearLayout implements Tunable {
     protected void onFinishInflate() {
         super.onFinishInflate();
         mFooter = findViewById(R.id.qs_footer);
-        mQsControlsLayoutShade = findViewById(R.id.qs_controls_layout_shade);
     }
 
     private void updateHorizontalLinearLayoutMargins() {
@@ -598,19 +564,13 @@ public class QSPanel extends LinearLayout implements Tunable {
             if (rowUpdate || colUpdate) {
                 mTileLayout.updateSettings();
             }
-        }
+        }        
+        updateBrightnessSliderPosition();
+        updateAutoBrightnessIconVisibility();
     }
 
     private void switchAllContentToParent(ViewGroup parent, QSTileLayout newLayout) {
         int index = parent == this ? mMovableContentStartIndex : 0;
-        boolean isLandscape = mContext.getResources().getConfiguration().orientation 
-            == Configuration.ORIENTATION_LANDSCAPE;
-
-        if (mQsControlsLayoutShade != null 
-            && TileUtils.isQsWidgetsEnabled(mContext) && isLandscape) {
-            switchToParent(mQsControlsLayoutShade, parent, index);
-            index++;
-        }
 
         if (mBrightnessView != null && mTop) {
             switchToParent(mBrightnessView, parent, index);
@@ -639,16 +599,6 @@ public class QSPanel extends LinearLayout implements Tunable {
 
     /** Call when orientation has changed and MediaHost needs to be adjusted. */
     private void reAttachMediaHost(ViewGroup hostView, boolean horizontal) {
-        ViewGroup currentParent = (ViewGroup) hostView.getParent();
-        ViewGroup newParent = horizontal ? mHorizontalLinearLayout : this;
-        if (TileUtils.isQsWidgetsEnabled(mContext)) {
-            if (currentParent != newParent) {
-                if (currentParent != null) {
-                    currentParent.removeView(hostView);
-                }
-            }
-            return;
-        }
         if (!mUsingMediaPlayer) {
             // If the host view was attached, detach it.
             ViewGroup parent = (ViewGroup) hostView.getParent();
@@ -658,6 +608,8 @@ public class QSPanel extends LinearLayout implements Tunable {
             return;
         }
         mMediaHostView = hostView;
+        ViewGroup newParent = horizontal ? mHorizontalLinearLayout : this;
+        ViewGroup currentParent = (ViewGroup) hostView.getParent();
         Log.d(getDumpableTag(), "Reattaching media host: " + horizontal
                 + ", current " + currentParent + ", new " + newParent);
         if (currentParent != newParent) {
@@ -849,14 +801,19 @@ public class QSPanel extends LinearLayout implements Tunable {
         updateHorizontalLinearLayoutMargins();
         updatePadding();
     }
+    
+    private void updateAutoBrightnessIconVisibility() {
+        if (mAutoBrightnessView != null) {
+            boolean isAutoBrightnessAvailable = getResources().getBoolean(
+                    com.android.internal.R.bool.config_automatic_brightness_available);
+            boolean isAutoBrightnessEnabled = Settings.Secure.getIntForUser(
+                    mContext.getContentResolver(),
+                    Settings.Secure.QS_SHOW_AUTO_BRIGHTNESS,
+                    1,
+                    UserHandle.USER_CURRENT) != 0;
 
-    protected void updateBrightnessSliderPosition() {
-        if (mBrightnessView == null) return;
-        ViewGroup newParent = mUsingHorizontalLayout ? mHorizontalContentContainer : this;
-        switchAllContentToParent(newParent, mTileLayout);
-        if (mBrightnessRunnable != null) {
-            updateResources();
-            mBrightnessRunnable.run();
+            mAutoBrightnessView.setVisibility(
+                    isAutoBrightnessAvailable && isAutoBrightnessEnabled ? View.VISIBLE : View.GONE);
         }
     }
 
@@ -926,6 +883,16 @@ public class QSPanel extends LinearLayout implements Tunable {
             return mTileLayout.getTilesHeight() + getPaddingBottom() + getPaddingTop();
         }
         return getHeight();
+    }
+
+    protected void updateBrightnessSliderPosition() {
+        if (mBrightnessView == null) return;
+        ViewGroup newParent = mUsingHorizontalLayout ? mHorizontalContentContainer : this;
+        switchAllContentToParent(newParent, mTileLayout);
+        updateResources();
+        if (mBrightnessRunnable != null) {
+            mBrightnessRunnable.run();
+        }
     }
 
     @Nullable
@@ -1023,8 +990,7 @@ public class QSPanel extends LinearLayout implements Tunable {
             if (currentParent != null) {
                 currentParent.removeView(child);
             }
-            int validIndex = Math.min(index, parent.getChildCount());
-            parent.addView(child, validIndex);
+            parent.addView(child, index);
             return;
         }
         // Same parent, we are just changing indices
@@ -1034,7 +1000,6 @@ public class QSPanel extends LinearLayout implements Tunable {
             return;
         }
         parent.removeView(child);
-        int validIndex = Math.min(index, parent.getChildCount());
-        parent.addView(child, validIndex);
+        parent.addView(child, index);
     }
 }

@@ -2023,7 +2023,7 @@ public class CameraMetadataNative implements Parcelable {
 
             writeValues(tag, values);
         } catch (Exception e) {
-                // Do nothing
+                 // Do nothing
         }
     }
 

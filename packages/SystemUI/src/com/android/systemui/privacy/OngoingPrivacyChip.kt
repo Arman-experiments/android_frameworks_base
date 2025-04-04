@@ -17,7 +17,9 @@ package com.android.systemui.privacy
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.graphics.Color
 import android.util.AttributeSet
+import android.util.TypedValue
 import android.view.Gravity.CENTER_VERTICAL
 import android.view.Gravity.END
 import android.view.ViewGroup
@@ -26,6 +28,7 @@ import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import androidx.core.graphics.ColorUtils
 import com.android.settingslib.Utils
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.events.BackgroundAnimatableView
@@ -72,7 +75,7 @@ class OngoingPrivacyChip @JvmOverloads constructor(
     override fun setBoundsForAnimation(l: Int, t: Int, r: Int, b: Int) {
         iconsContainer.setLeftTopRightBottom(l - left, t - top, r - left, b - top)
     }
-
+    
     // Should only be called if the builder icons or app changed
     private fun updateView(builder: PrivacyChipBuilder) {
         fun setIcons(chipBuilder: PrivacyChipBuilder, iconsContainer: ViewGroup) {
@@ -121,18 +124,36 @@ class OngoingPrivacyChip @JvmOverloads constructor(
 
     private fun updateResources() {
         iconMargin = context.resources
-                .getDimensionPixelSize(R.dimen.ongoing_appops_chip_icon_margin)
+            .getDimensionPixelSize(R.dimen.ongoing_appops_chip_icon_margin)
         iconSize = context.resources
-                .getDimensionPixelSize(R.dimen.ongoing_appops_chip_icon_size)
-        iconColor =
-                Utils.getColorAttrDefaultColor(context, com.android.internal.R.attr.colorPrimary)
+            .getDimensionPixelSize(R.dimen.ongoing_appops_chip_icon_size)
+        val typedValue = TypedValue()
+        context.theme.resolveAttribute(android.R.attr.colorAccent, typedValue, true)
+        val colorAccent = typedValue.data
+        val white = Color.WHITE
+        val black = Color.BLACK
+        val accentLuminance = calculatePreciseLuminance(colorAccent)
+
+        iconColor = if (accentLuminance < 0.5) white else black
 
         val height = context.resources
-                .getDimensionPixelSize(R.dimen.ongoing_appops_chip_height)
+            .getDimensionPixelSize(R.dimen.ongoing_appops_chip_height)
         val padding = context.resources
-                .getDimensionPixelSize(R.dimen.ongoing_appops_chip_side_padding)
+            .getDimensionPixelSize(R.dimen.ongoing_appops_chip_side_padding)
         iconsContainer.layoutParams.height = height
         iconsContainer.setPaddingRelative(padding, 0, padding, 0)
         iconsContainer.background = context.getDrawable(R.drawable.statusbar_privacy_chip_bg)
+    }
+
+    private fun calculatePreciseLuminance(color: Int): Double {
+        val r = Color.red(color) / 255.0
+        val g = Color.green(color) / 255.0
+        val b = Color.blue(color) / 255.0
+
+        val rLinear = if (r <= 0.03928) r / 12.92 else Math.pow((r + 0.055) / 1.055, 2.4)
+        val gLinear = if (g <= 0.03928) g / 12.92 else Math.pow((g + 0.055) / 1.055, 2.4)
+        val bLinear = if (b <= 0.03928) b / 12.92 else Math.pow((b + 0.055) / 1.055, 2.4)
+
+        return 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear
     }
 }

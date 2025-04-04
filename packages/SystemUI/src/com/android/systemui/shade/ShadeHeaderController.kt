@@ -21,6 +21,7 @@ import android.animation.AnimatorListenerAdapter
 import android.annotation.IdRes
 import android.app.PendingIntent
 import android.app.StatusBarManager
+import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.content.res.Configuration
@@ -29,11 +30,14 @@ import android.graphics.Insets
 import android.os.Bundle
 import android.os.Trace
 import android.os.Trace.TRACE_TAG_APP
-import android.os.UserHandle;
 import android.provider.AlarmClock
+import android.provider.CalendarContract
+import android.os.UserHandle;
 import android.provider.Settings
 import android.view.DisplayCutout
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.TextView
 import androidx.annotation.VisibleForTesting
@@ -98,16 +102,18 @@ constructor(
     private val privacyIconsController: HeaderPrivacyIconsController,
     private val insetsProviderStore: StatusBarContentInsetsProviderStore,
     @ShadeDisplayAware private val configurationController: ConfigurationController,
+    private val context: Context,
     private val variableDateViewControllerFactory: VariableDateViewController.Factory,
     @Named(SHADE_HEADER) private val batteryMeterViewController: BatteryMeterViewController,
     private val dumpManager: DumpManager,
     private val shadeCarrierGroupControllerBuilder: ShadeCarrierGroupController.Builder,
     private val combinedShadeHeadersConstraintManager: CombinedShadeHeadersConstraintManager,
     private val demoModeController: DemoModeController,
+    private val qsBatteryModeController: QsBatteryModeController,
     private val nextAlarmController: NextAlarmController,
     private val activityStarter: ActivityStarter,
-    private val statusOverlayHoverListenerFactory: StatusOverlayHoverListenerFactory,
     private val tunerService: TunerService,
+    private val statusOverlayHoverListenerFactory: StatusOverlayHoverListenerFactory,
 ) : ViewController<View>(header), Dumpable, TunerService.Tunable {
 
     private val insetsProvider = insetsProviderStore.defaultDisplay
@@ -170,6 +176,7 @@ constructor(
     private var cutout: DisplayCutout? = null
     private var lastInsets: WindowInsets? = null
     private var nextAlarmIntent: PendingIntent? = null
+    private var textColorPrimary = Color.TRANSPARENT
 
     private var qsDisabled = false
     private var visible = false
@@ -310,7 +317,6 @@ constructor(
             override fun onDensityOrFontScaleChanged() {
                 clock.setTextAppearance(R.style.TextAppearance_QS_Status)
                 date.setTextAppearance(R.style.TextAppearance_QS_Status)
-                updateQsHeaderClockDateVisibility()
                 mShadeCarrierGroup.updateTextAppearance(R.style.TextAppearance_QS_Status_Carriers)
                 loadConstraints()
                 header.minHeight =
@@ -321,11 +327,17 @@ constructor(
                 clock.onDensityOrFontScaleChanged()
             }
 
+            override fun onUiModeChanged() {
+                updateResources()
+                batteryIcon.setIsQsPercent(true)
+            }
+
             override fun onThemeChanged() {
+                updateResources()
                 clock.setTextAppearance(R.style.TextAppearance_QS_Status)
                 date.setTextAppearance(R.style.TextAppearance_QS_Status)
-                updateQsHeaderClockDateVisibility()
                 mShadeCarrierGroup.updateTextAppearance(R.style.TextAppearance_QS_Status_Carriers)
+                updateQsHeaderClockDateVisibility()
             }
         }
 
@@ -341,18 +353,23 @@ constructor(
             batteryIcon.setBatteryStyle(batteryStyle)
         }
         batteryIcon.setBatteryPercent(qsBatteryPercent)
+        updateBatteryResources(true)
+        updateQsHeaderClockDateVisibility()
     }
     
     fun updateQsHeaderClockDateVisibility() {
-        val color = if (qsClockStyle != 0) Color.TRANSPARENT else Color.WHITE
-        val colorStateList = ColorStateList.valueOf(color)
-        clock.setTextColor(colorStateList)
-        date.setTextColor(colorStateList)
-    }
+        val textColor = if (qsClockStyle != 0) Color.TRANSPARENT 
+                    else context.getColor(R.color.island_title_color)
 
+        val colorStateList = ColorStateList.valueOf(textColor)
+        clock?.setTextColor(colorStateList)
+        date?.setTextColor(colorStateList)
+    }
+    
     override fun onInit() {
         variableDateViewControllerFactory.create(date as VariableDateView).init()
         batteryMeterViewController.init()
+        batteryIcon.setIsQsPercent(true)
 
         // battery settings same as in QS icons
         batteryMeterViewController.ignoreTunerUpdates()
@@ -406,13 +423,11 @@ constructor(
         demoModeController.addCallback(demoModeReceiver)
         statusBarIconController.addIconGroup(iconManager)
         nextAlarmController.addCallback(nextAlarmCallback)
+        updateResources()
         systemIconsHoverContainer.setOnHoverListener(
             statusOverlayHoverListenerFactory.createListener(systemIconsHoverContainer)
         )
-
         updateQsBatteryStyle()
-        updateQsHeaderClockDateVisibility()
-
         tunerService.addTunable(this, QS_BATTERY_STYLE)
         tunerService.addTunable(this, STATUS_BAR_BATTERY_STYLE)
         tunerService.addTunable(this, QS_SHOW_BATTERY_PERCENT)
@@ -430,29 +445,25 @@ constructor(
         systemIconsHoverContainer.setOnHoverListener(null)
         tunerService.removeTunable(this)
     }
-
+    
     override fun onTuningChanged(key: String?, value: String?) {
         when (key) {
             QS_BATTERY_STYLE -> {
                 qsBatteryStyle = TunerService.parseInteger(value, -1)
                 updateQsBatteryStyle()
             }
-
             STATUS_BAR_BATTERY_STYLE -> {
                 batteryStyle = TunerService.parseInteger(value, 0)
                 updateQsBatteryStyle()
             }
-
             QS_SHOW_BATTERY_PERCENT -> {
                 qsBatteryPercent = TunerService.parseInteger(value, 2)
                 updateQsBatteryStyle()
             }
-
             QS_HEADER_CLOCK_STYLE -> {
                 qsClockStyle = TunerService.parseInteger(value, 0)
                 updateQsHeaderClockDateVisibility()
             }
-
             else -> return
         }
     }
@@ -635,7 +646,34 @@ constructor(
         val padding = resources.getDimensionPixelSize(R.dimen.qs_panel_padding)
         header.setPadding(padding, header.paddingTop, padding, header.paddingBottom)
         updateQQSPaddings()
-        clock.updateClockSize()
+        qsBatteryModeController.updateResources()
+        batteryIcon.setIsQsPercent(true)
+        updateBatteryResources(false)
+        updateQsHeaderClockDateVisibility()
+    }
+        
+    private fun updateBatteryResources(forceUpdate: Boolean) {
+        val textColor = Utils.getColorAttrDefaultColor(context, android.R.attr.textColorPrimary)
+        val colorStateList = Utils.getColorAttr(context, android.R.attr.textColorPrimary)
+        if (textColor != textColorPrimary || forceUpdate) {
+            var textColorSecondary = Utils.getColorAttrDefaultColor(context,
+                    android.R.attr.textColorSecondary)
+            val currentBatteryStyle = batteryIcon.getBatteryStyle()
+            if (currentBatteryStyle == 1 || currentBatteryStyle == 2) {
+                textColorSecondary = Utils.getColorAttrDefaultColor(header.context, android.R.attr.textColorHint)
+            }
+            textColorPrimary = textColor
+            if (iconManager != null) {
+                iconManager.setTint(
+                    textColorPrimary,
+                    Utils.getColorAttrDefaultColor(context, android.R.attr.textColorPrimaryInverse),
+                )
+            }
+            clock.setTextColor(textColorPrimary)
+            date.setTextColor(textColorPrimary)
+            mShadeCarrierGroup.updateColors(textColorPrimary, colorStateList)
+            batteryIcon.updateColors(textColorPrimary, textColorSecondary, textColorPrimary)
+        }
     }
 
     private fun updateQQSPaddings() {

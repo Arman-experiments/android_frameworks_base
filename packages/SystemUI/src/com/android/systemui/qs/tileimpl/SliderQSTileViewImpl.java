@@ -57,14 +57,16 @@ public class SliderQSTileViewImpl extends QSTileViewImpl {
     private float mCurrentPercent;
     private int mWarnColor;
 
-    private final static int ACTIVE_STATE_PERCENTAGE_ALPHA = 64;
-    private final static int INACTIVE_STATE_PERCENTAGE_ALPHA = 0;
+    private final int ACTIVE_STATE_PERCENTAGE_ALPHA;
+    private final int INACTIVE_STATE_PERCENTAGE_ALPHA;
 
     public SliderQSTileViewImpl(
             Context context,
             boolean collapsed,
             SlideableQSTile slideableQSTile) {
         super(context, collapsed);
+        ACTIVE_STATE_PERCENTAGE_ALPHA = context.getResources().getInteger(R.integer.tile_active_state_percentage_alpha);
+        INACTIVE_STATE_PERCENTAGE_ALPHA = context.getResources().getInteger(R.integer.tile_inactive_state_percentage_alpha);
         mSlideableQSTile = slideableQSTile;
         mSettingsKey = slideableQSTile.getSettingsSystemKey();
         mWarnColor = Utils.getColorErrorDefaultColor(context);
@@ -84,7 +86,7 @@ public class SliderQSTileViewImpl extends QSTileViewImpl {
     @Override
     public void handleStateChanged(QSTile.State state) {
         super.handleStateChanged(state);
-        if (mSlideableQSTile.isSlideable()) {
+        if (mSlideableQSTile != null && mSlideableQSTile.isSlideable()) {
             updatePercentBackground(state.state);
         }
     }

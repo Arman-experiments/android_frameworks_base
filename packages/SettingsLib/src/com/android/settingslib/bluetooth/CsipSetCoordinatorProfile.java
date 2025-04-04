@@ -42,7 +42,7 @@ import java.util.Map;
  */
 public class CsipSetCoordinatorProfile implements LocalBluetoothProfile {
     private static final String TAG = "CsipSetCoordinatorProfile";
-    private static final boolean VDBG = false;
+    private static final boolean VDBG = true;
 
     private Context mContext;
 

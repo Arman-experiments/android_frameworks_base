@@ -34,6 +34,7 @@ import android.companion.virtual.VirtualDeviceManager;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.AttributionSource.ScopedParcelState;
 import android.content.Context;
+import android.content.res.Resources;
 import android.graphics.ImageFormat;
 import android.graphics.Point;
 import android.graphics.Rect;
@@ -294,12 +295,20 @@ public class Camera {
         String packageName = ActivityThread.currentOpPackageName();
         if (packageName == null)
             return true;
-        List<String> packageList = Arrays.asList(
-                SystemProperties.get("vendor.camera.aux.packagelist", packageName).split(","));
-        List<String> packageExcludelist = Arrays.asList(
-                SystemProperties.get("vendor.camera.aux.packageexcludelist", "").split(","));
+        List<String> packageList = new ArrayList<>(Arrays.asList(
+                SystemProperties.get("vendor.camera.aux.packagelist", ",").split(",")));
+        List<String> packageExcludelist = new ArrayList<>(Arrays.asList(
+                SystemProperties.get("vendor.camera.aux.packageexcludelist", ",").split(",")));
 
-        return packageList.contains(packageName) && !packageExcludelist.contains(packageName);
+        // Append packages from resources
+        Resources res = ActivityThread.currentApplication().getResources();
+        packageList.addAll(Arrays.asList(res.getStringArray(
+                com.android.internal.R.array.config_cameraAuxPackageAllowList)));
+        packageExcludelist.addAll(Arrays.asList(res.getStringArray(
+                com.android.internal.R.array.config_cameraAuxPackageExcludeList)));
+
+        return (packageList.isEmpty() || packageList.contains(packageName)) &&
+                !packageExcludelist.contains(packageName);
     }
 
     /**
@@ -318,12 +327,7 @@ public class Camera {
      *   cameras or an error was encountered enumerating them.
      */
     public static int getNumberOfCameras() {
-        int numberOfCameras =
-                getNumberOfCameras(ActivityThread.currentApplication().getApplicationContext());
-        if (!shouldExposeAuxCamera() && numberOfCameras > 2) {
-            numberOfCameras = 2;
-        }
-        return numberOfCameras;
+        return getNumberOfCameras(ActivityThread.currentApplication().getApplicationContext());
     }
 
     /**
@@ -338,8 +342,12 @@ public class Camera {
     public static int getNumberOfCameras(@NonNull Context context) {
         try (ScopedParcelState clientAttribution =
                 context.getAttributionSource().asScopedParcelState()) {
-            return _getNumberOfCameras(
+            int numberOfCameras = _getNumberOfCameras(
                     clientAttribution.getParcel(), getDevicePolicyFromContext(context));
+            if (!shouldExposeAuxCamera() && numberOfCameras > 2) {
+                 numberOfCameras = 2;
+            }
+            return numberOfCameras;
         }
     }
 
@@ -1784,31 +1792,13 @@ public class Camera {
                     } catch (RemoteException e) {
                         Log.e(TAG, "Audio service is unavailable for queries");
                     }
-                    try {
-                        _enableShutterSound(false);
-                    } catch (Exception e) {
-                        Log.e(TAG, "Couldn't disable shutter sound");
-                    }
+                    _enableShutterSound(false);
                 } else {
                     enableShutterSound(mShutterSoundEnabledFromApp);
                 }
             }
         }
     }
-
-    /**
-     * Send a vendor-specific camera command
-     *
-     * @hide
-     */
-    public final void sendVendorCommand(int cmd, int arg1, int arg2) {
-        if (cmd < 1000) {
-            throw new IllegalArgumentException("Command numbers must be at least 1000");
-        }
-        _sendVendorCommand(cmd, arg1, arg2);
-    }
-
-    private native final void _sendVendorCommand(int cmd, int arg1, int arg2);
 
     /**
      * Callback interface for zoom changes during a smooth zoom operation.
@@ -3906,7 +3896,6 @@ public class Camera {
          * @see #getSceneMode()
          */
         public void setSceneMode(String value) {
-            if(getSupportedSceneModes() == null) return;
             set(KEY_SCENE_MODE, value);
         }
 
@@ -3944,7 +3933,6 @@ public class Camera {
          * @see #getFlashMode()
          */
         public void setFlashMode(String value) {
-	    if(getSupportedFlashModes() == null) return;
             set(KEY_FLASH_MODE, value);
         }
 

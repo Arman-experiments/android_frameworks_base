@@ -20,6 +20,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.UserHandle;
 import android.provider.Settings;
@@ -28,10 +29,13 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewStub;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextClock;
+import android.widget.TextView;
 
+import com.android.systemui.clocks.UserProfileUtils;
 import com.android.systemui.res.R;
 import com.android.systemui.Dependency;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
@@ -46,10 +50,20 @@ public class ClockStyle extends RelativeLayout implements TunerService.Tunable {
             R.layout.keyguard_clock_simple,
             R.layout.keyguard_clock_miui,
             R.layout.keyguard_clock_ide,
-            R.layout.keyguard_clock_moto
+            R.layout.keyguard_clock_moto,
+            R.layout.keyguard_clock_stylish,
+            R.layout.keyguard_clock_stylish2,
+            R.layout.keyguard_clock_stylish3,
+            R.layout.keyguard_clock_stylish4,
+            R.layout.keyguard_clock_stylish5,
+            R.layout.keyguard_clock_stylish6,
+            R.layout.keyguard_clock_stylish7,
+            R.layout.keyguard_clock_stylish8,
+            R.layout.keyguard_clock_stylish9,
+            R.layout.keyguard_clock_stylish10
     };
 
-    private final static int[] mCenterClocks = {2, 3, 5, 6};
+    private final static int[] mCenterClocks = {2, 3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16};
 
     private static final int DEFAULT_STYLE = 0; // Disabled
     public static final String CLOCK_STYLE_KEY = "clock_style";
@@ -199,6 +213,25 @@ public class ClockStyle extends RelativeLayout implements TunerService.Tunable {
             if (stub != null) {
                 stub.setLayoutResource(CLOCK_LAYOUTS[mClockStyle]);
                 currentClockView = stub.inflate();
+                
+                ImageView userProfileIcon = currentClockView.findViewById(R.id.user_profile_icon);
+                if (userProfileIcon != null) {
+                    Drawable profileDrawable = UserProfileUtils.getUserProfileIcon(mContext);
+                    userProfileIcon.setImageDrawable(profileDrawable);
+                }
+                
+                TextView userNameView = currentClockView.findViewById(R.id.user_name);
+                if (userNameView != null) {
+                    String username = UserProfileUtils.getUsername(mContext);
+                    userNameView.setText(username);
+                }
+                
+                TextView deviceNameView = currentClockView.findViewById(R.id.device_name);
+                if (deviceNameView != null) {
+                    String deviceName = UserProfileUtils.getDeviceName();
+                    deviceNameView.setText(deviceName);
+                }
+            
                 int gravity = isCenterClock(mClockStyle) ? Gravity.CENTER : Gravity.START;
                 if (currentClockView instanceof LinearLayout) {
                     ((LinearLayout) currentClockView).setGravity(gravity);

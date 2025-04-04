@@ -17,27 +17,23 @@
 package com.android.systemui.statusbar.phone;
 
 import android.annotation.Nullable;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.res.Configuration;
-import android.content.res.Resources;
 import android.graphics.Insets;
+import android.content.res.Resources;
 import android.graphics.Rect;
-import android.inputmethodservice.InputMethodService;
-import android.os.IBinder;
-import android.os.RemoteException;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.os.UserHandle;
+import android.provider.Settings;
 import android.util.TypedValue;
-import android.view.ContextThemeWrapper;
-import android.view.Display;
 import android.view.DisplayCutout;
-import android.view.IWindowManager;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
-import android.view.WindowManagerGlobal;
 import android.view.accessibility.AccessibilityEvent;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -45,48 +41,44 @@ import android.widget.LinearLayout;
 import androidx.annotation.NonNull;
 
 import com.android.internal.policy.SystemBarUtils;
-import com.android.settingslib.Utils;
 import com.android.systemui.Dependency;
 import com.android.systemui.Flags;
 import com.android.systemui.Gefingerpoken;
 import com.android.systemui.res.R;
 import com.android.systemui.shade.ShadeExpandsOnStatusBarLongPress;
 import com.android.systemui.shade.StatusBarLongPressGestureDetector;
-import com.android.systemui.shared.rotation.FloatingRotationButton;
-import com.android.systemui.shared.rotation.RotationButtonController;
-import com.android.systemui.statusbar.CommandQueue;
-import com.android.systemui.statusbar.CommandQueue.Callbacks;
 import com.android.systemui.statusbar.phone.userswitcher.StatusBarUserSwitcherContainer;
-import com.android.systemui.statusbar.policy.Offset;
+import com.android.systemui.statusbar.policy.Clock;
+import com.android.systemui.statusbar.phone.ClockController;
 import com.android.systemui.statusbar.window.StatusBarWindowControllerStore;
+import com.android.systemui.statusbar.policy.Offset;
+import com.android.systemui.tuner.TunerService;
 import com.android.systemui.user.ui.binder.StatusBarUserChipViewBinder;
 import com.android.systemui.user.ui.viewmodel.StatusBarUserChipViewModel;
 import com.android.systemui.util.leak.RotationUtils;
-import com.android.systemui.tuner.TunerService;
+
+import com.google.common.primitives.Floats;
 
 import java.util.Objects;
 
-public class PhoneStatusBarView extends FrameLayout implements Callbacks, TunerService.Tunable {
-
-    private static final String STATUSBAR_LEFT_PADDING =
-            "system:" + "statusbar_left_padding";
-    private static final String STATUSBAR_RIGHT_PADDING =
-            "system:" + "statusbar_right_padding";
-    private static final String STATUSBAR_TOP_PADDING =
-            "system:" + "statusbar_top_padding";
-            
-    private final TunerService mTunerService;
-
-    private int mStatusBarPaddingLeft = 0;
-    private int mStatusBarPaddingRight = 0;
-    private int mStatusBarPaddingTop = 0;
-
+public class PhoneStatusBarView extends FrameLayout implements TunerService.Tunable {
     private static final String TAG = "PhoneStatusBarView";
-    private final CommandQueue mCommandQueue;
     private final StatusBarWindowControllerStore mStatusBarWindowControllerStore;
+    private TunerService mTunerService;
 
+    private static final String LEFT_PADDING =
+            "system:" + Settings.System.STATUSBAR_LEFT_PADDING;
+    private static final String RIGHT_PADDING =
+            "system:" + Settings.System.STATUSBAR_RIGHT_PADDING;
+    private static final String TOP_PADDING =
+            "system:" + Settings.System.STATUSBAR_TOP_PADDING;
+
+    private int mLeftPad;
+    private int mRightPad;
+    private int mTopPad;
+
+    private ClockController mClockController;
     private int mRotationOrientation = -1;
-    private RotationButtonController mRotationButtonController;
     @Nullable
     private View mCutoutSpace;
     @Nullable
@@ -103,7 +95,6 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks, TunerS
     private int mDensity;
     private float mFontScale;
     private StatusBarLongPressGestureDetector mStatusBarLongPressGestureDetector;
-
     @Nullable
     private ViewGroup mStatusBarContents = null;
 
@@ -116,54 +107,7 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks, TunerS
 
     public PhoneStatusBarView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        mCommandQueue = Dependency.get(CommandQueue.class);
         mStatusBarWindowControllerStore = Dependency.get(StatusBarWindowControllerStore.class);
-
-        mTunerService = Dependency.get(TunerService.class);
-
-        // Only create FRB here if there is no navbar
-        if (!hasNavigationBar()) {
-            final Context lightContext = new ContextThemeWrapper(context,
-                    Utils.getThemeAttr(context, R.attr.lightIconTheme));
-            final Context darkContext = new ContextThemeWrapper(context,
-                    Utils.getThemeAttr(context, R.attr.darkIconTheme));
-            final int lightIconColor =
-                    Utils.getColorAttrDefaultColor(lightContext, R.attr.singleToneColor);
-            final int darkIconColor =
-                    Utils.getColorAttrDefaultColor(darkContext, R.attr.singleToneColor);
-            final FloatingRotationButton floatingRotationButton = new FloatingRotationButton(
-                    context,
-                    R.string.accessibility_rotate_button, R.layout.rotate_suggestion,
-                    R.id.rotate_suggestion, R.dimen.floating_rotation_button_min_margin,
-                    R.dimen.rounded_corner_content_padding,
-                    R.dimen.floating_rotation_button_taskbar_left_margin,
-                    R.dimen.floating_rotation_button_taskbar_bottom_margin,
-                    R.dimen.floating_rotation_button_diameter, R.dimen.key_button_ripple_max_width,
-                    R.bool.floating_rotation_button_position_left);
-
-            mRotationButtonController = new RotationButtonController(lightContext, lightIconColor,
-                    darkIconColor, R.drawable.ic_sysbar_rotate_button_ccw_start_0,
-                    R.drawable.ic_sysbar_rotate_button_ccw_start_90,
-                    R.drawable.ic_sysbar_rotate_button_cw_start_0,
-                    R.drawable.ic_sysbar_rotate_button_cw_start_90,
-                    () -> getDisplay().getRotation());
-            mRotationButtonController.setRotationButton(floatingRotationButton, null);
-        }
-    }
-
-    @Override
-    public void onRotationProposal(final int rotation, boolean isValid) {
-        if (mRotationButtonController != null && !hasNavigationBar()) {
-            mRotationButtonController.onRotationProposal(rotation, isValid);
-        }
-    }
-
-    private boolean hasNavigationBar() {
-        try {
-            IWindowManager windowManager = WindowManagerGlobal.getWindowManagerService();
-            return windowManager.hasNavigationBar(Display.DEFAULT_DISPLAY);
-        } catch (RemoteException ex) { }
-        return false;
     }
 
     void setLongPressGestureDetector(
@@ -192,77 +136,39 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks, TunerS
         StatusBarUserChipViewBinder.bind(container, viewModel);
     }
 
-    public void offsetStatusBar(Offset offset) {
-        if (mStatusBarContents == null) {
-            return;
-        }
-        mStatusBarContents.setTranslationX(offset.getX());
-        mStatusBarContents.setTranslationY(offset.getY());
-        invalidate();
-    }
-
     @Override
     public void onFinishInflate() {
         super.onFinishInflate();
+        mClockController = new ClockController(getContext(), this);
         mCutoutSpace = findViewById(R.id.cutout_space_view);
         mStatusBarContents = (ViewGroup) findViewById(R.id.status_bar_contents);
-
         updateResources();
     }
 
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        mTunerService.addTunable(this, STATUSBAR_LEFT_PADDING, STATUSBAR_RIGHT_PADDING, STATUSBAR_TOP_PADDING);
+
+        if (mTunerService == null) {
+            mTunerService = Dependency.get(TunerService.class);
+        }
+        mTunerService.addTunable(this, LEFT_PADDING);
+        mTunerService.addTunable(this, RIGHT_PADDING);
+        mTunerService.addTunable(this, TOP_PADDING);
+
         if (updateDisplayParameters()) {
             updateLayoutForCutout();
             updateWindowHeight();
-        }
-
-        if (mRotationButtonController != null && !hasNavigationBar()) {
-            mCommandQueue.addCallback(this);
         }
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        mTunerService.removeTunable(this);
-        mDisplayCutout = null;
-
-        if (mRotationButtonController != null) {
-            mCommandQueue.removeCallback(this);
+        if (mTunerService != null) {
+            mTunerService.removeTunable(this);
         }
-    }
-    
-    @Override
-    public void onTuningChanged(String key, String newValue) {
-        switch (key) {
-            case STATUSBAR_LEFT_PADDING:
-                mStatusBarPaddingLeft = convertToDip(TunerService.parseInteger(newValue, 
-                    getResources().getDimensionPixelSize(com.android.internal.R.dimen.status_bar_padding_start)));
-                updateResources();
-                break;
-            case STATUSBAR_RIGHT_PADDING:
-                mStatusBarPaddingRight = convertToDip(TunerService.parseInteger(newValue, 
-                    getResources().getDimensionPixelSize(com.android.internal.R.dimen.status_bar_padding_end)));
-                updateResources();
-                break;
-            case STATUSBAR_TOP_PADDING:
-                mStatusBarPaddingTop = convertToDip(TunerService.parseInteger(newValue, 
-                    getResources().getDimensionPixelSize(com.android.internal.R.dimen.status_bar_padding_top)));
-                updateResources();
-                break;
-            default:
-                break;
-         }
-    }
-
-    private int convertToDip(int padding) {
-        return Math.round(TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP,
-                padding,
-                getResources().getDisplayMetrics()));
+        mDisplayCutout = null;
     }
 
     // Per b/300629388, we let the PhoneStatusBarView detect onConfigurationChanged to
@@ -281,6 +187,10 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks, TunerS
         updateWindowHeight();
     }
 
+    void onDensityOrFontScaleChanged() {
+        mClockController.onDensityOrFontScaleChanged();
+    }
+
     @Override
     public WindowInsets onApplyWindowInsets(WindowInsets insets) {
         if (updateDisplayParameters()) {
@@ -288,6 +198,15 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks, TunerS
             requestLayout();
         }
         return super.onApplyWindowInsets(insets);
+    }
+
+    public void offsetStatusBar(Offset offset) {
+        if (mStatusBarContents == null) {
+            return;
+        }
+        mStatusBarContents.setTranslationX(offset.getX());
+        mStatusBarContents.setTranslationY(offset.getY());
+        invalidate();
     }
 
     /**
@@ -371,15 +290,6 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks, TunerS
         }
     }
 
-    @Override
-    public void setImeWindowStatus(int displayId, int vis, int backDisposition,
-            boolean showImeSwitcher) {
-        if (mRotationButtonController != null) {
-            final boolean imeShown = (vis & InputMethodService.IME_VISIBLE) != 0;
-            mRotationButtonController.getRotationButton().setCanShowRotationButton(!imeShown);
-        }
-    }
-
     public boolean getBrightnessControlEnabled() {
         return mBrightnessControlEnabled;
     }
@@ -418,14 +328,17 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks, TunerS
     }
 
     private void updatePaddings() {
+        if (mStatusBarContents == null) {
+            mStatusBarContents = findViewById(R.id.status_bar_contents);
+        }
         mStatusBarContents.setPaddingRelative(
-                mStatusBarPaddingLeft,
-                mStatusBarPaddingTop,
-                mStatusBarPaddingRight,
+                (int) mLeftPad,
+                (int) mTopPad,
+                (int) mRightPad,
                 0);
 
         findViewById(R.id.notification_lights_out)
-                .setPaddingRelative(0, mStatusBarPaddingLeft, 0, 0);
+                .setPaddingRelative(0, (int) mLeftPad, 0, 0);
 
         findViewById(R.id.system_icons).setPaddingRelative(
                 getResources().getDimensionPixelSize(R.dimen.status_bar_icons_padding_start),
@@ -477,7 +390,7 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks, TunerS
             return;
         }
 
-        Insets insets  = mInsetsFetcher.fetchInsets();
+        Insets insets = mInsetsFetcher.fetchInsets();
         setPadding(
                 insets.left,
                 insets.top,
@@ -485,14 +398,21 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks, TunerS
                 getPaddingBottom());
 
         // Apply negative paddings to centered area layout so that we'll actually be on the center.
-        Display display = getDisplay();
-        final int winRotation = display != null ? display.getRotation() : Surface.ROTATION_0;
+        int winRotation = Surface.ROTATION_0; // Default rotation
+        if (getDisplay() != null) {
+            winRotation = getDisplay().getRotation();
+        } else {
+            Log.w(TAG, "getDisplay() returned null. Using default rotation.");
+        }
         LayoutParams centeredAreaParams =
                 (LayoutParams) findViewById(R.id.centered_area).getLayoutParams();
         centeredAreaParams.leftMargin =
                 winRotation == Surface.ROTATION_0 ? -insets.left : 0;
         centeredAreaParams.rightMargin =
-                winRotation == Surface.ROTATION_0 ? -insets.right : 0;
+                winRotation == Surface.ROTATION_0 ? -(insets.right) : 0;
+    }
+    public ClockController getClockController() {
+        return mClockController;
     }
 
     private void updateWindowHeight() {
@@ -508,5 +428,71 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks, TunerS
 
     interface InsetsFetcher {
         Insets fetchInsets();
+    }
+    
+    @Override
+    public void onTuningChanged(String key, String newValue) {
+        if (isNullOrEmpty(key)) return;
+        Float value;
+        switch (key) {
+            case LEFT_PADDING:
+                value = isNullOrEmpty(newValue) ? null : Floats.tryParse(newValue);
+                if (value == null) {
+                    mLeftPad = getDefaultLeftPadding();
+                }
+                else {
+                    mLeftPad = Math.round(TypedValue.applyDimension(
+                            TypedValue.COMPLEX_UNIT_DIP,
+                            value.floatValue(),
+                            getResources().getDisplayMetrics()));
+                }
+                updateStatusBarHeight();
+                break;
+            case RIGHT_PADDING:
+                value = isNullOrEmpty(newValue) ? null : Floats.tryParse(newValue);
+                if (value == null) {
+                    mRightPad = getDefaultRightPadding();
+                }
+                else {
+                    mRightPad = Math.round(TypedValue.applyDimension(
+                            TypedValue.COMPLEX_UNIT_DIP,
+                            value.floatValue(),
+                            getResources().getDisplayMetrics()));
+                }
+                updateStatusBarHeight();
+                break;
+            case TOP_PADDING:
+                value = isNullOrEmpty(newValue) ? null : Floats.tryParse(newValue);
+                if (value == null) {
+                    mTopPad = getDefaultTopPadding();
+                }
+                else {
+                    mTopPad = Math.round(TypedValue.applyDimension(
+                            TypedValue.COMPLEX_UNIT_DIP,
+                            value.floatValue(),
+                            getResources().getDisplayMetrics()));
+                }
+                updateStatusBarHeight();
+                break;
+            default:
+                break;
+        }
+    }
+
+    private int getDefaultLeftPadding() {
+      return getResources().getDimensionPixelSize(R.dimen.status_bar_padding_start);
+    }
+
+    private int getDefaultRightPadding() {
+        return getResources().getDimensionPixelSize(R.dimen.status_bar_padding_end);
+    }
+
+    private int getDefaultTopPadding() {
+        return getResources().getDimensionPixelSize(R.dimen.status_bar_padding_top);
+
+    }
+
+    private boolean isNullOrEmpty(String string) {
+        return string == null || string.trim().isEmpty();
     }
 }

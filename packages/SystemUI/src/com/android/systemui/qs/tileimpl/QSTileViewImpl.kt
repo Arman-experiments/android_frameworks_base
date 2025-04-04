@@ -89,8 +89,6 @@ import com.android.systemui.tuner.TunerService
 import java.util.Objects
 import java.util.Random
 
-import com.android.internal.util.android.VibrationUtils
-
 private const val TAG = "QSTileViewImpl"
 
 open class QSTileViewImpl
@@ -111,6 +109,7 @@ constructor(
         const val UNAVAILABLE_ALPHA = 0.3f
         const val ACTIVE_ALPHA = 0.2f
         const val INACTIVE_ALPHA = 0.8f
+        
         @VisibleForTesting internal const val TILE_STATE_RES_PREFIX = "tile_states_"
         @VisibleForTesting internal const val LONG_PRESS_EFFECT_WIDTH_SCALE = 1.1f
         @VisibleForTesting internal const val LONG_PRESS_EFFECT_HEIGHT_SCALE = 1.2f
@@ -152,15 +151,15 @@ constructor(
             updateHeight()
         }
 
-    private var isA11Style: Boolean = Settings.System.getIntForUser(
-            context.contentResolver,
-            Settings.System.QS_TILE_UI_STYLE, 0, UserHandle.USER_CURRENT
-        ) != 0
-
     private var qsPanelStyle: Int = Settings.System.getIntForUser(
             context.contentResolver,
             Settings.System.QS_PANEL_STYLE, 0, UserHandle.USER_CURRENT
         )
+
+    private var isA11Style: Boolean = Settings.System.getIntForUser(
+            context.contentResolver,
+            Settings.System.QS_TILE_UI_STYLE, 0, UserHandle.USER_CURRENT
+        ) != 0
 
     private var animStyle: Int = Settings.System.getIntForUser(
             context.contentResolver,
@@ -177,9 +176,8 @@ constructor(
             Settings.System.QS_TILE_ANIMATION_INTERPOLATOR, 0, UserHandle.USER_CURRENT
         )
 
-    private val colorActive = Utils.getColorAttrDefaultColor(context, R.attr.shadeActive)
-
-    private val colorOffstate = Utils.getColorAttrDefaultColor(context, R.attr.shadeInactive) 
+    private val colorActive = Utils.getColorAttrDefaultColor(context, com.android.internal.R.attr.colorAccent)
+    private val colorOffstate = Utils.getColorAttrDefaultColor(context, com.android.internal.R.attr.colorSurface) 
     private val colorInactive = if (isA11Style) Utils.applyAlpha(INACTIVE_ALPHA, colorOffstate)
             else colorOffstate
     private val colorUnavailable = Utils.applyAlpha(UNAVAILABLE_ALPHA, colorInactive)
@@ -194,14 +192,6 @@ constructor(
             /* alpha= */ 0.08f,
             Utils.getColorAttrDefaultColor(context, R.attr.onShadeInactive),
         )
-
-    private val qsTileHaptic: Int = Settings.System.getIntForUser(
-            context.contentResolver,
-            Settings.System.QS_PANEL_TILE_HAPTIC, 0, UserHandle.USER_CURRENT
-        )
-
-    private var initialX = 0f
-    private var initialY = 0f
 
     private val colorLabelActive = Utils.getColorAttrDefaultColor(context,
         if (isA11Style) R.attr.onShadeInactive
@@ -238,9 +228,9 @@ constructor(
     )
 
     private val colorActiveRandom = Utils.applyAlpha(ACTIVE_ALPHA, randomTint)
+    private lateinit var iconContainer: LinearLayout
     private val colorLabelActiveRandom = randomTint
     private val colorSecondaryLabelActiveRandom = randomTint
-    private lateinit var iconContainer: LinearLayout
     private lateinit var label: TextView
     protected lateinit var secondaryLabel: TextView
     private lateinit var labelContainer: IgnorableChildLinearLayout
@@ -306,6 +296,7 @@ constructor(
     private var labelHide = false
     private var forceHideCheveron = false
     private var labelSize = 14f
+    private var seclabelSize = 12f
 
     /** Visuo-haptic long-press effects */
     private var longPressEffectAnimator: ValueAnimator? = null
@@ -418,8 +409,9 @@ constructor(
 
     fun updateResources() {
         labelSize = TileUtils.getQSTileLabelSize(context)
+        seclabelSize = TileUtils.getQSTileSecLabelSize(context)
         label.setTextSize(TypedValue.COMPLEX_UNIT_SP, labelSize)
-        secondaryLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, labelSize)
+        secondaryLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, seclabelSize)
 
         if (isA11Style) {
             updateA11StyleResources()
@@ -672,21 +664,9 @@ constructor(
 
     private fun setAnimationTile(v: View) {
         val animTile: ObjectAnimator = when (animStyle) {
-	    1 -> ObjectAnimator.ofFloat(v, "rotation", 0f, 360f) // Rotate
-	    2 -> ObjectAnimator.ofFloat(v, "rotationX", 0f, 360f) // Flip X
-	    3 -> ObjectAnimator.ofFloat(v, "rotationY", 0f, 360f) // Flip Y
-	    4 -> ObjectAnimator.ofFloat(v, "translationX", 0f, 25f, -25f, 25f, -25f, 15f, -15f, 6f, -6f, 0f) // Shake
-	    5 -> ObjectAnimator.ofFloat(v, "alpha", 0f, 1f) // Fade In
-	    6 -> ObjectAnimator.ofFloat(v, "scaleX", 1f, 1.2f, 0.8f, 1f) // Bounce Effect (Scale X)
-	    7 -> ObjectAnimator.ofFloat(v, "scaleY", 1f, 1.2f, 0.8f, 1f) // Bounce Effect (Scale Y)
-	    8 -> ObjectAnimator.ofFloat(v, "scaleX", 1f, 1.1f, 1f).apply {
-	        repeatCount = 0
-	        duration = 1000
-	    } // Pulse Animation X
-	    9 -> ObjectAnimator.ofFloat(v, "scaleY", 1f, 1.1f, 1f).apply {
-	        repeatCount = 0
-	        duration = 1000
-	    } // Pulse Animation Y
+            1 -> ObjectAnimator.ofFloat(v, "rotation", 0f, 360f)
+            2 -> ObjectAnimator.ofFloat(v, "rotationX", 0f, 360f)
+            3 -> ObjectAnimator.ofFloat(v, "rotationY", 0f, 360f)
             else -> return
         }
 
@@ -926,31 +906,21 @@ constructor(
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent?): Boolean {
+        // let the View run the onTouch logic for click and long-click detection
         val result = super.onTouchEvent(event)
-        val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
-        if (event == null) return result
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                initialX = event.x
-                initialY = event.y
-                longPressEffect?.handleActionDown()
-                if (isLongClickable) {
-                    postDelayed(
-                        { longPressEffect?.handleTimeoutComplete() },
-                        ViewConfiguration.getTapTimeout().toLong(),
-                    )
+        if (!isA11Style && longPressEffect != null) {
+            when (event?.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    longPressEffect.handleActionDown()
+                    if (isLongClickable) {
+                        postDelayed(
+                            { longPressEffect.handleTimeoutComplete() },
+                            ViewConfiguration.getTapTimeout().toLong(),
+                        )
+                    }
                 }
-            }
-            MotionEvent.ACTION_UP -> {
-                val distanceX = Math.abs(event.x - initialX)
-                val distanceY = Math.abs(event.y - initialY)
-                longPressEffect?.handleActionUp()
-                if (distanceX < touchSlop && distanceY < touchSlop) {
-                    VibrationUtils.triggerVibration(context, qsTileHaptic)
-                }
-            }
-            MotionEvent.ACTION_CANCEL -> {
-                longPressEffect?.handleActionCancel()
+                MotionEvent.ACTION_UP -> longPressEffect.handleActionUp()
+                MotionEvent.ACTION_CANCEL -> longPressEffect.handleActionCancel()
             }
         }
         return result
@@ -1226,11 +1196,11 @@ constructor(
         return when {
             state == Tile.STATE_UNAVAILABLE || disabledByPolicy -> colorLabelUnavailable
             state == Tile.STATE_ACTIVE -> 
-                if (qsPanelStyle == 1 || qsPanelStyle == 2 || qsPanelStyle == 9)
+                if (qsPanelStyle == 1 || qsPanelStyle == 2)
                     colorActive
                 else if (qsPanelStyle == 3) 
                     colorLabelActiveRandom
-                else if (qsPanelStyle == 4 || qsPanelStyle == 6 || qsPanelStyle == 8 || qsPanelStyle == 9)   
+                else if (qsPanelStyle == 6 || qsPanelStyle == 8 || qsPanelStyle == 9)   
                     colorActiveSurround
                 else colorLabelActive
             state == Tile.STATE_INACTIVE -> colorLabelInactive
@@ -1245,11 +1215,11 @@ constructor(
         return when {
             state == Tile.STATE_UNAVAILABLE || disabledByPolicy -> colorSecondaryLabelUnavailable
             state == Tile.STATE_ACTIVE -> 
-                if(qsPanelStyle == 1 || qsPanelStyle == 2 || qsPanelStyle == 9) 
+                if(qsPanelStyle == 1 || qsPanelStyle == 2) 
                     colorActive
                 else if(qsPanelStyle == 3) 
                     colorSecondaryLabelActiveRandom
-                else if(qsPanelStyle == 4 || qsPanelStyle == 6 || qsPanelStyle == 8 || qsPanelStyle == 9)   
+                else if(qsPanelStyle == 6 || qsPanelStyle == 8 || qsPanelStyle == 9)   
                     colorActiveSurround
                 else colorSecondaryLabelActive
             state == Tile.STATE_INACTIVE -> colorSecondaryLabelInactive
@@ -1322,14 +1292,12 @@ constructor(
         val deltaH = (newHeight - startingHeight) / 2
         val deltaW = (newWidth - startingWidth) / 2
 
-        background?.let {
-            it.updateBounds(
-                left = -deltaW,
-                top = -deltaH,
-                right = newWidth - deltaW,
-                bottom = newHeight - deltaH,
-            )
-        }
+        background.updateBounds(
+            left = -deltaW,
+            top = -deltaH,
+            right = newWidth - deltaW,
+            bottom = newHeight - deltaH,
+        )
 
         // Radius change
         val newRadius =
@@ -1382,14 +1350,12 @@ constructor(
         start + fraction * (end - start)
 
     fun resetLongPressEffectProperties() {
-        background?.let {
-            it.updateBounds(
-                left = 0,
-                top = 0,
-                right = initialLongPressProperties?.width?.toInt() ?: measuredWidth,
-                bottom = initialLongPressProperties?.height?.toInt() ?: measuredHeight,
-            )
-        }
+        background.updateBounds(
+            left = 0,
+            top = 0,
+            right = initialLongPressProperties?.width?.toInt() ?: measuredWidth,
+            bottom = initialLongPressProperties?.height?.toInt() ?: measuredHeight,
+        )
         if (isA11Style) {
             changeCornerRadius(getCornerRadiusForState(lastState))
         } else {

@@ -125,7 +125,8 @@ public final class ColorDisplayService extends SystemService {
     private static final int MSG_APPLY_GLOBAL_SATURATION = 4;
     private static final int MSG_APPLY_DISPLAY_WHITE_BALANCE = 5;
     private static final int MSG_APPLY_REDUCE_BRIGHT_COLORS = 6;
-    private static final int MSG_APPLY_UPDATE_DISPLAY_ENGINE = 7;
+    private static final int MSG_APPLY_DISPLAY_COLOR_BALANCE = 7;
+    private static final int MSG_APPLY_UPDATE_DISPLAY_ENGINE = 8;
 
     /**
      * Return value if a setting has not been set.
@@ -167,12 +168,12 @@ public final class ColorDisplayService extends SystemService {
                     LocalServices.getService(DisplayManagerInternal.class), mDisplayManagerFlags);
     private final NightDisplayTintController mNightDisplayTintController =
             new NightDisplayTintController();
+    private final ColorBalanceTintController mColorBalanceTintController =
+            new ColorBalanceTintController();
     private final TintController mGlobalSaturationTintController =
             new GlobalSaturationTintController();
     private final ReduceBrightColorsTintController mReduceBrightColorsTintController =
             new ReduceBrightColorsTintController();
-    private final DisplayEngineController mDisplayEngineController =
-            new DisplayEngineController();
 
     @VisibleForTesting
     final Handler mHandler;
@@ -381,6 +382,14 @@ public final class ColorDisplayService extends SystemService {
                                     onAccessibilityDaltonizerChanged();
                                 }
                                 break;
+                            case Secure.DISPLAY_COLOR_BALANCE_RED:
+                            case Secure.DISPLAY_COLOR_BALANCE_BLUE:
+                            case Secure.DISPLAY_COLOR_BALANCE_GREEN:
+                                mHandler.sendEmptyMessage(MSG_APPLY_DISPLAY_COLOR_BALANCE);
+                                break;
+                            case ColorBalanceTintController.X_REALITY_ENGINE_ENABLED:
+                                mHandler.sendEmptyMessage(MSG_APPLY_UPDATE_DISPLAY_ENGINE);
+                                break;
                             case Secure.DISPLAY_WHITE_BALANCE_ENABLED:
                                 updateDisplayWhiteBalanceStatus();
                                 break;
@@ -391,9 +400,6 @@ public final class ColorDisplayService extends SystemService {
                             case Secure.REDUCE_BRIGHT_COLORS_LEVEL:
                                 onReduceBrightColorsStrengthLevelChanged();
                                 mHandler.sendEmptyMessage(MSG_APPLY_REDUCE_BRIGHT_COLORS);
-                                break;
-                            case Secure.DISPLAY_ENGINE_MODE:
-                                mHandler.sendEmptyMessage(MSG_APPLY_UPDATE_DISPLAY_ENGINE);
                                 break;
                         }
                     }
@@ -413,14 +419,20 @@ public final class ColorDisplayService extends SystemService {
                 false /* notifyForDescendants */, mContentObserver, mCurrentUser);
         cr.registerContentObserver(System.getUriFor(System.DISPLAY_COLOR_MODE),
                 false /* notifyForDescendants */, mContentObserver, mCurrentUser);
-        if (isAccessibilityInversionAvailable()) {
-            cr.registerContentObserver(Secure.getUriFor(Secure.ACCESSIBILITY_DISPLAY_INVERSION_ENABLED),
-                    false /* notifyForDescendants */, mContentObserver, mCurrentUser);
-        }
+        cr.registerContentObserver(Secure.getUriFor(Secure.ACCESSIBILITY_DISPLAY_INVERSION_ENABLED),
+                false /* notifyForDescendants */, mContentObserver, mCurrentUser);
         cr.registerContentObserver(
                 Secure.getUriFor(Secure.ACCESSIBILITY_DISPLAY_DALTONIZER_ENABLED),
                 false /* notifyForDescendants */, mContentObserver, mCurrentUser);
         cr.registerContentObserver(Secure.getUriFor(Secure.ACCESSIBILITY_DISPLAY_DALTONIZER),
+                false /* notifyForDescendants */, mContentObserver, mCurrentUser);
+        cr.registerContentObserver(Secure.getUriFor(Secure.DISPLAY_COLOR_BALANCE_RED),
+                false /* notifyForDescendants */, mContentObserver, mCurrentUser);
+        cr.registerContentObserver(Secure.getUriFor(Secure.DISPLAY_COLOR_BALANCE_GREEN),
+                false /* notifyForDescendants */, mContentObserver, mCurrentUser);
+        cr.registerContentObserver(Secure.getUriFor(Secure.DISPLAY_COLOR_BALANCE_BLUE),
+                false /* notifyForDescendants */, mContentObserver, mCurrentUser);
+        cr.registerContentObserver(Secure.getUriFor(ColorBalanceTintController.X_REALITY_ENGINE_ENABLED),
                 false /* notifyForDescendants */, mContentObserver, mCurrentUser);
         cr.registerContentObserver(Secure.getUriFor(Secure.DISPLAY_WHITE_BALANCE_ENABLED),
                 false /* notifyForDescendants */, mContentObserver, mCurrentUser);
@@ -433,8 +445,6 @@ public final class ColorDisplayService extends SystemService {
                     Secure.getUriFor(Secure.ACCESSIBILITY_DISPLAY_DALTONIZER_SATURATION_LEVEL),
                     false /* notifyForDescendants */, mContentObserver, mCurrentUser);
         }
-        cr.registerContentObserver(Secure.getUriFor(Secure.DISPLAY_ENGINE_MODE),
-                false /* notifyForDescendants */, mContentObserver, mCurrentUser);
 
         // Apply the accessibility settings first, since they override most other settings.
         onAccessibilityInversionChanged();
@@ -482,8 +492,9 @@ public final class ColorDisplayService extends SystemService {
                 mHandler.sendEmptyMessage(MSG_APPLY_REDUCE_BRIGHT_COLORS);
             }
         }
-        
-        if (mDisplayEngineController.isAvailable(getContext())) {
+
+        if (mColorBalanceTintController.isAvailable(getContext())) {
+            mHandler.sendEmptyMessage(MSG_APPLY_DISPLAY_COLOR_BALANCE);
             mHandler.sendEmptyMessage(MSG_APPLY_UPDATE_DISPLAY_ENGINE);
         }
     }
@@ -624,13 +635,7 @@ public final class ColorDisplayService extends SystemService {
 
     private boolean isAccessiblityInversionEnabled() {
         return Secure.getIntForUser(getContext().getContentResolver(),
-            Secure.ACCESSIBILITY_DISPLAY_INVERSION_ENABLED, 0, mCurrentUser) != 0
-            && isAccessibilityInversionAvailable();
-    }
-
-    private boolean isAccessibilityInversionAvailable() {
-        return getContext().getResources().getBoolean(
-                com.android.internal.R.bool.config_displayInversionAvailable);
+            Secure.ACCESSIBILITY_DISPLAY_INVERSION_ENABLED, 0, mCurrentUser) != 0;
     }
 
     private boolean isAccessibilityEnabled() {
@@ -1143,6 +1148,25 @@ public final class ColorDisplayService extends SystemService {
             }
         }
         return false;
+    }
+
+    private boolean setColorBalanceChannelInternal(int channel, int value) {
+        if (mCurrentUser == UserHandle.USER_NULL) {
+            return false;
+        }
+
+        boolean putSuccess = Secure.putIntForUser(getContext().getContentResolver(),
+                ColorBalanceTintController.channelToKey(channel), value, mCurrentUser);
+        if (putSuccess) {
+            mHandler.sendEmptyMessage(MSG_APPLY_DISPLAY_COLOR_BALANCE);
+        }
+
+        return putSuccess;
+    }
+
+    private int getColorBalanceChannelInternal(int channel) {
+        return Secure.getIntForUser(getContext().getContentResolver(),
+                ColorBalanceTintController.channelToKey(channel), 255, mCurrentUser);
     }
 
     private void dumpInternal(PrintWriter pw) {
@@ -1809,9 +1833,10 @@ public final class ColorDisplayService extends SystemService {
                 case MSG_APPLY_DISPLAY_WHITE_BALANCE:
                     applyTintByCct(mDisplayWhiteBalanceTintController, false);
                     break;
+                case MSG_APPLY_DISPLAY_COLOR_BALANCE:
                 case MSG_APPLY_UPDATE_DISPLAY_ENGINE:
-                    mDisplayEngineController.updateBalance(getContext(), mCurrentUser);
-                    applyTint(mDisplayEngineController, true);
+                    mColorBalanceTintController.updateBalance(getContext(), mCurrentUser);
+                    applyTint(mColorBalanceTintController, true);
                     break;
             }
         }
@@ -2072,6 +2097,26 @@ public final class ColorDisplayService extends SystemService {
         }
 
         @android.annotation.EnforcePermission(android.Manifest.permission.CONTROL_DISPLAY_COLOR_TRANSFORMS)
+        @Override
+        public boolean setColorBalanceChannel(int channel, int value) {
+            final long token = Binder.clearCallingIdentity();
+            try {
+                return setColorBalanceChannelInternal(channel, value);
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
+        @Override
+        public int getColorBalanceChannel(int channel) {
+            final long token = Binder.clearCallingIdentity();
+            try {
+                return getColorBalanceChannelInternal(channel);
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
         @Override
         public boolean setDisplayWhiteBalanceEnabled(boolean enabled) {
             setDisplayWhiteBalanceEnabled_enforcePermission();

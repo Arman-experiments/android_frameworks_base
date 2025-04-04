@@ -478,7 +478,6 @@ import com.android.server.utils.TimingsTraceAndSlog;
 import com.android.server.vr.VrManagerInternal;
 import com.android.server.wm.ActivityMetricsLaunchObserver;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
-import com.android.server.wm.ActivityTaskSupervisor;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.ActivityTaskManagerService;
 import com.android.server.wm.WindowManagerInternal;
@@ -659,9 +658,6 @@ public class ActivityManagerService extends IActivityManager.Stub
     SystemServiceManager mSystemServiceManager;
 
     private Installer mInstaller;
-
-    /** Run all ActivityStacks through this */
-    ActivityTaskSupervisor mTaskSupervisor;
 
     final InstrumentationReporter mInstrumentationReporter = new InstrumentationReporter();
 
@@ -1618,6 +1614,11 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     static final HostingRecord sNullHostingRecord =
             new HostingRecord(HostingRecord.HOSTING_TYPE_EMPTY);
+
+    final SwipeToScreenshotObserver mSwipeToScreenshotObserver;
+    private boolean mIsSwipeToScreenshotEnabled;
+    private boolean mIsSwipeToScreenshotActive;
+
     /**
      * Used to notify activity lifecycle events.
      */
@@ -1674,10 +1675,6 @@ public class ActivityManagerService extends IActivityManager.Stub
     @Nullable
     volatile ActivityManagerInternal.VoiceInteractionManagerProvider
             mVoiceInteractionManagerProvider;
-
-    // Swipe to screenshot
-    final SwipeToScreenshotObserver mSwipeToScreenshotObserver;
-    private boolean mIsSwipeToScrenshotEnabled;
 
     final class UiHandler extends Handler {
         public UiHandler() {
@@ -2544,7 +2541,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         mActivityTaskManager.initialize(mIntentFirewall, mPendingIntentController,
                 DisplayThread.get().getLooper());
         mAtmInternal = LocalServices.getService(ActivityTaskManagerInternal.class);
-        mTaskSupervisor = mActivityTaskManager.mTaskSupervisor;
 
         mHiddenApiBlacklist = new HiddenApiSettings(mHandler, mContext);
 
@@ -2560,7 +2556,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     Process.THREAD_GROUP_SYSTEM);
             Process.setThreadGroupAndCpuset(
                     mOomAdjuster.mCachedAppOptimizer.mCachedAppOptimizerThread.getThreadId(),
-                    Process.THREAD_GROUP_BACKGROUND);
+                    Process.THREAD_GROUP_SYSTEM);
         } catch (Exception e) {
             Slog.w(TAG, "Setting background thread cpuset failed");
         }
@@ -2569,6 +2565,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         mPendingStartActivityUids = new PendingStartActivityUids();
         mTraceErrorLogger = new TraceErrorLogger();
         mComponentAliasResolver = new ComponentAliasResolver(this);
+        mSwipeToScreenshotObserver = new SwipeToScreenshotObserver(mHandler, mContext);
         sCreatorTokenCacheCleaner = new Handler(mHandlerThread.getLooper());
         try {
             mApplicationSharedMemoryReadOnlyFd =
@@ -2577,7 +2574,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             Slog.e(TAG, "Failed to get read only fd for shared memory", e);
             throw new RuntimeException(e);
         }
-        mSwipeToScreenshotObserver = new SwipeToScreenshotObserver(mHandler, mContext);
     }
 
     void setBroadcastQueueForTest(BroadcastQueue broadcastQueue) {
@@ -5248,7 +5244,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                             // Defer the full Pss collection as the system is really busy now.
                             mHandler.postDelayed(() -> {
                                 synchronized (mProcLock) {
-                                    mOomAdjuster.mCachedAppOptimizer.compactAllSystem();
                                     mAppProfiler.requestPssAllProcsLPr(
                                             SystemClock.uptimeMillis(), true, false);
                                 }
@@ -5265,7 +5260,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     private void showConsoleNotificationIfActive() {
-        if (!SystemProperties.get("init.svc.console").equals("running") || true) {
+        if (!SystemProperties.get("init.svc.console").equals("running")) {
             return;
         }
         String title = mContext
@@ -6097,6 +6092,11 @@ public class ActivityManagerService extends IActivityManager.Stub
         public Object getAMSLock() {
             return ActivityManagerService.this;
         }
+
+        @Override
+        public ContentResolver getContentResolver() {
+            return ActivityManagerService.this.mContext.getContentResolver();
+        }
     }
 
     /**
@@ -6144,13 +6144,13 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     private void enforceDebuggable(ProcessRecord proc) {
-        if (!Build.IS_DEBUGGABLE && !proc.isDebuggable()) {
+        if (!Build.IS_ENG && !proc.isDebuggable()) {
             throw new SecurityException("Process not debuggable: " + proc.info.packageName);
         }
     }
 
     private void enforceDebuggable(ApplicationInfo info) {
-        if (!Build.IS_DEBUGGABLE && (info.flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
+        if (!Build.IS_ENG && (info.flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
             throw new SecurityException("Process not debuggable: " + info.packageName);
         }
     }
@@ -6209,8 +6209,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     @PermissionMethod
     void enforceCallingPermission(@PermissionName String permission, String func) {
         if (checkCallingPermission(permission)
-                == PackageManager.PERMISSION_GRANTED 
-           || com.android.internal.util.android.BypassUtils.shouldBypassTaskPermission(Binder.getCallingUid())) {
+                == PackageManager.PERMISSION_GRANTED) {
             return;
         }
 
@@ -7559,7 +7558,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     void setProfileApp(ApplicationInfo app, String processName, ProfilerInfo profilerInfo,
             ApplicationInfo sdkSandboxClientApp, int profileType) {
         synchronized (mAppProfiler.mProfilerLock) {
-            if (!Build.IS_DEBUGGABLE) {
+            if (!Build.IS_ENG) {
                 boolean isAppDebuggable = (app.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
                 boolean isAppProfileable = app.isProfileableByShell();
 
@@ -8964,10 +8963,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                     com.android.internal.R.integer.config_backgroundUserScheduledStopTimeSecs);
             mUserController.setInitialConfig(userSwitchUiEnabled, maxRunningUsers,
                     delayUserDataLocking, backgroundUserScheduledStopTimeSecs);
+            mSwipeToScreenshotObserver.registerObserver();
         }
         mAppErrors.loadAppsNotReportingCrashesFromConfig(res.getString(
                 com.android.internal.R.string.config_appsNotReportingCrashes));
-        mSwipeToScreenshotObserver.registerObserver();
     }
 
     /**
@@ -9839,14 +9838,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         // Exit early if the dropbox isn't configured to accept this report type.
         final String dropboxTag = processClass(process) + "_" + eventType;
         if (dbox == null || !dbox.isTagEnabled(dropboxTag)) return;
-
-        if (dropboxTag.equals("system_server_crash") && Binder.getCallingPid() != Process.myPid()) {
-            // processClass(process) above returns "system_server" when process is null, which
-            // leads to some app crashes being reported as system_server crashes
-            Slog.d(TAG, "addErrorToDropBox: skipping spurious system_server_crash entry, "
-                    + "processName " + processName, new Throwable());
-            return;
-        }
 
         // Check if we should rate limit and abort early if needed.
         final DropboxRateLimiter.RateLimitResult rateLimitResult =
@@ -14477,7 +14468,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             } catch (RemoteException e) {
             }
             if (match < 0 && match != PackageManager.SIGNATURE_FIRST_NOT_SIGNED) {
-                if (Build.IS_DEBUGGABLE && (callingUid == Process.ROOT_UID)
+                if (Build.IS_ENG && (callingUid == Process.ROOT_UID)
                         && (flags & INSTR_FLAG_ALWAYS_CHECK_SIGNATURE) == 0) {
                     Slog.w(TAG, "Instrumentation test " + ii.packageName
                             + " doesn't have a signature matching the target " + ii.targetPackage
@@ -16318,7 +16309,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             return false;
         }
 
-        return Build.IS_DEBUGGABLE || process.isDebuggable();
+        return Build.IS_ENG || process.isDebuggable();
     }
 
     public boolean startBinderTracking() throws RemoteException {
@@ -16772,6 +16763,39 @@ public class ActivityManagerService extends IActivityManager.Stub
         @Override
         public Map<Integer, String> getProcessesWithPendingBindMounts(int userId) {
             return mProcessList.getProcessesWithPendingBindMounts(userId);
+        }
+
+        @Override
+        public boolean queryActivityAllowed(ComponentName resolvedActivity, Intent intent, int callerUid,
+            int callerPid, String resolvedType, ApplicationInfo resolvedApp, int userId) {
+            return mIntentFirewall.checkQueryActivity(resolvedActivity, intent, callerUid, callerPid,
+                resolvedType, resolvedApp, userId);
+        }
+
+        @Override
+        public boolean queryServiceAllowed(ComponentName resolvedService, Intent intent, int callerUid,
+            int callerPid, String resolvedType, ApplicationInfo resolvedApp, int userId) {
+            return mIntentFirewall.checkQueryService(resolvedService, intent, callerUid, callerPid,
+                resolvedType, resolvedApp, userId);
+        }
+
+        @Override
+        public boolean queryReceiverAllowed(ComponentName resolvedReceiver, Intent intent, int callerUid,
+            int callerPid, String resolvedType, ApplicationInfo resolvedApp, int userId) {
+            return mIntentFirewall.checkQueryReceiver(resolvedReceiver, intent, callerUid, callerPid,
+                resolvedType, resolvedApp, userId);
+        }
+
+        @Override
+        public boolean queryProviderAllowed(ComponentName resolvedProvider, Intent intent, int callerUid,
+            int callerPid, String resolvedType, ApplicationInfo resolvedApp, int userId) {
+            return mIntentFirewall.checkQueryProvider(resolvedProvider, intent, callerUid, callerPid,
+                resolvedType, resolvedApp, userId);
+        }
+
+        @Override
+        public boolean queryPackageAllowed(int targetUid, String targetPackageName, int callerUid, int userId) {
+            return mIntentFirewall.checkQueryPackage(targetUid, targetPackageName, callerUid, userId);
         }
 
         @Override
@@ -19118,7 +19142,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         int callerUid = Binder.getCallingUid();
 
         // Only system can toggle the freezer state
-        if (callerUid == SYSTEM_UID || Build.IS_DEBUGGABLE) {
+        if (callerUid == SYSTEM_UID || Build.IS_ENG) {
             return mOomAdjuster.mCachedAppOptimizer.enableFreezer(enable);
         } else {
             throw new SecurityException("Caller uid " + callerUid + " cannot set freezer state ");
@@ -19201,6 +19225,42 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
     }
 
+    private class SwipeToScreenshotObserver extends ContentObserver {
+
+        private final Context mContext;
+
+        public SwipeToScreenshotObserver(Handler handler, Context context) {
+            super(handler);
+            mContext = context;
+        }
+
+        public void registerObserver() {
+            mContext.getContentResolver().registerContentObserver(
+                    Settings.System.getUriFor(Settings.System.THREE_FINGER_GESTURE),
+                    false, this, UserHandle.USER_ALL);
+            update();
+        }
+
+        private void update() {
+            mIsSwipeToScreenshotEnabled = Settings.System.getIntForUser(mContext.getContentResolver(),
+                    Settings.System.THREE_FINGER_GESTURE, 0, UserHandle.USER_CURRENT) == 1;
+        }
+
+        public void onChange(boolean selfChange) {
+            update();
+        }
+    }
+
+    @Override
+    public boolean isSwipeToScreenshotGestureActive() {
+        return mIsSwipeToScreenshotEnabled && mIsSwipeToScreenshotActive;
+    }
+
+    @Override
+    public void setSwipeToScreenshotGestureActive(boolean enabled) {
+        mIsSwipeToScreenshotActive = enabled;
+    }
+
     /**
      * Deal with binder transactions to frozen apps.
      *
@@ -19216,6 +19276,10 @@ public class ActivityManagerService extends IActivityManager.Stub
             app = mPidsSelfLocked.get(debugPid);
         }
         mOomAdjuster.mCachedAppOptimizer.binderError(debugPid, app, code, flags, err);
+    }
+
+    public boolean shouldForceCutoutFullscreen(String packageName) {
+        return mActivityTaskManager.shouldForceCutoutFullscreen(packageName);
     }
 
     @GuardedBy("this")
@@ -19460,52 +19524,5 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     private IBackupManager getBackupManager() {
         return IBackupManager.Stub.asInterface(ServiceManager.getService(Context.BACKUP_SERVICE));
-    }
-
-    private class SwipeToScreenshotObserver extends ContentObserver {
-
-        private final Context mContext;
-
-        public SwipeToScreenshotObserver(Handler handler, Context context) {
-            super(handler);
-            mContext = context;
-        }
-
-        public void registerObserver() {
-            mContext.getContentResolver().registerContentObserver(
-                    Settings.System.getUriFor(Settings.System.SWIPE_TO_SCREENSHOT),
-                    false, this, UserHandle.USER_ALL);
-            update();
-        }
-
-        private void update() {
-            mIsSwipeToScrenshotEnabled = Settings.System.getIntForUser(mContext.getContentResolver(),
-                    Settings.System.SWIPE_TO_SCREENSHOT, 0, UserHandle.USER_CURRENT) == 1;
-        }
-
-        public void onChange(boolean selfChange) {
-            update();
-        }
-    }
-
-    @Override
-    public boolean isSwipeToScreenshotGestureActive() {
-        synchronized (this) {
-            return mIsSwipeToScrenshotEnabled && SystemProperties.getBoolean("sys.android.screenshot", false);
-        }
-    }
-
-    @Override
-    public boolean shouldForceCutoutFullscreen(String packageName) {
-        return mActivityTaskManager.shouldForceCutoutFullscreen(packageName);
-    }
-
-    @Override
-    public boolean isThreeFingersSwipeActive() {
-        final boolean gestureActive = Settings.System.getInt(
-                mContext.getContentResolver(), "three_finger_gesture_active", 0) != 0;
-        synchronized (this) {
-            return gestureActive;
-        }
     }
 }

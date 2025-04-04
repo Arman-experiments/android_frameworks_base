@@ -366,6 +366,7 @@ public final class PlaybackActivityMonitor
             if (apc == null) {
                 return;
             }
+
             sEventLogger.enqueue(new PlayerEvent(piid, event, eventValues));
 
             if (event == AudioPlaybackConfiguration.PLAYER_UPDATE_PORT_ID) {

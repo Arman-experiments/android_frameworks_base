@@ -699,7 +699,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mStatusBarStateController,
                 mNotificationShadeWindowController,
                 mDozeLog, mDozeParameters, mCommandQueue, mVibratorHelper,
-                mLatencyTracker, mPowerManager, mAccessibilityManager, 0, mUpdateMonitor,
+                mLatencyTracker, mAccessibilityManager, 0, mUpdateMonitor,
                 mMetricsLogger,
                 mShadeLog,
                 mConfigurationController,
@@ -769,8 +769,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mKeyguardClockPositionAlgorithm,
                 mNaturalScrollingSettingObserver,
                 mMSDLPlayer,
-                mBrightnessMirrorShowingInteractor,
-                mContext);
+                mBrightnessMirrorShowingInteractor);
         mNotificationPanelViewController.initDependencies(
                 mCentralSurfaces,
                 null,

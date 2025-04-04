@@ -247,7 +247,6 @@ import com.android.server.am.ServiceRecord.TimeLimitedFgsInfo;
 import com.android.server.pm.KnownPackages;
 import com.android.server.uri.NeededUriGrants;
 import com.android.server.utils.AnrTimer;
-import com.android.server.wm.ActivityRecord;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
 
 import java.io.FileDescriptor;
@@ -5067,7 +5066,7 @@ public final class ActiveServices {
                 return new ServiceLookupResult(msg);
             }
             if (!mAm.mIntentFirewall.checkService(r.name, service, callingUid, callingPid,
-                    resolvedType, r.appInfo)) {
+                    resolvedType, r.appInfo, userId)) {
                 return new ServiceLookupResult("blocked by firewall");
             }
             if (mAm.checkComponentPermission(r.permission,
@@ -5627,31 +5626,8 @@ public final class ActiveServices {
             return;
         }
         try {
-            boolean shouldDelay = false;
-            boolean isVisible = false;
-            ActivityRecord top_rc = mAm.mTaskSupervisor.getTopResumedActivity();
-            ProcessRecord pRec = mAm.getProcessRecordLocked(r.serviceInfo.applicationInfo.processName,r.serviceInfo.applicationInfo.uid);
-            boolean isPersistent
-                        = !((r.serviceInfo.applicationInfo.flags&ApplicationInfo.FLAG_PERSISTENT) == 0);
-            if (pRec != null)
-                    isVisible = ((pRec.mProfile.getCurRawAdj()) ==  ProcessList.VISIBLE_APP_ADJ);
-            if(top_rc != null) {
-               if(top_rc.launching && !r.shortInstanceName.contains(top_rc.packageName)
-                            && !isPersistent && r.isForeground == false && !isVisible) {
-                   shouldDelay = true;
-               }
-            }
-            if(!shouldDelay) {
-               bringUpServiceLocked(r, r.intent.getIntent().getFlags(), r.createdFromFg, true, false,
-                            false, true, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
-            } else {
-                    if (DEBUG_DELAYED_SERVICE) {
-                        Slog.v(TAG, "Reschedule service restart due to app launch"
-                              +" r.shortInstanceName "+r.shortInstanceName+" r.app = "+r.app);
-                    }
-               r.resetRestartCounter();
-               scheduleServiceRestartLocked(r, true);
-            }
+            bringUpServiceLocked(r, r.intent.getIntent().getFlags(), r.createdFromFg, true, false,
+                    false, true, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
         } catch (TransactionTooLargeException e) {
             // Ignore, it's been logged and nothing upstack cares.
         } finally {
@@ -6990,10 +6966,6 @@ public final class ActiveServices {
                 mPendingServices.remove(i);
                 size = mPendingServices.size();
                 i--;
-                if (proc.isPersistent() && !proc.isolated) {
-                    mRestartingServices.add(sr);
-                    continue;
-                }
                 needOomAdj = true;
                 bringDownServiceLocked(sr, true);
             }
@@ -7132,7 +7104,7 @@ public final class ActiveServices {
                     final int numServices = smap.mServicesByInstanceName.size();
                     for (int i = 0; i < numServices; i++) {
                         final ServiceRecord sr = smap.mServicesByInstanceName.valueAt(i);
-                        if (sr.isForeground) {
+                        if (sr.isForeground && callingUid == sr.appInfo.uid) {
                             callback.onForegroundStateChanged(sr, sr.appInfo.packageName,
                                     sr.userId, true);
                         }

@@ -16,13 +16,17 @@
 
 package com.android.server.policy;
 
+import android.app.ActivityManager;
 import android.content.Context;
+import android.os.RemoteException;
 import android.os.SystemProperties;
 import android.provider.Settings;
 import android.util.Log;
 import android.util.DisplayMetrics;
 import android.view.MotionEvent;
 import android.view.WindowManagerPolicyConstants.PointerEventListener;
+
+import java.lang.ref.WeakReference;
 
 public class SwipeToScreenshotListener implements PointerEventListener {
     private static final String TAG = "SwipeToScreenshotListener";
@@ -31,23 +35,28 @@ public class SwipeToScreenshotListener implements PointerEventListener {
     private static final int THREE_GESTURE_STATE_DETECTED_FALSE = 2;
     private static final int THREE_GESTURE_STATE_DETECTED_TRUE = 3;
     private static final int THREE_GESTURE_STATE_NO_DETECT = 4;
+
     private boolean mBootCompleted;
-    private Context mContext;
     private boolean mDeviceProvisioned = false;
-    private float[] mInitMotionY;
-    private int[] mPointerIds;
+    private final float[] mInitMotionY;
+    private final int[] mPointerIds;
     private int mThreeGestureState = THREE_GESTURE_STATE_NONE;
-    private int mThreeGestureThreshold;
-    private int mThreshold;
+    private final int mThreeGestureThreshold;
+    private final int mThreshold;
     private final Callbacks mCallbacks;
-    DisplayMetrics mDisplayMetrics;
+    private final WeakReference<Context> mContextRef;
+    private DisplayMetrics mDisplayMetrics;
 
     public SwipeToScreenshotListener(Context context, Callbacks callbacks) {
         mPointerIds = new int[3];
         mInitMotionY = new float[3];
-        mContext = context;
+        mContextRef = new WeakReference<>(context);
         mCallbacks = callbacks;
-        mDisplayMetrics = mContext.getResources().getDisplayMetrics();
+
+        Context safeContext = mContextRef.get();
+        if (safeContext != null) {
+            mDisplayMetrics = safeContext.getResources().getDisplayMetrics();
+        }
         mThreshold = (int) (50.0f * mDisplayMetrics.density);
         mThreeGestureThreshold = mThreshold * 3;
     }
@@ -59,11 +68,14 @@ public class SwipeToScreenshotListener implements PointerEventListener {
             return;
         }
         if (!mDeviceProvisioned) {
-            mDeviceProvisioned = Settings.Global.getInt(mContext.getContentResolver(),
-                Settings.Global.DEVICE_PROVISIONED, 0) != 0;
+            Context context = mContextRef.get();
+            if (context != null) {
+                mDeviceProvisioned = Settings.Global.getInt(context.getContentResolver(),
+                        Settings.Global.DEVICE_PROVISIONED, 0) != 0;
+            }
             return;
         }
-        if (event.getAction() == 0) {
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
             changeThreeGestureState(THREE_GESTURE_STATE_NONE);
         } else if (mThreeGestureState == THREE_GESTURE_STATE_NONE && event.getPointerCount() == 3) {
             if (checkIsStartThreeGesture(event)) {
@@ -83,18 +95,16 @@ public class SwipeToScreenshotListener implements PointerEventListener {
             }
             if (event.getActionMasked() == MotionEvent.ACTION_MOVE) {
                 float distance = 0.0f;
-                int i = 0;
-                while (i < 3) {
+                for (int i = 0; i < 3; i++) {
                     int index = event.findPointerIndex(mPointerIds[i]);
                     if (index < 0 || index >= 3) {
                         changeThreeGestureState(THREE_GESTURE_STATE_DETECTED_FALSE);
                         return;
                     } else {
                         distance += event.getY(index) - mInitMotionY[i];
-                        i++;
                     }
                 }
-                if (distance >= ((float) mThreeGestureThreshold)) {
+                if (distance >= mThreeGestureThreshold) {
                     changeThreeGestureState(THREE_GESTURE_STATE_DETECTED_TRUE);
                     mCallbacks.onSwipeThreeFinger();
                 }
@@ -103,14 +113,14 @@ public class SwipeToScreenshotListener implements PointerEventListener {
     }
 
     private void changeThreeGestureState(int state) {
-        if (mThreeGestureState != state){
+        if (mThreeGestureState != state) {
             mThreeGestureState = state;
-            boolean shouldEnableProp = mThreeGestureState == THREE_GESTURE_STATE_DETECTED_TRUE ||
-                mThreeGestureState == THREE_GESTURE_STATE_DETECTING;
+            boolean shouldEnable = mThreeGestureState == THREE_GESTURE_STATE_DETECTED_TRUE ||
+                    mThreeGestureState == THREE_GESTURE_STATE_DETECTING;
             try {
-                SystemProperties.set("sys.android.screenshot", shouldEnableProp ? "true" : "false");
-            } catch(Exception e) {
-                Log.e(TAG, "Exception when setprop", e);
+                ActivityManager.getService().setSwipeToScreenshotGestureActive(shouldEnable);
+            } catch (RemoteException e) {
+                Log.e(TAG, "setSwipeToScreenshotGestureActive exception", e);
             }
         }
     }
@@ -128,7 +138,7 @@ public class SwipeToScreenshotListener implements PointerEventListener {
         for (int i = 0; i < event.getPointerCount(); i++) {
             float x = event.getX(i);
             float y = event.getY(i);
-            if (y > ((float) (height - mThreshold))) {
+            if (y > (height - mThreshold)) {
                 return false;
             }
             maxX = Math.max(maxX, x);
@@ -136,10 +146,12 @@ public class SwipeToScreenshotListener implements PointerEventListener {
             maxY = Math.max(maxY, y);
             minY = Math.min(minY, y);
         }
-        if (maxY - minY <= mDisplayMetrics.density * 150.0f) {
-            return maxX - minX <= ((float) (width < height ? width : height));
-        }
-        return false;
+        return maxY - minY <= mDisplayMetrics.density * 150.0f &&
+               maxX - minX <= Math.min(width, height);
+    }
+
+    public void cleanup() {
+        mContextRef.clear();
     }
 
     interface Callbacks {

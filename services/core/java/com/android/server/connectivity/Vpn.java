@@ -19,7 +19,6 @@ package com.android.server.connectivity;
 import static android.Manifest.permission.BIND_VPN_SERVICE;
 import static android.Manifest.permission.CONTROL_VPN;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
-import static android.net.ConnectivitySettingsManager.PRIVATE_DNS_MODE_OFF;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VPN;
 import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
@@ -57,7 +56,6 @@ import android.content.pm.ResolveInfo;
 import android.content.pm.UserInfo;
 import android.net.ConnectivityDiagnosticsManager;
 import android.net.ConnectivityManager;
-import android.net.ConnectivitySettingsManager;
 import android.net.INetd;
 import android.net.INetworkManagementEventObserver;
 import android.net.Ikev2VpnProfile;
@@ -711,14 +709,12 @@ public class Vpn {
                     mNetworkAgent.unregister();
                     mNetworkAgent = null;
                 }
-                maybeRestoreDNS();
                 break;
             case CONNECTING:
                 if (null != mNetworkAgent) {
                     throw new IllegalStateException("VPN can only go to CONNECTING state when"
                             + " the agent is null.");
                 }
-                maybeRestrictDNS();
                 break;
             default:
                 throw new IllegalArgumentException("Illegal state argument " + detailedState);
@@ -1025,14 +1021,12 @@ public class Vpn {
 
         if (isCurrentPreparedPackage(packageName)) {
             updateAlwaysOnNotification(mNetworkInfo.getDetailedState());
-            final boolean anyAllowlistChange = setVpnForcedLocked(mLockdown);
+            setVpnForcedLocked(mLockdown);
 
             // Lockdown forces the VPN to be non-bypassable (see #agentConnect) because it makes
             // no sense for a VPN to be bypassable when connected but not when not connected.
             // As such, changes in lockdown need to restart the agent.
-            // Changes in the lockdown allowlist must also restart the agent to ensure that
-            // the VPN's ranges properly exclude or include allowlisted UIDs.
-            if (mNetworkAgent != null && (anyAllowlistChange || oldLockdownState != mLockdown)) {
+            if (mNetworkAgent != null && oldLockdownState != mLockdown) {
                 startNewNetworkAgent(mNetworkAgent, "Lockdown mode changed");
             }
         } else {
@@ -1689,34 +1683,6 @@ public class Vpn {
     }
 
     @GuardedBy("this")
-    private void maybeRestrictDNS() {
-        BinderUtils.withCleanCallingIdentity(() -> {
-            final boolean isEnforceDns = mSystemServices.settingsSecureGetIntForUser(
-                    Settings.Secure.VPN_ENFORCE_DNS, 0, mUserId) == 1;
-            final int mode = ConnectivitySettingsManager.getPrivateDnsMode(mUserIdContext);
-            if (!isEnforceDns || mode == PRIVATE_DNS_MODE_OFF) return;
-            // Store current private DNS mode
-            mSystemServices.settingsSecurePutIntForUser(
-                    Settings.Secure.VPN_ENFORCE_DNS_STORE, mode, mUserId);
-            // Disable private DNS
-            ConnectivitySettingsManager.setPrivateDnsMode(mUserIdContext, PRIVATE_DNS_MODE_OFF);
-        });
-    }
-
-    @GuardedBy("this")
-    private void maybeRestoreDNS() {
-        BinderUtils.withCleanCallingIdentity(() -> {
-            final int mode = mSystemServices.settingsSecureGetIntForUser(
-                    Settings.Secure.VPN_ENFORCE_DNS_STORE, -1, mUserId);
-            if (mode == -1) return;
-            // Restore previous private DNS mode
-            ConnectivitySettingsManager.setPrivateDnsMode(mUserIdContext, mode);
-            mSystemServices.settingsSecurePutIntForUser(
-                    Settings.Secure.VPN_ENFORCE_DNS_STORE, -1, mUserId);
-        });
-    }
-
-    @GuardedBy("this")
     private void startNewNetworkAgent(NetworkAgent oldNetworkAgent, String reason) {
         // Initialize the state for a new agent, while keeping the old one connected
         // in case this new connection fails.
@@ -1994,10 +1960,6 @@ public class Vpn {
     public void onUserAdded(int userId) {
         // If the user is restricted tie them to the parent user's VPN
         UserInfo user = mUserManager.getUserInfo(userId);
-        if (user == null) {
-            Log.e(TAG, "Can not retrieve UserInfo for userId=" + userId);
-            return;
-        }
         if (user.isRestricted() && user.restrictedProfileParentId == mUserId) {
             synchronized(Vpn.this) {
                 final Set<Range<Integer>> existingRanges = mNetworkCapabilities.getUids();
@@ -2027,14 +1989,6 @@ public class Vpn {
     public void onUserRemoved(int userId) {
         // clean up if restricted
         UserInfo user = mUserManager.getUserInfo(userId);
-        // TODO: Retrieving UserInfo upon receiving the USER_REMOVED intent is not guaranteed.
-        //  This could prevent the removal of associated ranges. To ensure proper range removal,
-        //  store the user info when adding ranges. This allows using the user ID in the
-        //  USER_REMOVED intent to handle the removal process.
-        if (user == null) {
-            Log.e(TAG, "Can not retrieve UserInfo for userId=" + userId);
-            return;
-        }
         if (user.isRestricted() && user.restrictedProfileParentId == mUserId) {
             synchronized(Vpn.this) {
                 final Set<Range<Integer>> existingRanges = mNetworkCapabilities.getUids();
@@ -2087,12 +2041,11 @@ public class Vpn {
      * @param enforce {@code true} to require that all traffic under the jurisdiction of this
      *                {@link Vpn} goes through a VPN connection or is blocked until one is
      *                available, {@code false} to lift the requirement.
-     * @return {@code true} if any lockdown ranges changed.
      *
      * @see #mBlockedUidsAsToldToConnectivity
      */
     @GuardedBy("this")
-    private boolean setVpnForcedLocked(boolean enforce) {
+    private void setVpnForcedLocked(boolean enforce) {
         final List<String> exemptedPackages;
         if (isNullOrLegacyVpn(mPackage)) {
             exemptedPackages = null;
@@ -2136,7 +2089,6 @@ public class Vpn {
         setAllowOnlyVpnForUids(false, rangesToRemove);
         // If nothing should be blocked now, this will now be a no-op.
         setAllowOnlyVpnForUids(true, rangesToAdd);
-        return !rangesToRemove.isEmpty() || !rangesToAdd.isEmpty();
     }
 
     /**

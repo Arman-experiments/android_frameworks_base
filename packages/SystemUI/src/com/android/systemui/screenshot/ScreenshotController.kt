@@ -30,7 +30,6 @@ import android.graphics.Rect
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Process
-import android.os.RemoteException
 import android.os.UserHandle
 import android.os.UserManager
 import android.os.VibrationEffect
@@ -47,7 +46,6 @@ import android.widget.Toast
 import android.window.WindowContext
 import androidx.core.animation.doOnEnd
 import com.android.internal.logging.UiEventLogger
-import com.android.internal.statusbar.IStatusBarService
 import com.android.settingslib.applications.InterestingConfigChanges
 import com.android.systemui.broadcast.BroadcastDispatcher
 import com.android.systemui.broadcast.BroadcastSender
@@ -86,7 +84,6 @@ internal constructor(
     private val imageCapture: ImageCapture,
     private val scrollCaptureExecutor: ScrollCaptureExecutor,
     private val screenshotHandler: TimeoutHandler,
-    private val statusBarService: IStatusBarService,
     private val broadcastSender: BroadcastSender,
     private val broadcastDispatcher: BroadcastDispatcher,
     private val packageManager: PackageManager,
@@ -126,7 +123,7 @@ internal constructor(
                 ActivityInfo.CONFIG_SCREEN_LAYOUT or
                 ActivityInfo.CONFIG_ASSETS_PATHS
         )
-
+        
     private val audioManager: AudioManager
     private val vibrator: Vibrator?
 
@@ -135,7 +132,7 @@ internal constructor(
 
         window = screenshotWindowFactory.create(display)
         context = window.getContext()
-
+        
         audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator?
 
@@ -178,19 +175,30 @@ internal constructor(
         requestCallback: TakeScreenshotService.RequestCallback,
     ) {
         Assert.isMainThread()
-        screenshotHandler.resetTimeout()
+	screenshotHandler.resetTimeout()
 
-        packageLabel = runCatching {
-            val info = packageManager.getApplicationInfo(screenshot.packageNameString, 0)
-            info.loadLabel(packageManager).toString()
-        }.getOrDefault("")
-        scrollCaptureExecutor.longScreenshotHolder.foregroundAppName = packageLabel
-
-        if (screenshot.type == WindowManager.TAKE_SCREENSHOT_SELECTED_REGION) {
+	packageLabel = try {
+	    screenshot.topComponent?.let {
+		try {
+		    val activityInfo = packageManager.getActivityInfo(it, 0)
+		    activityInfo.applicationInfo.loadLabel(packageManager).toString()
+		} catch (e: PackageManager.NameNotFoundException) {
+		    val appInfo = packageManager.getApplicationInfo(it.packageName, 0)
+		    appInfo.loadLabel(packageManager).toString()
+		}
+	    } ?: ""
+	} catch (e: Exception) {
+	    Log.e(TAG, "Error getting package label", e)
+	    ""
+	}
+	    
+	scrollCaptureExecutor.longScreenshotHolder.foregroundAppName = packageLabel
+	    
+	if (screenshot.type == WindowManager.TAKE_SCREENSHOT_SELECTED_REGION) {
             startPartialScreenshotActivity(Process.myUserHandle())
-            finisher.accept(null)
-            return
-        }
+	    finisher.accept(null)
+	    return
+	}
 
         val currentBitmap = screenshot.bitmap
         if (currentBitmap == null) {
@@ -415,20 +423,20 @@ internal constructor(
             }
         }
     }
-
+    
     private fun startPartialScreenshotActivity(owner: UserHandle) {
-        scrollCaptureExecutor.executeBatchScrollCapture(
-            BitmapScreenshot(context, imageCapture.captureDisplay(display.displayId, null)),
-            {
-                val intent = createLongScreenshotIntent(owner, context)
-                context.startActivity(intent)
-
-                statusBarManager.collapsePanels()
-            },
-            { _: Rect, onTransitionEnd: Runnable, _: LongScreenshot ->
-                onTransitionEnd.run()
-            },
-        )
+         scrollCaptureExecutor.executeBatchScrollCapture(
+             BitmapScreenshot(context, imageCapture.captureDisplay(display.displayId, null)),
+             {
+                 val intent = createLongScreenshotIntent(owner, context)
+                 context.startActivity(intent)
+                 
+                 statusBarManager.collapsePanels()
+             },
+             { _: Rect, onTransitionEnd: Runnable, _: LongScreenshot ->
+                 onTransitionEnd.run()
+             },
+         )
     }
 
     private fun onScrollButtonClicked(owner: UserHandle, response: ScrollCaptureResponse) {
@@ -457,12 +465,6 @@ internal constructor(
             {
                 val intent = createLongScreenshotIntent(owner, context)
                 context.startActivity(intent)
-
-                try {
-                    statusBarService.collapsePanels()
-                } catch (e: RemoteException) {
-                    Log.e(TAG, "Error during collapsing panels", e)
-                }
             },
             { viewProxy.restoreNonScrollingUi() },
             { transitionDestination: Rect, onTransitionEnd: Runnable, longScreenshot: LongScreenshot
@@ -480,36 +482,36 @@ internal constructor(
         window.removeWindow()
         viewProxy.stopInputListening()
     }
-
+    
     private fun playScreenshotSound() {
-        var playSound = false
-        when (audioManager.ringerMode) {
-            AudioManager.RINGER_MODE_SILENT -> {
-                // do nothing
-            }
-            AudioManager.RINGER_MODE_VIBRATE -> {
-                vibrator?.takeIf { it.hasVibrator() }?.vibrate(
-                    VibrationEffect.createOneShot(
-                        50,
-                        VibrationEffect.DEFAULT_AMPLITUDE
-                    )
-                )
-            }
-            AudioManager.RINGER_MODE_NORMAL -> {
-                // in this case we want to play sound even if not forced on
-                playSound = true
-            }
-        }
-        if (playSound && Settings.System.getIntForUser(
-                context.contentResolver,
-                Settings.System.SCREENSHOT_SHUTTER_SOUND,
-                1,
-                UserHandle.USER_CURRENT
-            ) == 1
-        ) {
-            screenshotSoundController.playScreenshotSoundAsync()
-        }
-    }
+         var playSound = false
+         when (audioManager.ringerMode) {
+             AudioManager.RINGER_MODE_SILENT -> {
+                 // do nothing
+             }
+             AudioManager.RINGER_MODE_VIBRATE -> {
+                 vibrator?.takeIf { it.hasVibrator() }?.vibrate(
+                     VibrationEffect.createOneShot(
+                         50,
+                         VibrationEffect.DEFAULT_AMPLITUDE
+                     )
+                 )
+             }
+             AudioManager.RINGER_MODE_NORMAL -> {
+                 // in this case we want to play sound even if not forced on
+                 playSound = true
+             }
+         }
+         if (playSound && Settings.System.getIntForUser(
+                 context.contentResolver,
+                 Settings.System.SCREENSHOT_SHUTTER_SOUND,
+                 1,
+                 UserHandle.USER_CURRENT
+             ) == 1
+         ) {
+             screenshotSoundController.playScreenshotSoundAsync()
+         }
+     }
 
     /**
      * Save the bitmap but don't show the normal screenshot UI.. just a toast (or notification on

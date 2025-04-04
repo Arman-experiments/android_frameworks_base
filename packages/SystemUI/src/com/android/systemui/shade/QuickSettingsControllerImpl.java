@@ -39,6 +39,7 @@ import android.graphics.Insets;
 import android.graphics.Rect;
 import android.graphics.Region;
 import android.os.Handler;
+import android.provider.Settings;
 import android.util.IndentingPrintWriter;
 import android.util.Log;
 import android.util.MathUtils;
@@ -106,8 +107,6 @@ import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.SplitShadeStateController;
 import com.android.systemui.util.LargeScreenUtils;
 import com.android.systemui.util.kotlin.JavaAdapter;
-
-import lineageos.providers.LineageSettings;
 
 import dalvik.annotation.optimization.NeverCompile;
 
@@ -402,9 +401,9 @@ public class QuickSettingsControllerImpl implements QuickSettingsController, Dum
         mOneFingerQuickSettingsInterceptObserver = new ContentObserver(null) {
             @Override
             public void onChange(boolean selfChange) {
-                mOneFingerQuickSettingsIntercept = LineageSettings.System.getInt(
+                mOneFingerQuickSettingsIntercept = Settings.System.getInt(
                         mPanelView.getContext().getContentResolver(),
-                        LineageSettings.System.STATUS_BAR_QUICK_QS_PULLDOWN, 0);
+                        Settings.System.STATUS_BAR_QUICK_QS_PULLDOWN, 0);
             }
         };
 
@@ -621,9 +620,6 @@ public class QuickSettingsControllerImpl implements QuickSettingsController, Dum
                 break;
             case 2: // Left side pulldown
                 showQsOverride = mQs.getView().isLayoutRtl() ? w - region < x : x < region;
-                break;
-            case 3: // pull down anywhere
-                showQsOverride = true;
                 break;
         }
         showQsOverride &= mBarState == StatusBarState.SHADE;
@@ -2288,8 +2284,8 @@ public class QuickSettingsControllerImpl implements QuickSettingsController, Dum
             }
             mQs.setScrollListener(mQsScrollListener);
             mPanelView.getContext().getContentResolver().registerContentObserver(
-                    LineageSettings.System.getUriFor(
-                            LineageSettings.System.STATUS_BAR_QUICK_QS_PULLDOWN),
+                    Settings.System.getUriFor(
+                            Settings.System.STATUS_BAR_QUICK_QS_PULLDOWN),
                     false, mOneFingerQuickSettingsInterceptObserver);
             mOneFingerQuickSettingsInterceptObserver.onChange(true);
             updateExpansion();

@@ -697,14 +697,14 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         }
 
         @Override
-        public boolean showShutdownUi(boolean isReboot, String reason, boolean rebootCustom) {
+        public boolean showShutdownUi(boolean isReboot, String reason, boolean advancedReboot) {
             if (!mContext.getResources().getBoolean(R.bool.config_showSysuiShutdown)) {
                 return false;
             }
             IStatusBar bar = mBar;
             if (bar != null) {
                 try {
-                    bar.showShutdownUi(isReboot, reason, rebootCustom);
+                    bar.showShutdownUi(isReboot, reason, advancedReboot);
                     return true;
                 } catch (RemoteException ex) {}
             }
@@ -1326,6 +1326,17 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         return mTracingEnabled;
     }
 
+    @Override
+    public void toggleCameraFlash() {
+        if (mBar != null) {
+            try {
+                mBar.toggleCameraFlash();
+            } catch (RemoteException ex) {
+                Slog.e(TAG, "Unable to toggle camera flash:", ex);
+            }
+        }
+    }
+
     // TODO(b/117478341): make it aware of multi-display if needed.
     @Override
     public void disable(int what, IBinder token, String pkg) {
@@ -1421,7 +1432,7 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
     }
 
     void runGcForTest() {
-        if (!Build.IS_DEBUGGABLE) {
+        if (!Build.IS_ENG) {
             throw new SecurityException("runGcForTest requires a debuggable build");
         }
 
@@ -1517,13 +1528,10 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
             getUiState(displayId).setImeWindowState(vis, backDisposition, showImeSwitcher);
 
             mHandler.post(() -> {
-                IStatusBar bar = mBar;
-                if (bar != null) {
-                    try {
-                        bar.setImeWindowStatus(displayId, vis, backDisposition, showImeSwitcher);
-                    } catch (RemoteException ex) {
-                    }
-                }
+                if (mBar == null) return;
+                try {
+                    mBar.setImeWindowStatus(displayId, vis, backDisposition, showImeSwitcher);
+                } catch (RemoteException ex) { }
             });
         }
     }
@@ -1875,10 +1883,13 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
      * Allows the status bar to reboot the device.
      */
     @Override
-    public void reboot(boolean safeMode, String reason) {
+    public void reboot(boolean safeMode) {
         enforceStatusBarService();
         enforceValidCallingUser();
 
+        String reason = safeMode
+                ? PowerManager.REBOOT_SAFE_MODE
+                : PowerManager.SHUTDOWN_USER_REQUESTED;
         ShutdownCheckPoints.recordCheckPoint(Binder.getCallingPid(), reason);
         final long identity = Binder.clearCallingIdentity();
         try {
@@ -1888,7 +1899,7 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
                 if (safeMode) {
                     ShutdownThread.rebootSafeMode(getUiContext(), true);
                 } else {
-                    ShutdownThread.rebootCustom(getUiContext(), reason, false);
+                    ShutdownThread.reboot(getUiContext(), reason, false);
                 }
             });
         } finally {
@@ -1908,6 +1919,24 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         try {
             mHandler.post(() -> {
                 mActivityManagerInternal.restart();
+            });
+        } finally {
+            Binder.restoreCallingIdentity(identity);
+        }
+    }
+
+    /**
+     * Allows the status bar to reboot the device to recovery or bootloader.
+     */
+    @Override
+    public void advancedReboot(String mode) {
+        enforceStatusBarService();
+        long identity = Binder.clearCallingIdentity();
+        try {
+            mHandler.post(() -> {
+                // ShutdownThread displays UI, so give it a UI context.
+                    ShutdownThread.reboot(getUiContext(),
+                            mode, false/*don't ask for confirmation*/);
             });
         } finally {
             Binder.restoreCallingIdentity(identity);

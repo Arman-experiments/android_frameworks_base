@@ -1357,10 +1357,7 @@ public class AudioService extends IAudioService.Stub
                     (MAX_STREAM_VOLUME[AudioSystem.STREAM_VOICE_CALL] * 3) / 4;
         }
 
-        int maxMusicVolume = SystemProperties.getInt("ro.config.media_vol_steps", -1);
-        if (maxMusicVolume != -1) {
-            MAX_STREAM_VOLUME[AudioSystem.STREAM_MUSIC] = maxMusicVolume;
-        }
+        MAX_STREAM_VOLUME[AudioSystem.STREAM_MUSIC] = 15;
 
         mDefaultMaxMusicVolume = MAX_STREAM_VOLUME[AudioSystem.STREAM_MUSIC];
         mSettings.putSystemIntForUser(mContentResolver,
@@ -3863,9 +3860,9 @@ public class AudioService extends IAudioService.Stub
         if (mUseFixedVolume) {
             return;
         }
-        mVolumeController.onVolumeKeyPressed();
         streamType = replaceBtScoStreamWithVoiceCall(streamType, "adjustStreamVolume");
 
+        mVolumeController.onVolumeKeyPressed();
         if (DEBUG_VOL) Log.d(TAG, "adjustStreamVolume() stream=" + streamType + ", dir=" + direction
                 + ", flags=" + flags + ", caller=" + caller);
 
@@ -3956,10 +3953,17 @@ public class AudioService extends IAudioService.Stub
             }
         } else {
             // convert one UI step (+/-1) into a number of internal units on the stream alias
-            int streamStep = mVolumeController.isLongPress() ? (100 / MAX_STREAM_VOLUME[streamTypeAlias]) : 10;
+            int streamStep = 10; // Default value
+	    if (mVolumeController.isLongPress()) {
+		if (MAX_STREAM_VOLUME[streamTypeAlias] != 0) {
+		    streamStep = 100 / MAX_STREAM_VOLUME[streamTypeAlias];
+		} else {
+		    Log.w("AudioService", "MAX_STREAM_VOLUME for streamTypeAlias " + streamTypeAlias + " is zero.");
+		}
+	    }
             streamStep = streamStep > 10 ? 10 : streamStep;
             if (DEBUG_VOL) Log.d("streamStep", "scale: [ streamStep=" + streamStep + " ]");
-            step = rescaleStep((int) (streamStep * streamState.getIndexStepFactor()), streamType, streamTypeAlias);
+            step = rescaleStep(streamStep, streamType, streamTypeAlias);
         }
 
         // If either the client forces allowing ringer modes for this adjustment,
@@ -5067,22 +5071,10 @@ public class AudioService extends IAudioService.Stub
             streamType = AudioManager.STREAM_BLUETOOTH_SCO;
         }
 
-        int device = (ada == null)
+        final int device = (ada == null)
                 ? getDeviceForStream(streamType)
                 : ada.getInternalType();
         int oldIndex;
-
-        // apply a2dp absolute volume control request in multiple audio
-        // output
-        if ((flags & AudioManager.FLAG_BLUETOOTH_ABS_VOLUME) != 0) {
-            final Set<Integer> devices = getDeviceSetForStream(streamTypeAlias);
-            for (int deviceType : AudioSystem.DEVICE_OUT_ALL_A2DP_SET) {
-                if (devices.contains(deviceType)) {
-                    device = deviceType;
-                    break;
-                }
-            }
-        }
 
         // skip a2dp absolute volume control request when the device
         // is neither an a2dp device nor BLE device
@@ -7667,7 +7659,7 @@ public class AudioService extends IAudioService.Stub
     public boolean isStreamMutableByUi(int streamType) {
         return (mUserMutableStreams & (1 << streamType)) != 0;
     }
-
+    
     /** @hide */
     @Override
     public boolean isVisualizerLocked(String callingPackage) {
@@ -7800,8 +7792,7 @@ public class AudioService extends IAudioService.Stub
                 return AudioSystem.STREAM_RING;
             }
         default:
-            if (isInCommunication()
-                    || mAudioSystem.isStreamActive(AudioManager.STREAM_VOICE_CALL, 0)) {
+            if (isInCommunication()) {
                 if (!replaceStreamBtSco()
                         && mBtCommDeviceActive.get() == BT_COMM_DEVICE_ACTIVE_SCO) {
                     if (DEBUG_VOL) Log.v(TAG, "getActiveStreamType: Forcing STREAM_BLUETOOTH_SCO");
@@ -8670,12 +8661,6 @@ public class AudioService extends IAudioService.Stub
         return true;
     }
 
-    private boolean shouldPreserveVolume(boolean userSwitch, VolumeGroupState vgs) {
-        // as for STREAM_MUSIC, preserve volume from one user to the next except
-        // Android Automotive platform
-        return (userSwitch && vgs.isMusic()) && !isPlatformAutomotive();
-    }
-
     private void readVolumeGroupsSettings(boolean userSwitch) {
         synchronized (mSettingsLock) {
             synchronized (VolumeStreamState.class) {
@@ -8684,7 +8669,8 @@ public class AudioService extends IAudioService.Stub
                 }
                 for (int i = 0; i < sVolumeGroupStates.size(); i++) {
                     VolumeGroupState vgs = sVolumeGroupStates.valueAt(i);
-                    if (!shouldPreserveVolume(userSwitch, vgs)) {
+                    // as for STREAM_MUSIC, preserve volume from one user to the next.
+                    if (!(userSwitch && vgs.isMusic())) {
                         vgs.clearIndexCache();
                         vgs.readSettings();
                     }
@@ -9123,11 +9109,6 @@ public class AudioService extends IAudioService.Stub
             mIndexMap.clear();
         }
 
-        private @UserIdInt int getVolumePersistenceUserId() {
-            return isMusic() && !isPlatformAutomotive()
-                    ? UserHandle.USER_SYSTEM : UserHandle.USER_CURRENT;
-        }
-
         private void persistVolumeGroup(int device) {
             // No need to persist the index if the volume group is backed up
             // by a public stream type as this is redundant
@@ -9145,7 +9126,7 @@ public class AudioService extends IAudioService.Stub
             boolean success = mSettings.putSystemIntForUser(mContentResolver,
                     getSettingNameForDevice(device),
                     getIndex(device),
-                    getVolumePersistenceUserId());
+                    isMusic() ? UserHandle.USER_SYSTEM : UserHandle.USER_CURRENT);
             if (!success) {
                 Log.e(TAG, "persistVolumeGroup failed for group " +  mAudioVolumeGroup.name());
             }
@@ -9168,7 +9149,7 @@ public class AudioService extends IAudioService.Stub
                     String name = getSettingNameForDevice(device);
                     index = mSettings.getSystemIntForUser(
                             mContentResolver, name, defaultIndex,
-                            getVolumePersistenceUserId());
+                            isMusic() ? UserHandle.USER_SYSTEM : UserHandle.USER_CURRENT);
                     if (index == -1) {
                         continue;
                     }
@@ -10664,11 +10645,11 @@ public class AudioService extends IAudioService.Stub
             mContentResolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.MASTER_BALANCE), false, this, UserHandle.USER_ALL);
             mContentResolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.MAX_CALL_VOLUME), false, this, UserHandle.USER_ALL);
+                    Settings.System.MAX_CALL_VOLUME), false, this);
             mContentResolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.MAX_MUSIC_VOLUME), false, this, UserHandle.USER_ALL);
+                    Settings.System.MAX_MUSIC_VOLUME), false, this);
             mContentResolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.MAX_ALARM_VOLUME), false, this, UserHandle.USER_ALL);
+                    Settings.System.MAX_ALARM_VOLUME), false, this);
 
             mEncodedSurroundMode = mSettings.getGlobalInt(
                     mContentResolver, Settings.Global.ENCODED_SURROUND_OUTPUT,
@@ -10696,13 +10677,13 @@ public class AudioService extends IAudioService.Stub
                 if (lastPath.equals(Settings.System.MAX_CALL_VOLUME)) {
                     final int value = mSettings.getSystemIntForUser(mContentResolver,
                             Settings.System.MAX_CALL_VOLUME,
-                            mDefaultMaxCallVolume, UserHandle.USER_CURRENT);
+                            mDefaultMaxCallVolume, UserHandle.USER_CURRENT);        
                     updateStreamMax(AudioSystem.STREAM_VOICE_CALL, value);
                     return;
                 } else if (lastPath.equals(Settings.System.MAX_MUSIC_VOLUME)) {
                     final int value = mSettings.getSystemIntForUser(mContentResolver,
                             Settings.System.MAX_MUSIC_VOLUME,
-                            mDefaultMaxMusicVolume, UserHandle.USER_CURRENT);
+                            mDefaultMaxMusicVolume, UserHandle.USER_CURRENT);      
                     updateStreamMax(AudioSystem.STREAM_MUSIC, value);
                     return;
                 } else if (lastPath.equals(Settings.System.MAX_ALARM_VOLUME)) {
@@ -10746,26 +10727,21 @@ public class AudioService extends IAudioService.Stub
         }
 
         private void updateStreamMax(int stream, int newMax) {
+            AudioManager am = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
+            if (am == null) return;
             // keep the old volume fraction
-            final float oldMax = getStreamMaxVolume(stream);
-            final float oldVolume = getStreamVolume(stream);
-            final float min = getStreamMinVolume(stream);
-            final float fraction = (oldVolume - min) / (oldMax - min);
+            final float oldMax = am.getStreamMaxVolume(stream);
+            final float oldVolume = am.getStreamVolume(stream);
+            final int newVolume = Math.round(((float) newMax / oldMax) * oldVolume);
             // set the new max
-            MAX_STREAM_VOLUME[stream] = newMax;
             mStreamStates.get(stream).mIndexMax = newMax * 10;
             AudioSystem.initStreamVolume(stream, mStreamStates.get(stream).mIndexMin / 10, newMax);
+            MAX_STREAM_VOLUME[stream] = newMax;
             // notify listeners (should be volume dialog only)
             Intent intent = new Intent(AudioManager.ACTION_MAX_CHANGED);
             sendBroadcastToAll(intent, null);
             // set the volume to the old fraction
-            AudioManager am = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
-            if (am != null) {
-                final int newVolume = Math.round(fraction * (float) getStreamMaxVolume(stream));
-                am.setStreamVolume(stream, newVolume, 0);
-            }
-            // re-init everything, everywhere.
-            onAudioServerDied();
+            am.setStreamVolume(stream, newVolume, 0);
         }
     }
 
@@ -11378,8 +11354,6 @@ public class AudioService extends IAudioService.Stub
                 == PackageManager.PERMISSION_GRANTED)) {
             permissionOverridesCheck = true;
         } else if (uid < UserHandle.AID_APP_START) {
-            permissionOverridesCheck = true;
-        } else if (sdk <= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             permissionOverridesCheck = true;
         }
 
@@ -12007,7 +11981,7 @@ public class AudioService extends IAudioService.Stub
 
     private AudioDeviceAttributes anonymizeAudioDeviceAttributesUnchecked(
             AudioDeviceAttributes ada) {
-        if (ada == null || !AudioSystem.isBluetoothDevice(ada.getInternalType())) {
+        if (!AudioSystem.isBluetoothDevice(ada.getInternalType())) {
             return ada;
         }
         AudioDeviceAttributes res = new AudioDeviceAttributes(ada);
@@ -12073,25 +12047,6 @@ public class AudioService extends IAudioService.Stub
     // camera sound is forced if any of the resources corresponding to one active SIM
     // demands it.
     private boolean readCameraSoundForced() {
-        if (SystemProperties.getBoolean("audio.camerasound.force", false)
-                || mContext.getResources().getBoolean(
-                        com.android.internal.R.bool.config_camera_sound_forced)) {
-            return true;
-        }
-
-        SubscriptionManager subscriptionManager = mContext.getSystemService(
-                SubscriptionManager.class);
-        if (subscriptionManager == null) {
-            Log.e(TAG, "readCameraSoundForced cannot create SubscriptionManager!");
-            return false;
-        }
-        int[] subscriptionIds = subscriptionManager.getActiveSubscriptionIdList(false);
-        for (int subId : subscriptionIds) {
-            if (SubscriptionManager.getResourcesForSubId(mContext, subId).getBoolean(
-                    com.android.internal.R.bool.config_camera_sound_forced)) {
-                return true;
-            }
-        }
         return false;
     }
 
@@ -15305,13 +15260,11 @@ public class AudioService extends IAudioService.Stub
         final String key = "additional_output_device_delay";
         final String reply = AudioSystem.getParameters(
                 key + "=" + device.getInternalType() + "," + device.getAddress());
-        long delayMillis = 0;
-        if (reply.contains(key)) {
-            try {
-                delayMillis = Long.parseLong(reply.substring(key.length() + 1));
-            } catch (NullPointerException e) {
-                delayMillis = 0;
-            }
+        long delayMillis;
+        try {
+            delayMillis = Long.parseLong(reply.substring(key.length() + 1));
+        } catch (NullPointerException e) {
+            delayMillis = 0;
         }
         return delayMillis;
     }
@@ -15337,13 +15290,11 @@ public class AudioService extends IAudioService.Stub
         final String key = "max_additional_output_device_delay";
         final String reply = AudioSystem.getParameters(
                 key + "=" + device.getInternalType() + "," + device.getAddress());
-        long delayMillis = 0;
-        if (reply.contains(key)) {
-            try {
-                delayMillis = Long.parseLong(reply.substring(key.length() + 1));
-            } catch (NullPointerException e) {
-                delayMillis = 0;
-            }
+        long delayMillis;
+        try {
+            delayMillis = Long.parseLong(reply.substring(key.length() + 1));
+        } catch (NullPointerException e) {
+            delayMillis = 0;
         }
         return delayMillis;
     }

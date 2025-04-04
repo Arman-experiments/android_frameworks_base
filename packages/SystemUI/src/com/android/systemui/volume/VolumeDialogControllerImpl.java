@@ -1402,9 +1402,6 @@ public class VolumeDialogControllerImpl implements VolumeDialogController, Dumpa
             if (action.equals(AudioManager.VOLUME_CHANGED_ACTION)) {
                 final int stream = intent.getIntExtra(AudioManager.EXTRA_VOLUME_STREAM_TYPE,
                         STREAM_UNKNOWN);
-                if (stream == AudioSystem.STREAM_MUSIC) {
-                    return;
-                }
                 final int oldLevel = intent
                         .getIntExtra(AudioManager.EXTRA_PREV_VOLUME_STREAM_VALUE, -1);
                 if (D.BUG) Log.d(TAG, "onReceive VOLUME_CHANGED_ACTION stream=" + stream
@@ -1436,7 +1433,7 @@ public class VolumeDialogControllerImpl implements VolumeDialogController, Dumpa
                     changed = updateStreamMuteW(stream, muted);
                 }
             } else if (action.equals(AudioManager.ACTION_MAX_CHANGED)) {
-                getState();
+                getState();    
             } else if (action.equals(NotificationManager.ACTION_EFFECTS_SUPPRESSOR_CHANGED)) {
                 if (D.BUG) Log.d(TAG, "onReceive ACTION_EFFECTS_SUPPRESSOR_CHANGED");
                 changed = updateEffectsSuppressorW(mNoMan.getEffectsSuppressor());

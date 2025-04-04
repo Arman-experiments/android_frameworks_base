@@ -81,7 +81,6 @@ import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -1130,6 +1129,10 @@ public final class LoadedApk {
 
     @UnsupportedAppUsage
     public ClassLoader getClassLoader() {
+        ClassLoader ret = mClassLoader;
+        if (ret != null) {
+            return ret;
+        }
         synchronized (mLock) {
             if (mClassLoader == null) {
                 createOrUpdateClassLoaderLocked(null /*addedPaths*/);
@@ -1458,7 +1461,7 @@ public final class LoadedApk {
                         false, false);
                 for (int i = 0, n = packageIdentifiers.size(); i < n; i++) {
                     final int id = packageIdentifiers.keyAt(i);
-                    if (id == 0x01 || id == 0x7f || id == 0x3f) {
+                    if (id == 0x01 || id == 0x7f) {
                         continue;
                     }
 
@@ -1673,18 +1676,19 @@ public final class LoadedApk {
             if (holder != null) {
                 rd = holder.get(r);
                 if (rd != null) {
-                    Slog.d(TAG, 
+                    RuntimeException ex = rd.getUnregisterLocation();
+                    throw new IllegalArgumentException(
                             "Unregistering Receiver " + r
-                            + " that was already unregistered");
+                            + " that was already unregistered", ex);
                 }
             }
             if (context == null) {
-                Slog.d(TAG, "Unbinding Receiver " + r
+                throw new IllegalStateException("Unbinding Receiver " + r
                         + " from Context that is no longer in use: " + context);
             } else {
-                Slog.d(TAG, "Receiver not registered: " + r);
+                throw new IllegalArgumentException("Receiver not registered: " + r);
             }
-            return null;
+
         }
     }
 
@@ -2009,18 +2013,18 @@ public final class LoadedApk {
             if (holder != null) {
                 sd = holder.get(c);
                 if (sd != null) {
-                    Slog.d(TAG,
+                    RuntimeException ex = sd.getUnbindLocation();
+                    throw new IllegalArgumentException(
                             "Unbinding Service " + c
-                            + " that was already unbound");
+                            + " that was already unbound", ex);
                 }
             }
             if (context == null) {
-                Slog.d(TAG, "Unbinding Service " + c
+                throw new IllegalStateException("Unbinding Service " + c
                         + " from Context that is no longer in use: " + context);
             } else {
-               Slog.d(TAG, "Service not registered: " + c);
+                throw new IllegalArgumentException("Service not registered: " + c);
             }
-            return null;
         }
     }
 
@@ -2112,11 +2116,7 @@ public final class LoadedApk {
             synchronized(this) {
                 for (int i=0; i<mActiveConnections.size(); i++) {
                     ServiceDispatcher.ConnectionInfo ci = mActiveConnections.valueAt(i);
-                    try {
-                        ci.binder.unlinkToDeath(ci.deathMonitor, 0);
-                    } catch (NoSuchElementException e) {
-                        Slog.e(TAG, "ci binder Unable to unlink to death");
-                    }
+                    ci.binder.unlinkToDeath(ci.deathMonitor, 0);
                 }
                 mActiveConnections.clear();
                 mForgotten = true;
@@ -2205,12 +2205,7 @@ public final class LoadedApk {
                 }
 
                 if (old != null) {
-                    try {
-                        old.binder.unlinkToDeath(old.deathMonitor, 0);
-                    } catch (NoSuchElementException e) {
-                        Slog.e(TAG, "old binder Unable to unlink to death");
-                    }
-
+                    old.binder.unlinkToDeath(old.deathMonitor, 0);
                 }
             }
 

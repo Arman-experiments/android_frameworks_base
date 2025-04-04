@@ -87,6 +87,9 @@ constructor(
      */
     val authenticationMethod: Flow<AuthenticationMethodModel> = repository.authenticationMethod
 
+    /** The current pattern size. */
+    val patternSize: StateFlow<Byte> = repository.patternSize
+
     /**
      * Whether the auto confirm feature is enabled for the currently-selected user.
      *
@@ -122,9 +125,6 @@ constructor(
                 started = SharingStarted.WhileSubscribed(),
                 initialValue = null,
             )
-
-    /** The current pattern size. */
-    val patternSize: StateFlow<Byte> = repository.patternSize
 
     /** Whether the pattern should be visible for the currently-selected user. */
     val isPatternVisible: StateFlow<Boolean> = repository.isPatternVisible

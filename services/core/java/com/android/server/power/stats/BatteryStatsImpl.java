@@ -2573,7 +2573,7 @@ public class BatteryStatsImpl extends BatteryStats {
                 if (mCounts == null) {
                     mCounts = new long[counts.length];
                 }
-                for (int i = 0; i < counts.length && i < mCounts.length; ++i) {
+                for (int i = 0; i < counts.length; ++i) {
                     mCounts[i] += counts[i];
                 }
             }
@@ -12742,13 +12742,11 @@ public class BatteryStatsImpl extends BatteryStats {
 
                 // Distribute the remaining Tx power appropriately between all apps that transmitted
                 // packets.
-                if (totalTxPackets > 0) { // see https://github.com/GrapheneOS/os-issue-tracker/issues/4627
-                    for (int i = 0; i < txPackets.size(); i++) {
-                        final int uid = txPackets.keyAt(i);
-                        final long myTxTimeMs = (txPackets.valueAt(i) * leftOverTxTimeMs)
-                                / totalTxPackets;
-                        txTimesMs.incrementValue(uid, myTxTimeMs);
-                    }
+                for (int i = 0; i < txPackets.size(); i++) {
+                    final int uid = txPackets.keyAt(i);
+                    final long myTxTimeMs = (txPackets.valueAt(i) * leftOverTxTimeMs)
+                            / totalTxPackets;
+                    txTimesMs.incrementValue(uid, myTxTimeMs);
                 }
 
                 // Distribute the remaining Rx power appropriately between all apps that received

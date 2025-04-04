@@ -45,8 +45,8 @@ import com.android.systemui.shade.display.StatusBarTouchShadeDisplayPolicy
 import com.android.systemui.shade.domain.interactor.PanelExpansionInteractor
 import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
 import com.android.systemui.shared.animation.UnfoldMoveFromCenterAnimator
-import com.android.systemui.statusbar.data.repository.StatusBarContentInsetsProviderStore
 import com.android.systemui.statusbar.OnGoingActionProgressGroup
+import com.android.systemui.statusbar.data.repository.StatusBarContentInsetsProviderStore
 import com.android.systemui.statusbar.policy.Clock
 import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.statusbar.window.StatusBarWindowStateController
@@ -89,7 +89,7 @@ private constructor(
 ) : ViewController<PhoneStatusBarView>(view) {
 
     private lateinit var battery: BatteryMeterView
-    val clockController by lazy { ClockController(context, mView) }
+    private lateinit var clock: Clock
     private lateinit var startSideContainer: View
     private lateinit var endSideContainer: View
 
@@ -115,11 +115,12 @@ private constructor(
     private val configurationListener =
         object : ConfigurationController.ConfigurationListener {
             override fun onDensityOrFontScaleChanged() {
-                clockController.onDensityOrFontScaleChanged()
+                clock.onDensityOrFontScaleChanged()
             }
         }
 
     override fun onViewAttached() {
+        clock = mView.requireViewById(R.id.clock)
         battery = mView.requireViewById(R.id.battery)
         addDarkReceivers()
         addCursorSupportToIconContainers()
@@ -198,6 +199,10 @@ private constructor(
     }
 
     override fun onInit() {}
+    
+    fun getView(): PhoneStatusBarView {
+        return mView
+    }
 
     fun setImportantForAccessibility(mode: Int) {
         mView.importantForAccessibility = mode
@@ -242,11 +247,10 @@ private constructor(
                 !upOrCancel || shadeController.isExpandedVisible,
             )
         }
+        centralSurfaces.onBrightnessChanged(upOrCancel)
         if (ShadeWindowGoesAround.isEnabled && event.action == MotionEvent.ACTION_DOWN) {
             lazyStatusBarShadeDisplayPolicy.get().onStatusBarTouched(context.displayId)
         }
-
-        centralSurfaces.onBrightnessChanged(upOrCancel)
     }
 
     fun getOngoingActionProgressGroup(): OnGoingActionProgressGroup{
@@ -259,14 +263,12 @@ private constructor(
 
     private fun addDarkReceivers() {
         darkIconDispatcher.addDarkReceiver(battery)
+        darkIconDispatcher.addDarkReceiver(clock)
     }
 
     private fun removeDarkReceivers() {
         darkIconDispatcher.removeDarkReceiver(battery)
-    }
-
-    fun getPhoneStatusBarView(): PhoneStatusBarView {
-        return mView
+        darkIconDispatcher.removeDarkReceiver(clock)
     }
 
     inner class PhoneStatusBarViewTouchHandler : Gefingerpoken {

@@ -43,7 +43,7 @@ import com.android.systemui.qs.tileimpl.QSTileImpl;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.policy.BatteryController;
 
-import org.lineageos.internal.logging.LineageMetricsLogger;
+import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 
 import vendor.lineage.powershare.V1_0.IPowerShare;
 
@@ -189,7 +189,6 @@ public class PowerShareTile extends QSTileImpl<BooleanState>
         }
 
         state.icon = ResourceIcon.get(R.drawable.ic_qs_powershare);
-        state.hasLongClickEffect = false;
         try {
             state.value = mPowerShare.isEnabled();
         } catch (RemoteException ex) {
@@ -209,7 +208,7 @@ public class PowerShareTile extends QSTileImpl<BooleanState>
 
     @Override
     public int getMetricsCategory() {
-        return LineageMetricsLogger.TILE_POWERSHARE;
+        return MetricsEvent.INFINITY;
     }
 
     @Override

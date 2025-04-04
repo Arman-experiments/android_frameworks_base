@@ -15,8 +15,6 @@
  */
 package com.android.systemui.util;
 
-import static com.android.systemui.statusbar.StatusBarState.KEYGUARD;
-
 import android.content.Context;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
@@ -27,21 +25,28 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
 import android.graphics.Rect;
 import android.net.Uri;
-import android.os.AsyncTask;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 
 import com.android.systemui.Dependency;
+import com.android.systemui.qs.QSImpl;
+import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.statusbar.phone.ScrimController;
+import com.android.systemui.statusbar.policy.ConfigurationController;
+import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.tuner.TunerService;
+
+import java.lang.ref.WeakReference;
 
 public class WallpaperDepthUtils {
 
+    private static final String TAG = "WallpaperDepthUtils";
     private static final String WALLPAPER_DEPTH_KEY = "system:depth_wallpaper_subject_image_uri";
     private static final String WALLPAPER_DEPTH_ENABLED_KEY = "system:depth_wallpaper_enabled";
     private static final String WALLPAPER_DEPTH_OPACITY_KEY = "system:depth_wallpaper_opacity";
@@ -53,8 +58,13 @@ public class WallpaperDepthUtils {
     private Drawable mDimmingOverlay;
 
     private final Context mContext;
+    private final ConfigurationController mConfigurationController;
+    private final KeyguardStateController mKeyguardStateController;
     private final ScrimController mScrimController;
+    private final StatusBarStateController mStatusBarStateController;
+    private final QSImpl mQS;
     private final TunerService mTunerService;
+    private final Handler mHandler = new Handler(Looper.getMainLooper());
 
     private boolean mDWallpaperEnabled;
     private int mDWallOpacity = 255;
@@ -66,13 +76,54 @@ public class WallpaperDepthUtils {
     private int mOffsetX;
     private int mOffsetY;
 
+    private final ConfigurationController.ConfigurationListener mConfigurationListener =
+            new ConfigurationController.ConfigurationListener() {
+                @Override
+                public void onThemeChanged() {
+                    updateDepthWallpaper();
+                }
+
+                @Override
+                public void onUiModeChanged() {
+                    updateDepthWallpaper();
+                }
+
+                @Override
+                public void onConfigChanged(Configuration newConfig) {
+                    updateDepthWallpaper();
+                }
+            };
+
+    private final KeyguardStateController.Callback mKeyguardStateCallback =
+            new KeyguardStateController.Callback() {
+                @Override
+                public void onKeyguardFadingAwayChanged() {
+                    hideDepthWallpaper();
+                }
+
+                @Override
+                public void onKeyguardGoingAwayChanged() {
+                    hideDepthWallpaper();
+                }
+            };
+
     private WallpaperDepthUtils(Context context) {
-        mContext = context.getApplicationContext();
+        mContext = context;
+        mQS = Dependency.get(QSImpl.class);
         mScrimController = Dependency.get(ScrimController.class);
+        mStatusBarStateController = Dependency.get(StatusBarStateController.class);
+        mConfigurationController = Dependency.get(ConfigurationController.class);
+        mKeyguardStateController = Dependency.get(KeyguardStateController.class);
         mTunerService = Dependency.get(TunerService.class);
-        mTunerService.addTunable(mTunable, WALLPAPER_DEPTH_KEY, 
-            WALLPAPER_DEPTH_ENABLED_KEY, WALLPAPER_DEPTH_OPACITY_KEY, 
-            WALLPAPER_DEPTH_OFFSET_X_KEY, WALLPAPER_DEPTH_OFFSET_Y_KEY);
+
+        mTunerService.addTunable(mTunable, WALLPAPER_DEPTH_KEY,
+                WALLPAPER_DEPTH_ENABLED_KEY, WALLPAPER_DEPTH_OPACITY_KEY,
+                WALLPAPER_DEPTH_OFFSET_X_KEY, WALLPAPER_DEPTH_OFFSET_Y_KEY);
+
+        mStatusBarStateController.addCallback(mStatusBarStateListener);
+        mConfigurationController.addCallback(mConfigurationListener);
+        mKeyguardStateController.addCallback(mKeyguardStateCallback);
+
         mLockScreenSubject = new FrameLayout(mContext) {
             @Override
             protected void onDetachedFromWindow() {
@@ -80,8 +131,8 @@ public class WallpaperDepthUtils {
                 WallpaperDepthUtils.this.onDetachedFromWindow();
             }
         };
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -1);
-        mLockScreenSubject.setLayoutParams(lp);
+        mLockScreenSubject.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
     }
 
     public static WallpaperDepthUtils getInstance(Context context) {
@@ -90,18 +141,20 @@ public class WallpaperDepthUtils {
         }
         return instance;
     }
-    
-    public void onDozingChanged(boolean dozing) {
-        if (mDozing == dozing) {
-            return;
-        }
-        mDozing = dozing;
-        if (mDozing) {
-            hideDepthWallpaper();
-        } else {
-            updateDepthWallpaperVisibility();
-        }
-    }
+
+    private final StatusBarStateController.StateListener mStatusBarStateListener =
+            new StatusBarStateController.StateListener() {
+                @Override
+                public void onStateChanged(int newState) {
+                }
+
+                @Override
+                public void onDozingChanged(boolean dozing) {
+                    if (mDozing == dozing) return;
+                    mDozing = dozing;
+                    updateDepthWallpaperVisibility();
+                }
+            };
 
     private final TunerService.Tunable mTunable = new TunerService.Tunable() {
         @Override
@@ -117,8 +170,7 @@ public class WallpaperDepthUtils {
                     updateDepthWallpaper(true);
                     break;
                 case WALLPAPER_DEPTH_OPACITY_KEY:
-                    int opacity = TunerService.parseInteger(newValue, 100);
-                    mDWallOpacity = Math.round(opacity * 2.55f);
+                    mDWallOpacity = Math.round(TunerService.parseInteger(newValue, 100) * 2.55f);
                     updateDepthWallpaper(true);
                     break;
                 case WALLPAPER_DEPTH_OFFSET_X_KEY:
@@ -129,17 +181,10 @@ public class WallpaperDepthUtils {
                     mOffsetY = TunerService.parseInteger(newValue, 0);
                     updateDepthWallpaper(true);
                     break;
-                default:
-                    break;
             }
         }
     };
-    
-    public void setSubjectAlpha(float subjectAlpha) {
-        if (mLockScreenSubject == null) return;
-        mLockScreenSubject.post(() -> mLockScreenSubject.setAlpha(subjectAlpha));
-    }
-    
+
     public void updateDepthWallpaper() {
         updateDepthWallpaper(false);
     }
@@ -154,117 +199,109 @@ public class WallpaperDepthUtils {
     }
 
     private boolean canShowDepthWallpaper() {
-        return mLockScreenSubject != null && isDWallpaperEnabled() && !mDozing
+        return mLockScreenSubject != null && isDWallpaperEnabled()
                 && mScrimController.getState().toString().equals("KEYGUARD")
+                && mQS.isFullyCollapsed() && !mDozing
                 && mContext.getResources().getConfiguration().orientation
-                != Configuration.ORIENTATION_LANDSCAPE && !MediaArtUtils.getInstance(mContext).albumArtVisible();
+                != Configuration.ORIENTATION_LANDSCAPE;
     }
 
     public void updateDepthWallpaperVisibility() {
         if (mLockScreenSubject == null || !isDWallpaperEnabled()) return;
         int subjectVisibility = canShowDepthWallpaper() ? View.VISIBLE : View.GONE;
         if (mLockScreenSubject.getVisibility() == subjectVisibility) return;
-        mLockScreenSubject.post(() -> mLockScreenSubject.setVisibility(subjectVisibility));
-    }
-    
-    public void hideDepthWallpaper() {
-        if (mLockScreenSubject.getVisibility() == View.GONE) return;
-        mLockScreenSubject.post(() -> mLockScreenSubject.setVisibility(View.GONE));
+        mLockScreenSubject.setVisibility(subjectVisibility);
     }
 
-    public Bitmap getResizedBitmap(Bitmap wallpaperBitmap, float xOffsetDp, float yOffsetDp) {
+    public void hideDepthWallpaper() {
+        if (mLockScreenSubject.getVisibility() == View.GONE) return;
+        mLockScreenSubject.setVisibility(View.GONE);
+    }
+
+    private Bitmap getResizedBitmap(Bitmap wallpaperBitmap, float xOffsetDp, float yOffsetDp) {
         Rect displayBounds = mContext.getSystemService(WindowManager.class)
                 .getCurrentWindowMetrics()
                 .getBounds();
         DisplayMetrics displayMetrics = mContext.getResources().getDisplayMetrics();
         float xOffsetPx = xOffsetDp * displayMetrics.density;
         float yOffsetPx = yOffsetDp * displayMetrics.density;
+
         float ratioW = displayBounds.width() / (float) wallpaperBitmap.getWidth();
         float ratioH = displayBounds.height() / (float) wallpaperBitmap.getHeight();
-        int desiredHeight = Math.round(Math.max(ratioH, ratioW) * wallpaperBitmap.getHeight());
-        int desiredWidth = Math.round(Math.max(ratioH, ratioW) * wallpaperBitmap.getWidth());
-        desiredHeight = Math.max(desiredHeight, 0);
-        desiredWidth = Math.max(desiredWidth, 0);
-        Bitmap scaledWallpaperBitmap = Bitmap.createScaledBitmap(wallpaperBitmap, desiredWidth, desiredHeight, true);
+        float scale = Math.max(ratioH, ratioW);
+
+        int desiredWidth = Math.round(wallpaperBitmap.getWidth() * scale);
+        int desiredHeight = Math.round(wallpaperBitmap.getHeight() * scale);
+
+        Bitmap scaledBitmap = Bitmap.createScaledBitmap(wallpaperBitmap, desiredWidth, desiredHeight, true);
         int xPixelShift = Math.max((desiredWidth - displayBounds.width()) / 2, 0) - Math.round(xOffsetPx);
         int yPixelShift = Math.max((desiredHeight - displayBounds.height()) / 2, 0) - Math.round(yOffsetPx);
-        int cropWidth = Math.min(displayBounds.width(), scaledWallpaperBitmap.getWidth() - xPixelShift);
-        int cropHeight = Math.min(displayBounds.height(), scaledWallpaperBitmap.getHeight() - yPixelShift);
-        scaledWallpaperBitmap = Bitmap.createBitmap(scaledWallpaperBitmap, Math.max(xPixelShift, 0), Math.max(yPixelShift, 0), cropWidth, cropHeight);
-        return scaledWallpaperBitmap;
+
+        return Bitmap.createBitmap(scaledBitmap, Math.max(xPixelShift, 0), Math.max(yPixelShift, 0),
+                Math.min(displayBounds.width(), scaledBitmap.getWidth() - xPixelShift),
+                Math.min(displayBounds.height(), scaledBitmap.getHeight() - yPixelShift));
     }
 
     public void updateDepthWallpaper(boolean forced) {
         if (mLockScreenSubject == null || !isDWallpaperEnabled()) return;
         boolean pathChanged = (mPreviousWallpaperPath != null && !mPreviousWallpaperPath.equals(mWallpaperSubjectPath));
         if (!mWallpaperLoaded || pathChanged || forced) {
-            Log.d("WallpaperDepthUtils", "updateDepthWallpaper: " + (mWallpaperLoaded || forced ? "update required" : "first load"));
-            new LoadWallpaperTask().execute();
+            Log.d(TAG, "Updating depth wallpaper");
+            mHandler.post(new LoadWallpaperRunnable());
             mWallpaperLoaded = true;
             mPreviousWallpaperPath = mWallpaperSubjectPath;
         }
         updateDepthWallpaperVisibility();
     }
 
-    private class LoadWallpaperTask extends AsyncTask<Void, Void, Drawable> {
+    private class LoadWallpaperRunnable implements Runnable {
         @Override
-        protected Drawable doInBackground(Void... voids) {
+        public void run() {
             try {
-                Log.d("LoadWallpaperTask", "Wallpaper path: " + mWallpaperSubjectPath);
                 Bitmap bitmap = BitmapFactory.decodeFile(mWallpaperSubjectPath);
                 if (bitmap == null) {
-                    Log.d("LoadWallpaperTask", "Failed to decode bitmap from file");
-                    return null;
+                    Log.d(TAG, "Failed to decode bitmap from file");
+                    return;
                 }
                 Bitmap resizedBitmap = getResizedBitmap(bitmap, mOffsetX, mOffsetY);
+                bitmap.recycle();
+
                 if (resizedBitmap == null) {
-                    Log.d("LoadWallpaperTask", "Failed to decode resized bitmap from file");
-                    return null;
+                    Log.d(TAG, "Failed to resize bitmap");
+                    return;
                 }
-                if (mWallpaperBitmap != null) {
-                    mWallpaperBitmap = null;
+
+                if (mWallpaperBitmap != null && !mWallpaperBitmap.isRecycled()) {
+                    mWallpaperBitmap.recycle();
                 }
                 mWallpaperBitmap = resizedBitmap;
+
                 Drawable bitmapDrawable = new BitmapDrawable(mContext.getResources(), mWallpaperBitmap);
                 bitmapDrawable.setAlpha(255);
                 mDimmingOverlay = bitmapDrawable.getConstantState().newDrawable().mutate();
                 mDimmingOverlay.setTint(Color.BLACK);
-                return new LayerDrawable(new Drawable[]{bitmapDrawable, mDimmingOverlay});
-            } catch (OutOfMemoryError e) {
-                Log.e("LoadWallpaperTask", "Out of memory error", e);
-                return null;
-            } catch (Exception e) {
-                Log.e("LoadWallpaperTask", "Error loading wallpaper", e);
-                return null;
-            }
-        }
 
-        @Override
-        protected void onPostExecute(Drawable drawable) {
-            if (drawable == null || mWallpaperBitmap == null) {
-                Log.d("LoadWallpaperTask", "decodeFile returned nothing, skipping application of subject as background");
-                mWallpaperLoaded = false;
-                return;
-            }
-            if (drawable != null) {
-                mLockScreenSubject.setBackground(drawable);
+                LayerDrawable layerDrawable = new LayerDrawable(new Drawable[]{bitmapDrawable, mDimmingOverlay});
+                mLockScreenSubject.setBackground(layerDrawable);
                 mLockScreenSubject.getBackground().setAlpha(mDWallOpacity);
                 mDimmingOverlay.setAlpha(Math.round(mScrimController.getScrimBehindAlpha() * 240));
-                Log.d("LoadWallpaperTask", "Subject Loaded!");
-            } else {
-                updateDepthWallpaperVisibility();
+            } catch (OutOfMemoryError e) {
+                Log.e(TAG, "Out of memory error", e);
+            } catch (Exception e) {
+                Log.e(TAG, "Error loading wallpaper", e);
             }
         }
+    }
 
-        @Override
-        protected void onCancelled() {
-            super.onCancelled();
+    public void onDetachedFromWindow() {
+        mStatusBarStateController.removeCallback(mStatusBarStateListener);
+        mConfigurationController.removeCallback(mConfigurationListener);
+        mKeyguardStateController.removeCallback(mKeyguardStateCallback);
+        mTunerService.removeTunable(mTunable);
+
+        if (mWallpaperBitmap != null && !mWallpaperBitmap.isRecycled()) {
+            mWallpaperBitmap.recycle();
             mWallpaperBitmap = null;
         }
-    }
-    
-    public void onDetachedFromWindow() {
-        mTunerService.removeTunable(mTunable);
-        mWallpaperBitmap = null;
     }
 }

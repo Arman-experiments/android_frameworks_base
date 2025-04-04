@@ -36,7 +36,8 @@
     <!-- The maximum width of large tiles in the infinite grid QuickSettings -->
     <integer name="quick_settings_infinite_grid_tile_max_width">3</integer>
 
-    <integer name="power_menu_lite_max_columns">2</integer>
+    <integer name="power_menu_lite_max_columns">1</integer>
+    
     <integer name="power_menu_lite_max_rows">3</integer>
 
 </resources>

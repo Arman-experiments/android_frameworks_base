@@ -100,7 +100,7 @@ import java.util.Objects;
  */
 public final class NotificationRecord {
     static final String TAG = "NotificationRecord";
-    static final boolean DBG = Log.isLoggable(TAG, Log.DEBUG);
+    static final boolean DBG = false;
     // the period after which a notification is updated where it can make sound
     private static final int MAX_SOUND_DELAY_MS = 2000;
     private final StatusBarNotification sbn;
@@ -288,8 +288,8 @@ public final class NotificationRecord {
     }
 
     private Light calculateLights() {
-        // Lineage lights will set the default color later
-        int defaultLightColor = 0;
+        int defaultLightColor = mContext.getResources().getColor(
+                com.android.internal.R.color.config_defaultNotificationColor);
         int defaultLightOn = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_defaultNotificationLedOn);
         int defaultLightOff = mContext.getResources().getInteger(

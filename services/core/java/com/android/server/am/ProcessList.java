@@ -855,8 +855,8 @@ public final class ProcessList {
                     break;
                 case LMKD_RECONNECT_MSG:
                     if (!sLmkdConnection.connect()) {
-                        Slog.i(TAG, "Failed to connect to lmkd, retry after " +
-                                LMKD_RECONNECT_DELAY_MS + " ms");
+                        //Slog.i(TAG, "Failed to connect to lmkd, retry after " +
+                                //LMKD_RECONNECT_DELAY_MS + " ms");
                         // retry after LMKD_RECONNECT_DELAY_MS
                         sendMessageDelayed(obtainMessage(
                                 LMKD_RECONNECT_MSG), LMKD_RECONNECT_DELAY_MS);
@@ -1876,7 +1876,6 @@ public final class ProcessList {
                 AppGlobals.getPackageManager().checkPackageStartable(app.info.packageName, userId);
             } catch (RemoteException e) {
                 throw e.rethrowAsRuntimeException();
-            } catch (SecurityException e) {
             }
 
             int uid = app.uid;
@@ -2594,9 +2593,14 @@ public final class ProcessList {
                         // If we're not told to skip the process group creation, go create it.
                         final int res = Process.createProcessGroup(uid, startResult.pid);
                         if (res < 0) {
+                            if (res == -OsConstants.ESRCH) {
                                 Slog.e(ActivityManagerService.TAG,
                                         "Unable to create process group for "
                                         + app.processName + " (" + startResult.pid + ")");
+                            } else {
+                                throw new AssertionError("Unable to create process group for "
+                                    + app.processName + " (" + startResult.pid + ")");
+                            }
                         } else {
                             app.mProcessGroupCreated = true;
                         }

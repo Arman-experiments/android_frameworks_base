@@ -28,7 +28,8 @@ public final class PinSet {
             new PinSet(Collections.<Pin>emptySet(), Long.MAX_VALUE);
     public final long expirationTime;
     public final Set<Pin> pins;
-    private final Set<String> algorithms;
+
+    private volatile Set<String> algorithms;
 
     public PinSet(Set<Pin> pins, long expirationTime) {
         if (pins == null) {
@@ -36,12 +37,21 @@ public final class PinSet {
         }
         this.pins = pins;
         this.expirationTime = expirationTime;
-        this.algorithms = pins.stream()
-            .map(pin -> pin.digestAlgorithm)
-            .collect(Collectors.toCollection(ArraySet::new));
+        this.algorithms = null;
     }
 
-    Set<String> getPinAlgorithms() {
+    public Set<String> getPinAlgorithms() {
+        if (algorithms == null) {
+            synchronized (this) {
+                if (algorithms == null) {
+                    algorithms = Collections.unmodifiableSet(
+                        (Set<String>) pins.stream()
+                            .map(pin -> pin.digestAlgorithm)
+                            .collect(Collectors.toCollection(ArraySet::new))
+                    );
+                }
+            }
+        }
         return algorithms;
     }
 }

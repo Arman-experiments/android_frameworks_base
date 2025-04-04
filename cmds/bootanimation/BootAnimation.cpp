@@ -82,19 +82,11 @@ static const char PRODUCT_SHUTDOWNANIMATION_FILE[] = "/product/media/shutdownani
 static const char SYSTEM_SHUTDOWNANIMATION_FILE[] = "/system/media/shutdownanimation.zip";
 
 static const char* const BOOT_ANIMATION_FILES[] = {
-    "/product/media/bootanimation_rising.zip",
-    "/product/media/bootanimation_evo_reveal.zip",
-    "/product/media/bootanimation_aokp.zip",
-    "/product/media/bootanimation_cm.zip",
-    "/product/media/bootanimation_ctos.zip",
-    "/product/media/bootanimation_cyberpunk.zip",
-    "/product/media/bootanimation_du.zip",
-    "/product/media/bootanimation_google.zip",
+    "/product/media/bootanimation.zip",
     "/product/media/bootanimation_google_monet.zip",
-    "/product/media/bootanimation_pac.zip",
-    "/product/media/bootanimation_rr.zip",
-    "/product/media/bootanimation_slim.zip",
-    "/product/media/bootanimation_valorant.zip",
+    "/product/media/bootanimation_cyberpunk.zip",
+    "/product/media/bootanimation_ctos.zip",
+    "/product/media/bootanimation_evo_reveal.zip",
     "/data/misc/bootanim/bootanimation.zip"
 };
 

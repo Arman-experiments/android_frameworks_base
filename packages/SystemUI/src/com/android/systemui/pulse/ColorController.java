@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2020-2025 crDroid Android Project
+ * Copyright (C) 2020-2023 crDroid Android Project
  *
  * @author: Randall Rushing <randall.rushing@gmail.com>
  *
@@ -159,9 +159,9 @@ public class ColorController extends ContentObserver
 
     public void setMediaNotificationColor(int color) {
         if (color != 0) {
-            // be sure the color has an acceptable contrast against dark background
+            // be sure the color has an acceptable contrast against black navbar
             mAlbumColor = ContrastColorUtil.findContrastColorAgainstDark(color, 0x000000, true, 2);
-            // now be sure the color also has an acceptable contrast against light background
+            // now be sure the color also has an acceptable contrast against white navbar
             mAlbumColor = ContrastColorUtil.findContrastColor(mAlbumColor, 0xffffff, true, 2);
         } else {
             // fallback to accent color if the media notification isn't colorized

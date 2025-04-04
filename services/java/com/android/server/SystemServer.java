@@ -125,6 +125,7 @@ import com.android.server.adb.AdbService;
 import com.android.server.alarm.AlarmManagerService;
 import com.android.server.am.ActivityManagerService;
 import com.android.server.ambientcontext.AmbientContextManagerService;
+import com.android.server.android.CustomDeviceConfigService;
 import com.android.server.app.AppLockManagerService;
 import com.android.server.app.GameManagerService;
 import com.android.server.appbinding.AppBindingService;
@@ -167,15 +168,14 @@ import com.android.server.crashrecovery.CrashRecoveryAdaptor;
 import com.android.server.credentials.CredentialManagerService;
 import com.android.server.criticalevents.CriticalEventLog;
 import com.android.server.devicepolicy.DevicePolicyManagerService;
+import com.android.server.display.DcDimmingService;
 import com.android.server.devicestate.DeviceStateManagerService;
 import com.android.server.display.AutoAODService;
-import com.android.server.display.AutoDimService;
 import com.android.server.display.DisplayManagerService;
 import com.android.server.display.FreeformService;
 import com.android.server.display.color.ColorDisplayService;
 import com.android.server.dreams.DreamManagerService;
 import com.android.server.emergency.EmergencyAffordanceService;
-import com.android.server.android.CustomDeviceConfigService;
 import com.android.server.flags.FeatureFlagsService;
 import com.android.server.gpu.GpuService;
 import com.android.server.grammaticalinflection.GrammaticalInflectionService;
@@ -224,6 +224,7 @@ import com.android.server.pm.DexOptHelper;
 import com.android.server.pm.DynamicCodeLoggingService;
 import com.android.server.pm.Installer;
 import com.android.server.pm.LauncherAppsService;
+import com.android.server.pm.OtaDexoptService;
 import com.android.server.pm.PackageManagerService;
 import com.android.server.pm.ShortcutService;
 import com.android.server.pm.UserManagerService;
@@ -237,6 +238,7 @@ import com.android.server.policy.PhoneWindowManager;
 import com.android.server.policy.role.RoleServicePlatformHelperImpl;
 import com.android.server.power.PowerManagerService;
 import com.android.server.power.ShutdownThread;
+import com.android.server.power.SleepModeService;
 import com.android.server.power.ThermalManagerService;
 import com.android.server.power.hint.HintManagerService;
 import com.android.server.powerstats.PowerStatsService;
@@ -307,18 +309,14 @@ import com.android.server.webkit.WebViewUpdateService;
 import com.android.server.wm.ActivityTaskManagerService;
 import com.android.server.wm.WindowManagerGlobalLock;
 import com.android.server.wm.WindowManagerService;
+import com.android.server.infinity.health.HealthInterfaceService;
 
 import dalvik.system.VMRuntime;
-
-import org.rising.server.RisingServicesStarter;
 
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
@@ -329,6 +327,9 @@ import java.util.Timer;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
+
+// LineageHardware
+import com.android.server.infinity.LineageHardwareService;
 
 /**
  * Entry point to {@code system_server}.
@@ -391,6 +392,7 @@ public final class SystemServer implements Dumpable {
             "com.android.server.media.MediaCommunicationService";
     private static final String HEALTHCONNECT_MANAGER_SERVICE_CLASS =
             "com.android.server.healthconnect.HealthConnectManagerService";
+
     private static final String ROLE_SERVICE_CLASS = "com.android.role.RoleService";
     private static final String ENHANCED_CONFIRMATION_SERVICE_CLASS =
             "com.android.ecm.EnhancedConfirmationService";
@@ -901,7 +903,7 @@ public final class SystemServer implements Dumpable {
             initZygoteChildHeapProfiling();
 
             // Debug builds - spawn a thread to monitor for fd leaks.
-            if (Build.IS_ENG) {
+            if (Build.IS_DEBUGGABLE) {
                 spawnFdLeakCheckThread();
             }
 
@@ -1325,6 +1327,21 @@ public final class SystemServer implements Dumpable {
                             .BOOT_TIME_EVENT_ELAPSED_TIME__EVENT__PACKAGE_MANAGER_INIT_READY,
                     SystemClock.elapsedRealtime());
         }
+        // Manages A/B OTA dexopting. This is a bootstrap service as we need it to rename
+        // A/B artifacts after boot, before anything else might touch/need them.
+        boolean disableOtaDexopt = SystemProperties.getBoolean("config.disable_otadexopt", false);
+        if (!disableOtaDexopt) {
+            t.traceBegin("StartOtaDexOptService");
+            try {
+                Watchdog.getInstance().pauseWatchingCurrentThread("moveab");
+                OtaDexoptService.main(mSystemContext, mPackageManagerService);
+            } catch (Throwable e) {
+                reportWtf("starting OtaDexOptService", e);
+            } finally {
+                Watchdog.getInstance().resumeWatchingCurrentThread("moveab");
+                t.traceEnd();
+            }
+        }
 
         if (Build.IS_ARC) {
             t.traceBegin("StartArcSystemHealthService");
@@ -1516,7 +1533,7 @@ public final class SystemServer implements Dumpable {
 
         if (!Flags.recoverabilityDetection()) {
             // For debugging RescueParty
-            if (Build.IS_DEBUGGABLE
+            if (Build.IS_ENG
                     && SystemProperties.getBoolean("debug.crash_system", false)) {
                 throw new RuntimeException();
             }
@@ -1751,10 +1768,19 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(PinnerService.class);
             t.traceEnd();
 
-            if (Build.IS_DEBUGGABLE && ProfcollectForwardingService.enabled()) {
+            if (Build.IS_ENG && ProfcollectForwardingService.enabled()) {
                 t.traceBegin("ProfcollectForwardingService");
                 mSystemServiceManager.startService(ProfcollectForwardingService.class);
                 t.traceEnd();
+            }
+
+            if (!context.getResources().getString(R.string.config_deviceDcDimmingSysfsNode)
+                    .isEmpty()) {
+                t.traceBegin("StartDcDimmingService");
+                mSystemServiceManager.startService(DcDimmingService.class);
+                t.traceEnd();
+            } else {
+                Slog.i(TAG, "Dc Dimming not supported");
             }
 
             t.traceBegin("SignedConfigService");
@@ -1776,18 +1802,24 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (context.getResources().getBoolean(R.bool.config_supportSmart5G)) {
-                t.traceBegin("StartSmart5gService");
-                mSystemServiceManager.startService(Smart5gService.class);
-                t.traceEnd();
-            }
-
             if (AppFunctionManagerConfiguration.isSupported(context)) {
                 t.traceBegin("StartAppFunctionManager");
                 mSystemServiceManager.startService(AppFunctionManagerService.class);
                 t.traceEnd();
             }
-
+            
+            if (context.getResources().getBoolean(R.bool.config_supportSmart5G)) {
+                 t.traceBegin("StartSmart5gService");
+                 mSystemServiceManager.startService(Smart5gService.class);
+                 t.traceEnd();
+             }
+            
+            if (context.getResources().getBoolean(R.bool.config_dozeAlwaysOnDisplayAvailable)) {
+                 t.traceBegin("AutoAODService");
+                 mSystemServiceManager.startService(AutoAODService.class);
+                 t.traceEnd();
+            }
+             
             if (!isWatch && !isTv && !isAutomotive
                     && android.security.Flags.aapmApi()) {
                 t.traceBegin("StartAdvancedProtectionService");
@@ -1800,7 +1832,7 @@ public final class SystemServer implements Dumpable {
                 mSystemServiceManager.startService(TradeInModeService.class);
                 t.traceEnd();
             }
-
+            
         } catch (Throwable e) {
             Slog.e("System", "******************************************");
             Slog.e("System", "************ Failure starting core service");
@@ -2139,9 +2171,8 @@ public final class SystemServer implements Dumpable {
             }
             t.traceEnd();
 
-            final boolean wifiSupported = context.getPackageManager().hasSystemFeature(
-                    PackageManager.FEATURE_WIFI);
-            if (wifiSupported) {
+            if (context.getPackageManager().hasSystemFeature(
+                    PackageManager.FEATURE_WIFI)) {
                 // Wifi Service must be started first for wifi-related services.
                 t.traceBegin("StartWifi");
                 mSystemServiceManager.startServiceFromJar(
@@ -2160,7 +2191,7 @@ public final class SystemServer implements Dumpable {
                 }
             }
 
-            if (wifiSupported && context.getPackageManager().hasSystemFeature(
+            if (context.getPackageManager().hasSystemFeature(
                     PackageManager.FEATURE_WIFI_RTT)) {
                 t.traceBegin("StartRttService");
                 mSystemServiceManager.startServiceFromJar(
@@ -2168,7 +2199,7 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (wifiSupported && context.getPackageManager().hasSystemFeature(
+            if (context.getPackageManager().hasSystemFeature(
                     PackageManager.FEATURE_WIFI_AWARE)) {
                 t.traceBegin("StartWifiAware");
                 mSystemServiceManager.startServiceFromJar(
@@ -2176,7 +2207,7 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (wifiSupported && context.getPackageManager().hasSystemFeature(
+            if (context.getPackageManager().hasSystemFeature(
                     PackageManager.FEATURE_WIFI_DIRECT)) {
                 t.traceBegin("StartWifiP2P");
                 mSystemServiceManager.startServiceFromJar(
@@ -2755,6 +2786,10 @@ public final class SystemServer implements Dumpable {
             t.traceBegin("StartMediaMetricsManager");
             mSystemServiceManager.startService(MediaMetricsManagerService.class);
             t.traceEnd();
+            
+            t.traceBegin("StartHealthService");
+            mSystemServiceManager.startService(HealthInterfaceService.class);
+            t.traceEnd();
 
             if (!com.android.server.flags.Flags.optionalBackgroundInstallControl()
                     || SystemProperties.getBoolean(
@@ -2763,25 +2798,7 @@ public final class SystemServer implements Dumpable {
                 mSystemServiceManager.startService(BackgroundInstallControlService.class);
                 t.traceEnd();
             }
-
-            if (context.getResources().getBoolean(R.bool.config_dozeAlwaysOnDisplayAvailable)) {
-                t.traceBegin("AutoAODService");
-                mSystemServiceManager.startService(AutoAODService.class);
-                t.traceEnd();
-            }
-
-            if (context.getResources().getBoolean(R.bool.config_reduceBrightColorsAvailable)) {
-                t.traceBegin("AutoDimService");
-                mSystemServiceManager.startService(AutoDimService.class);
-                t.traceEnd();
-            }
-
-            // CustomDeviceConfigService
-            t.traceBegin("StartCustomDeviceConfigService");
-            mSystemServiceManager.startService(CustomDeviceConfigService.class);
             t.traceEnd();
-
-            mSystemServiceManager.startService(HideAppListService.class);
         }
 
         t.traceBegin("StartMediaProjectionManager");
@@ -2965,26 +2982,6 @@ public final class SystemServer implements Dumpable {
             t.traceBegin("StartDynamicInstrumentationManager");
             mSystemServiceManager.startService(DynamicInstrumentationManagerService.class);
             t.traceEnd();
-        }
-
-        // Lineage Services
-        String externalServer = context.getResources().getString(
-                org.lineageos.platform.internal.R.string.config_externalSystemServer);
-        final Class<?> serverClazz;
-        try {
-            serverClazz = Class.forName(externalServer);
-            final Constructor<?> constructor = serverClazz.getDeclaredConstructor(Context.class);
-            constructor.setAccessible(true);
-            final Object baseObject = constructor.newInstance(mSystemContext);
-            final Method method = baseObject.getClass().getDeclaredMethod("run");
-            method.setAccessible(true);
-            method.invoke(baseObject);
-        } catch (ClassNotFoundException
-                | IllegalAccessException
-                | InvocationTargetException
-                | InstantiationException
-                | NoSuchMethodException e) {
-            reportWtf("Making " + externalServer + " ready", e);
         }
 
         // It is now time to start up the app processes...
@@ -3182,13 +3179,14 @@ public final class SystemServer implements Dumpable {
         t.traceBegin("AppCompatOverridesService");
         mSystemServiceManager.startService(AppCompatOverridesService.Lifecycle.class);
         t.traceEnd();
+        
+        t.traceBegin("SleepModeService");
+        mSystemServiceManager.startService(SleepModeService.class);
+        t.traceEnd();
 
         t.traceBegin("HealthConnectManagerService");
         mSystemServiceManager.startService(HEALTHCONNECT_MANAGER_SERVICE_CLASS);
         t.traceEnd();
-
-        RisingServicesStarter risingServiceStarter = new RisingServicesStarter(mSystemServiceManager);
-        risingServiceStarter.startAllServices();
 
         if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_DEVICE_LOCK)) {
             t.traceBegin("DeviceLockService");

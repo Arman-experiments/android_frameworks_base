@@ -967,6 +967,21 @@ interface IActivityManager {
     int checkPermissionForDevice(in String permission, int pid, int uid, int deviceId);
 
     /**
+     *  Should disable touch if three fingers to screen shot is active?
+     */
+    boolean isSwipeToScreenshotGestureActive();
+    
+    /**
+     * Set whether three fingers to screen shot is active.
+     */
+    void setSwipeToScreenshotGestureActive(boolean enabled);
+
+    /**
+     *  Force full screen for devices with cutout
+     */
+    boolean shouldForceCutoutFullscreen(in String packageName);
+
+    /**
      * Notify AMS about binder transactions to frozen apps.
      *
      * @param debugPid The binder transaction sender
@@ -1038,19 +1053,4 @@ interface IActivityManager {
      */
     @EnforcePermission("INTERACT_ACROSS_USERS_FULL")
     IBinder refreshIntentCreatorToken(in Intent intent);
-
-    /**
-     *  Should disable touch if three fingers to screen shot is active?
-     */
-    boolean isSwipeToScreenshotGestureActive();
-
-    /**
-     *  Force full screen for devices with cutout
-     */
-    boolean shouldForceCutoutFullscreen(in String packageName);
-            
-    /**
-     *  Should disable touch if three fingers swipe enabled
-     */
-    boolean isThreeFingersSwipeActive();
 }

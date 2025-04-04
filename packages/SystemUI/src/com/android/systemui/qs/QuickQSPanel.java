@@ -28,6 +28,7 @@ import com.android.internal.logging.UiEventLogger;
 import com.android.systemui.FontSizeUtils;
 import com.android.systemui.plugins.qs.QSTile;
 import com.android.systemui.res.R;
+import com.android.systemui.Dependency;
 import com.android.systemui.qs.TileUtils;
 import com.android.systemui.qs.logging.QSLogger;
 import com.android.systemui.tuner.TunerService;
@@ -41,6 +42,7 @@ public class QuickQSPanel extends QSPanel implements TunerService.Tunable {
     // A fallback value for max tiles number when setting via Tuner (parseNumTiles)
     public static final int TUNER_MAX_TILES_FALLBACK = 6;
 
+    private QSLogger mQsLogger;
     private boolean mDisabledByPolicy;
     private int mMaxTiles;
 
@@ -55,12 +57,30 @@ public class QuickQSPanel extends QSPanel implements TunerService.Tunable {
         mHorizontalContentContainer.setClipChildren(false);
     }
 
+
+    @Override
+    public void setBrightnessView(@NonNull View view) {
+        if (mBrightnessView != null) {
+            removeView(mBrightnessView);
+        }
+        mBrightnessView = view;
+        mAutoBrightnessView = view.findViewById(R.id.brightness_icon);
+        setBrightnessViewMargin(mTop);
+        if (mBrightnessView != null) {
+            addView(mBrightnessView);
+
+            TunerService tunerService = Dependency.get(TunerService.class);
+            if (tunerService.getValue(QS_SHOW_BRIGHTNESS_SLIDER, 2) > 1) {
+                mBrightnessView.setVisibility(VISIBLE);
+            }
+        }
+    }
+
     View getBrightnessView() {
         return mBrightnessView;
     }
 
-    @Override
-    protected void setBrightnessViewMargin(boolean top) {
+    private void setBrightnessViewMargin(boolean top) {
         if (mBrightnessView != null) {
             MarginLayoutParams lp = (MarginLayoutParams) mBrightnessView.getLayoutParams();
             if (top) {
@@ -78,9 +98,9 @@ public class QuickQSPanel extends QSPanel implements TunerService.Tunable {
         }
     }
 
-    @Override
-    void initialize(QSLogger qsLogger, boolean usingMediaPlayer) {
-        super.initialize(qsLogger, usingMediaPlayer);
+    void initialize(QSLogger qsLogger) {
+        mQsLogger = qsLogger;
+        super.initialize(mQsLogger, true);
         if (mHorizontalContentContainer != null) {
             mHorizontalContentContainer.setClipChildren(false);
         }
@@ -102,9 +122,7 @@ public class QuickQSPanel extends QSPanel implements TunerService.Tunable {
 
     @Override
     protected boolean mediaNeedsTopMargin() {
-        boolean isA11Style = TileUtils.getQsUiStyle(mContext) != 0;
-        boolean isCompactPlayerEnabled = TileUtils.isCompactQSMediaPlayerEnforced(mContext);
-        return !isCompactPlayerEnabled || isCompactPlayerEnabled && !isA11Style;
+        return true;
     }
 
     @Override
@@ -114,6 +132,7 @@ public class QuickQSPanel extends QSPanel implements TunerService.Tunable {
                 getPaddingTop(),
                 getPaddingEnd(),
                 bottomPadding);
+                setBrightnessViewMargin(mTop);
     }
 
     @Override
@@ -151,9 +170,14 @@ public class QuickQSPanel extends QSPanel implements TunerService.Tunable {
         switch (key) {
             case QS_SHOW_BRIGHTNESS_SLIDER:
                 boolean value =
-                        TunerService.parseInteger(newValue, 1) > 1;
+                        TunerService.parseInteger(newValue, 2) > 1;
                 super.onTuningChanged(key, value ? newValue : "0");
                 break;
+            case QS_BRIGHTNESS_SLIDER_POSITION:
+                mTop = TunerService.parseInteger(newValue, 0) == 0;
+                updatePadding();
+                super.onTuningChanged(key, newValue);
+                break;    
             case QS_LAYOUT_COLUMNS:
             case QS_LAYOUT_COLUMNS_LANDSCAPE:
             case QQS_LAYOUT_ROWS:

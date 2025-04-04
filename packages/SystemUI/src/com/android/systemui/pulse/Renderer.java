@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016-2025 crDroid Android Project
+ * Copyright (C) 2016-2022 crDroid Android Project
  *
  * @author: Randall Rushing <randall.rushing@gmail.com>
  *
@@ -72,6 +72,8 @@ public abstract class Renderer implements VisualizerStreamHandler.Listener {
     public void onVisualizerLinkChanged(boolean linked) {}
 
     public void destroy() {}
+
+    public void setLeftInLandscape(boolean leftInLandscape) {}
 
     public void onSizeChanged(int w, int h, int oldw, int oldh) {}
 

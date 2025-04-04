@@ -281,8 +281,7 @@ object KeyguardBottomAreaViewBinder {
                                         KeyguardBottomAreaVibrations.Activated
                                     } else {
                                         KeyguardBottomAreaVibrations.ActivatedAlt
-                                    }
-                                )
+                                    })
                                 settingsMenu.setOnTouchListener(
                                     KeyguardSettingsButtonOnTouchListener(
                                         viewModel = viewModel.settingsMenuViewModel,
@@ -454,8 +453,7 @@ object KeyguardBottomAreaViewBinder {
                             KeyguardBottomAreaVibrations.Shake
                         } else {
                             KeyguardBottomAreaVibrations.ShakeAlt
-                        }
-                    )
+                        })
                 }
                 view.onLongClickListener =
                     OnLongClickListener(falsingManager, viewModel, vibratorHelper, onTouchListener)

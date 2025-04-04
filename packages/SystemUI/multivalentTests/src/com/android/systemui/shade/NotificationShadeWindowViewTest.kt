@@ -131,7 +131,6 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
     @Mock lateinit var primaryBouncerInteractor: PrimaryBouncerInteractor
     @Mock lateinit var alternateBouncerInteractor: AlternateBouncerInteractor
     @Mock lateinit var configurationForwarder: ConfigurationForwarder
-    @Mock private lateinit var qqsGestureListener: QQSGestureListener
     @Captor
     private lateinit var interactionEventHandlerCaptor: ArgumentCaptor<InteractionEventHandler>
 
@@ -204,9 +203,12 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
                 primaryBouncerInteractor,
                 alternateBouncerInteractor,
                 mock(),
+<<<<<<< HEAD:packages/SystemUI/multivalentTests/src/com/android/systemui/shade/NotificationShadeWindowViewTest.kt
                 { configurationForwarder },
                 brightnessMirrorShowingInteractor,
+=======
                 qqsGestureListener,
+>>>>>>> 4c71737e8787 (SystemUI: Add double tap to sleep gesture [1/2]):packages/SystemUI/tests/src/com/android/systemui/shade/NotificationShadeWindowViewTest.kt
             )
 
         controller.setupExpandedStatusBar()

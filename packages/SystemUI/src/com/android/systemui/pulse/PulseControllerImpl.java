@@ -1,6 +1,6 @@
 /**
  * Copyright (C) 2014 The TeamEos Project
- * Copyright (C) 2016-2025 crDroid Android Project
+ * Copyright (C) 2016-2024 crDroid Android Project
  *
  * @author: Randall Rushing <randall.rushing@gmail.com>
  *
@@ -58,19 +58,19 @@ import android.widget.FrameLayout;
 
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.UiBackground;
+import com.android.systemui.navigationbar.views.NavigationBarFrame;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.CommandQueue.Callbacks;
 import com.android.systemui.statusbar.NotificationMediaManager;
 import com.android.systemui.statusbar.phone.CentralSurfacesImpl;
 import com.android.systemui.statusbar.policy.ConfigurationController;
-import com.android.systemui.util.MediaSessionManagerHelper;
 
 import java.util.concurrent.Executor;
 
 @SysUISingleton
 public class PulseControllerImpl implements
         NotificationMediaManager.MediaListener,
-        CommandQueue.Callbacks, MediaSessionManagerHelper.MediaMetadataListener {
+        CommandQueue.Callbacks {
 
     public static final boolean DEBUG = false;
 
@@ -88,17 +88,18 @@ public class PulseControllerImpl implements
     private int mPulseStyle;
     private CentralSurfacesImpl mStatusbar;
     private final PowerManager mPowerManager;
-    private final MediaSessionManagerHelper mMediaSessionManagerHelper;
 
     // Pulse state
     private boolean mLinked;
     private boolean mPowerSaveModeEnabled;
     private boolean mScreenOn = true; // MUST initialize as true
     private boolean mMusicStreamMuted;
+    private boolean mLeftInLandscape;
     private boolean mScreenPinningEnabled;
     private boolean mIsMediaPlaying;
     private boolean mAttached;
 
+    private boolean mNavPulseEnabled;
     private boolean mLsPulseEnabled;
     private boolean mAmbPulseEnabled;
     private boolean mPulseEnabled;
@@ -169,6 +170,9 @@ public class PulseControllerImpl implements
 
         void register() {
             mContext.getContentResolver().registerContentObserver(
+                    Settings.Secure.getUriFor(Settings.Secure.NAVBAR_PULSE_ENABLED), false, this,
+                    UserHandle.USER_ALL);
+            mContext.getContentResolver().registerContentObserver(
                     Settings.Secure.getUriFor(Settings.Secure.LOCKSCREEN_PULSE_ENABLED), false, this,
                     UserHandle.USER_ALL);
             mContext.getContentResolver().registerContentObserver(
@@ -181,7 +185,8 @@ public class PulseControllerImpl implements
 
         @Override
         public void onChange(boolean selfChange, Uri uri) {
-            if (uri.equals(Settings.Secure.getUriFor(Settings.Secure.LOCKSCREEN_PULSE_ENABLED))
+            if (uri.equals(Settings.Secure.getUriFor(Settings.Secure.NAVBAR_PULSE_ENABLED))
+                    || uri.equals(Settings.Secure.getUriFor(Settings.Secure.LOCKSCREEN_PULSE_ENABLED))
                     || uri.equals(Settings.Secure.getUriFor(Settings.Secure.AMBIENT_PULSE_ENABLED))) {
                 updateEnabled();
                 updatePulseVisibility();
@@ -197,11 +202,13 @@ public class PulseControllerImpl implements
         }
 
         void updateEnabled() {
+            mNavPulseEnabled = Settings.Secure.getIntForUser(mContext.getContentResolver(),
+                    Settings.Secure.NAVBAR_PULSE_ENABLED, 0, UserHandle.USER_CURRENT) == 1;
             mLsPulseEnabled = Settings.Secure.getIntForUser(mContext.getContentResolver(),
                     Settings.Secure.LOCKSCREEN_PULSE_ENABLED, 0, UserHandle.USER_CURRENT) == 1;
             mAmbPulseEnabled = Settings.Secure.getIntForUser(mContext.getContentResolver(),
                     Settings.Secure.AMBIENT_PULSE_ENABLED, 0, UserHandle.USER_CURRENT) == 1;
-            mPulseEnabled = mLsPulseEnabled || mAmbPulseEnabled;
+            mPulseEnabled = mNavPulseEnabled || mLsPulseEnabled || mAmbPulseEnabled;
         }
 
         void updateRenderMode() {
@@ -221,18 +228,27 @@ public class PulseControllerImpl implements
     private void updatePulseVisibility() {
         if (mStatusbar == null) return;
 
+        NavigationBarFrame nv = mStatusbar.getNavigationBarView() != null ?
+                mStatusbar.getNavigationBarView().getNavbarFrame() : null;
         VisualizerView vv = mStatusbar.getLsVisualizer();
         boolean allowAmbPulse = vv != null && vv.isAttached()
                 && mAmbPulseEnabled && mKeyguardShowing && mDozing;
         boolean allowLsPulse = vv != null && vv.isAttached()
                 && mLsPulseEnabled && mKeyguardShowing && !mDozing;
+        boolean allowNavPulse = nv!= null && nv.isAttached()
+            && mNavPulseEnabled && !mKeyguardShowing;
 
         if (mKeyguardGoingAway) {
-            detachPulseFrom(vv);
+            detachPulseFrom(vv, allowNavPulse/*keep linked*/);
+        } else if (allowNavPulse) {
+            detachPulseFrom(vv, allowNavPulse/*keep linked*/);
+            attachPulseTo(nv);
         } else if (allowLsPulse || allowAmbPulse) {
+            detachPulseFrom(nv, allowLsPulse || allowAmbPulse/*keep linked*/);
             attachPulseTo(vv);
         } else {
-            detachPulseFrom(vv);
+            detachPulseFrom(nv, false /*keep linked*/);
+            detachPulseFrom(vv, false /*keep linked*/);
         }
     }
 
@@ -283,7 +299,6 @@ public class PulseControllerImpl implements
         filter.addAction(AudioManager.STREAM_MUTE_CHANGED_ACTION);
         filter.addAction(AudioManager.VOLUME_CHANGED_ACTION);
         context.registerReceiver(mBroadcastReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        mMediaSessionManagerHelper = MediaSessionManagerHelper.Companion.getInstance(mContext);
     }
 
     private void attachPulseTo(FrameLayout parent) {
@@ -299,19 +314,17 @@ public class PulseControllerImpl implements
             log("attachPulseTo() ");
             doLinkage();
         }
-        mMediaSessionManagerHelper.addMediaMetadataListener(this);
     }
 
-    private void detachPulseFrom(FrameLayout parent) {
+    private void detachPulseFrom(FrameLayout parent, boolean keepLinked) {
         if (parent == null) return;
         View v = parent.findViewWithTag(PulseView.TAG);
         if (v != null && mPulseView.getParent() == parent) {
             parent.removeView(mPulseView);
-            mAttached = false;
+            mAttached = keepLinked;
             log("detachPulseFrom() ");
             doLinkage();
         }
-        mMediaSessionManagerHelper.removeMediaMetadataListener(this);
     }
 
     private void loadRenderer() {
@@ -325,6 +338,7 @@ public class PulseControllerImpl implements
         }
         mRenderer = getRenderer();
         mColorController.setRenderer(mRenderer);
+        mRenderer.setLeftInLandscape(mLeftInLandscape);
         if (isRendering) {
             mRenderer.onStreamAnalyzed(true);
             mStreamHandler.resume();
@@ -496,8 +510,8 @@ public class PulseControllerImpl implements
     }
 
     @Override
-    public void onMediaColorsChanged() {
-        mColorController.setMediaNotificationColor(mMediaSessionManagerHelper.getMediaColor());
+    public void setMediaNotificationColor(int color) {
+        mColorController.setMediaNotificationColor(color);
     }
 
     @Override

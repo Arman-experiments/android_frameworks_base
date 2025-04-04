@@ -59,7 +59,9 @@ public class FeatureHooksUtils {
             "android.software.game_service",
             "com.google.android.feature.EXCHANGE_6_2",
             "com.google.android.apps.dialer.call_recording_audio",
-            "com.google.android.apps.dialer.SUPPORTED"
+            "com.google.android.apps.dialer.SUPPORTED",
+            "com.google.android.feature.CONTEXTUAL_SEARCH",
+            "com.google.android.feature.D2D_CABLE_MIGRATION_FEATURE"
     ));
 
     private static final Set<String> featuresTensor = new HashSet<>(Set.of(
@@ -90,28 +92,34 @@ public class FeatureHooksUtils {
             "com.google.android.apps.pixel.creativeassistant"
     ));
 
-    public static boolean hasSystemFeature(String name, int version, boolean hasSystemFeature) {
+    public static boolean hasSystemFeature(String name, boolean hasSystemFeature) {
         if (SystemProperties.getBoolean(PropsHooksUtils.ENABLE_PROP_OPTIONS, true)) {
             String packageName = ActivityThread.currentPackageName();
             if (packageName != null) {
                 boolean isGPhotosSpoofEnabled = SystemProperties.getBoolean(PropsHooksUtils.SPOOF_PIXEL_GPHOTOS, true);
                 boolean isTensorDevice = SystemProperties.get("ro.product.model").matches("Pixel [6-9][a-zA-Z ]*");
+                boolean enableTensorFeaturesOnNonTensor = SystemProperties.getBoolean("persist.sys.features.tensor", false);
                 if (pixelPackages.contains(packageName)) {
                     if (containsAnyFeatureSet(name, featuresPixel, featuresPixelOthers, featuresTensor, featuresNexus)) {
                         return true;
                     }
                 }
                 if (packageName.equals("com.google.android.apps.photos") && isGPhotosSpoofEnabled) {
-                    if (featuresPixel.contains(name)) return false;
+                    if (featuresPixel.contains(name) || featuresTensor.contains(name)) return false;
                     return containsAnyFeatureSet(name, featuresPixelOthers, featuresNexus);
                 }
                 if (packageName.equals("com.google.android.as")) {
-                    return isTensorDevice && featuresTensor.contains(name);
+                    if (isTensorDevice && featuresTensor.contains(name)) {
+                        return true;
+                    }
+                    if (!isTensorDevice && enableTensorFeaturesOnNonTensor && featuresTensor.contains(name)) {
+                        return true;
+                    }
                 }
                 if (!isTensorDevice && featuresTensor.contains(name)) {
-                    return false;
+                    return enableTensorFeaturesOnNonTensor;
                 }
-                if (containsAnyFeatureSet(name, featuresPixel, featuresPixelOthers)) {
+                if (containsAnyFeatureSet(name, featuresPixel, featuresPixelOthers, featuresNexus)) {
                     return true;
                 }
             }

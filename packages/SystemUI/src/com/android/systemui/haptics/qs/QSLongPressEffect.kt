@@ -80,11 +80,8 @@ constructor(
 
     private val snapEffect = LongPressHapticBuilder.createSnapEffect()
 
-    private var hasPrimitives =
-        vibratorHelper?.areAllPrimitivesSupported(
-            VibrationEffect.Composition.PRIMITIVE_LOW_TICK,
-            VibrationEffect.Composition.PRIMITIVE_SPIN
-        ) ?: false
+    private var hasPrimitives = vibratorHelper?.areAllPrimitivesSupported(
+        VibrationEffect.Composition.PRIMITIVE_LOW_TICK, VibrationEffect.Composition.PRIMITIVE_SPIN) ?: false
 
     val hasInitialized: Boolean
         get() = longPressHint != null

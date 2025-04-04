@@ -351,10 +351,10 @@ public class SoundDoseHelper {
                 SAFE_MEDIA_VOLUME_UNINITIALIZED);
         mSafeMediaVolumeDevices.append(AudioSystem.DEVICE_OUT_BLE_BROADCAST,
                 SAFE_MEDIA_VOLUME_UNINITIALIZED);
-        //mSafeMediaVolumeDevices.append(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES,
-                //SAFE_MEDIA_VOLUME_UNINITIALIZED);
-        //mSafeMediaVolumeDevices.append(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP,
-                //SAFE_MEDIA_VOLUME_UNINITIALIZED);
+        mSafeMediaVolumeDevices.append(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES,
+                SAFE_MEDIA_VOLUME_UNINITIALIZED);
+        mSafeMediaVolumeDevices.append(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP,
+                SAFE_MEDIA_VOLUME_UNINITIALIZED);
     }
 
     float getOutputRs2UpperBound() {
@@ -1014,7 +1014,10 @@ public class SoundDoseHelper {
                         || mEnableCsd.get();
         boolean safeMediaVolumeForce = SystemProperties.getBoolean(SYSTEM_PROPERTY_SAFEMEDIA_FORCE,
                 false);
-        boolean mccEnforcedSafeMediaVolume = false;
+        // we are using the MCC overlaid legacy flag used for the safe volume enablement
+        // to determine whether the MCC enforces any safe hearing standard.
+        boolean mccEnforcedSafeMediaVolume = mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_safe_media_volume_enabled);
 
         boolean safeVolumeEnabled =
                 (mccEnforcedSafeMediaVolume || safeMediaVolumeForce) && !safeMediaVolumeBypass;
@@ -1050,8 +1053,12 @@ public class SoundDoseHelper {
     private void updateCsdEnabled(String caller) {
         mForceCsdProperty.set(SystemProperties.getBoolean(SYSTEM_PROPERTY_SAFEMEDIA_CSD_FORCE,
                 false));
-        boolean mccEnforcedSafeMedia = false;
-        boolean csdEnable = false;
+        // we are using the MCC overlaid legacy flag used for the safe volume enablement
+        // to determine whether the MCC enforces any safe hearing standard.
+        boolean mccEnforcedSafeMedia = mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_safe_media_volume_enabled);
+        boolean csdEnable = mContext.getResources().getBoolean(
+                R.bool.config_safe_sound_dosage_enabled);
         boolean newEnabledCsd = (mccEnforcedSafeMedia && csdEnable) || mForceCsdProperty.get();
 
         synchronized (mCsdAsAFeatureLock) {

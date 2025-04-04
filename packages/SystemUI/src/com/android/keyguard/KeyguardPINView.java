@@ -29,6 +29,7 @@ import android.animation.ValueAnimator;
 import android.annotation.Nullable;
 import android.content.Context;
 import android.content.res.Configuration;
+import android.provider.Settings;
 import android.util.AttributeSet;
 import android.util.MathUtils;
 import android.view.View;
@@ -43,8 +44,6 @@ import com.android.app.animation.Interpolators;
 import com.android.settingslib.animation.DisappearAnimationUtils;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.policy.DevicePostureController.DevicePostureInt;
-
-import lineageos.providers.LineageSettings;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -282,8 +281,8 @@ public class KeyguardPINView extends KeyguardPinBasedInputView {
     }
 
     private void updatePinScrambling() {
-        final boolean scramblePin = LineageSettings.System.getInt(getContext().getContentResolver(),
-                LineageSettings.System.LOCKSCREEN_PIN_SCRAMBLE_LAYOUT, 0) == 1;
+        final boolean scramblePin = Settings.System.getInt(getContext().getContentResolver(),
+                Settings.System.LOCKSCREEN_PIN_SCRAMBLE_LAYOUT, 0) == 1;
         if (scramblePin || scramblePin != mScramblePin) {
             mScramblePin = scramblePin;
             if (scramblePin) {

@@ -128,7 +128,7 @@ import java.util.concurrent.TimeUnit;
 // TODO (bug:122218838): Validate changed time is handled correctly
 final class HistoricalRegistry {
     private static final boolean DEBUG = false;
-    private static final boolean KEEP_WTF_LOG = Build.IS_DEBUGGABLE;
+    private static final boolean KEEP_WTF_LOG = Build.IS_ENG;
 
     private static final String LOG_TAG = HistoricalRegistry.class.getSimpleName();
 
@@ -498,7 +498,7 @@ final class HistoricalRegistry {
         synchronized (mInMemoryLock) {
             if (mMode == AppOpsManager.HISTORICAL_MODE_ENABLED_ACTIVE) {
                 if (!isPersistenceInitializedMLocked()) {
-                    Slog.v(LOG_TAG, "Interaction before persistence initialized");
+                    if (DEBUG) Slog.v(LOG_TAG, "Interaction before persistence initialized");
                     return;
                 }
                 getUpdatedPendingHistoricalOpsMLocked(

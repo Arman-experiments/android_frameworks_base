@@ -1865,7 +1865,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         }
 
         boolean isBuildDebuggable() {
-            return Build.IS_DEBUGGABLE;
+            return Build.IS_ENG;
         }
 
         LockPatternUtils newLockPatternUtils() {
@@ -8797,20 +8797,17 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         final CallerIdentity caller = getCallerIdentity(callerPackage);
         Preconditions.checkCallAuthorization(hasFullCrossUsersPermission(caller, userHandle));
 
-        boolean legacyApp = false;
-        // callerPackage can only be null if we were called from within the system,
-        // which means that we are not a legacy app.
-        if (callerPackage != null) {
-            final ApplicationInfo ai;
-            try {
-                ai = mIPackageManager.getApplicationInfo(callerPackage, 0, userHandle);
-            } catch (RemoteException e) {
-                throw new SecurityException(e);
-            }
 
-            if (ai.targetSdkVersion <= Build.VERSION_CODES.M) {
-                legacyApp = true;
-            }
+        final ApplicationInfo ai;
+        try {
+            ai = mIPackageManager.getApplicationInfo(callerPackage, 0, userHandle);
+        } catch (RemoteException e) {
+            throw new SecurityException(e);
+        }
+
+        boolean legacyApp = false;
+        if (ai.targetSdkVersion <= Build.VERSION_CODES.M) {
+            legacyApp = true;
         }
 
         final int rawStatus = getEncryptionStatus();

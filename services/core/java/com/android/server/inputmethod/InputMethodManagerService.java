@@ -177,6 +177,7 @@ import com.android.internal.inputmethod.SoftInputShowHideReason;
 import com.android.internal.inputmethod.StartInputFlags;
 import com.android.internal.inputmethod.StartInputReason;
 import com.android.internal.inputmethod.UnbindReason;
+import com.android.internal.infinity.hardware.LineageHardwareManager;
 import com.android.internal.os.TransferPipe;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.CollectionUtils;
@@ -195,9 +196,6 @@ import com.android.server.pm.UserManagerInternal;
 import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.utils.PriorityDump;
 import com.android.server.wm.WindowManagerInternal;
-
-import lineageos.hardware.LineageHardwareManager;
-import lineageos.providers.LineageSettings;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
@@ -491,19 +489,19 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
             ContentResolver resolver = mContext.getContentResolver();
             if (mLineageHardware.isSupported(
                     LineageHardwareManager.FEATURE_HIGH_TOUCH_POLLING_RATE)) {
-                resolver.registerContentObserverAsUser(LineageSettings.System.getUriFor(
-                        LineageSettings.System.HIGH_TOUCH_POLLING_RATE_ENABLE),
+                resolver.registerContentObserverAsUser(Settings.System.getUriFor(
+                        Settings.System.HIGH_TOUCH_POLLING_RATE_ENABLE),
                         false, this, UserHandle.ALL);
             }
             if (mLineageHardware.isSupported(
                     LineageHardwareManager.FEATURE_HIGH_TOUCH_SENSITIVITY)) {
-                resolver.registerContentObserverAsUser(LineageSettings.System.getUriFor(
-                        LineageSettings.System.HIGH_TOUCH_SENSITIVITY_ENABLE),
+                resolver.registerContentObserverAsUser(Settings.System.getUriFor(
+                        Settings.System.HIGH_TOUCH_SENSITIVITY_ENABLE),
                         false, this, UserHandle.ALL);
             }
             if (mLineageHardware.isSupported(LineageHardwareManager.FEATURE_TOUCH_HOVERING)) {
-                resolver.registerContentObserverAsUser(LineageSettings.Secure.getUriFor(
-                        LineageSettings.Secure.FEATURE_TOUCH_HOVERING),
+                resolver.registerContentObserverAsUser(Settings.Secure.getUriFor(
+                        Settings.Secure.FEATURE_TOUCH_HOVERING),
                         false, this, UserHandle.ALL);
             }
         }
@@ -515,12 +513,12 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         }
 
         private void onChangeInternal(@NonNull Uri uri, @UserIdInt int userId) {
-            final Uri highTouchPollingRateUri = LineageSettings.System.getUriFor(
-                    LineageSettings.System.HIGH_TOUCH_POLLING_RATE_ENABLE);
-            final Uri touchSensitivityUri = LineageSettings.System.getUriFor(
-                    LineageSettings.System.HIGH_TOUCH_SENSITIVITY_ENABLE);
-            final Uri touchHoveringUri = LineageSettings.Secure.getUriFor(
-                    LineageSettings.Secure.FEATURE_TOUCH_HOVERING);
+            final Uri highTouchPollingRateUri = Settings.System.getUriFor(
+                    Settings.System.HIGH_TOUCH_POLLING_RATE_ENABLE);
+            final Uri touchSensitivityUri = Settings.System.getUriFor(
+                    Settings.System.HIGH_TOUCH_SENSITIVITY_ENABLE);
+            final Uri touchHoveringUri = Settings.Secure.getUriFor(
+                    Settings.Secure.FEATURE_TOUCH_HOVERING);
             synchronized (ImfLock.class) {
                 if (!mConcurrentMultiUserModeEnabled && mCurrentImeUserId != userId) {
                     return;
@@ -1483,9 +1481,9 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
                     newSettings.getEnabledInputMethodList());
         }
 
+        updateTouchHovering();
         updateTouchPollingRate();
         updateTouchSensitivity();
-        updateTouchHovering();
 
         if (DEBUG) {
             Slog.d(TAG, "Switching user stage 3/3. newUserId=" + newUserId
@@ -1549,9 +1547,9 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
                 // Must happen before registerContentObserverLocked
                 mLineageHardware = LineageHardwareManager.getInstance(mContext);
 
+                updateTouchHovering();
                 updateTouchPollingRate();
                 updateTouchSensitivity();
-                updateTouchHovering();
 
                 mStatusBarManagerInternal =
                         LocalServices.getService(StatusBarManagerInternal.class);
@@ -3080,8 +3078,8 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         if (!mLineageHardware.isSupported(LineageHardwareManager.FEATURE_HIGH_TOUCH_POLLING_RATE)) {
             return;
         }
-        final boolean enabled = LineageSettings.System.getInt(mContext.getContentResolver(),
-                LineageSettings.System.HIGH_TOUCH_POLLING_RATE_ENABLE, 0) == 1;
+        final boolean enabled = Settings.System.getInt(mContext.getContentResolver(),
+                Settings.System.HIGH_TOUCH_POLLING_RATE_ENABLE, 0) == 1;
         mLineageHardware.set(LineageHardwareManager.FEATURE_HIGH_TOUCH_POLLING_RATE, enabled);
     }
 
@@ -3089,8 +3087,8 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         if (!mLineageHardware.isSupported(LineageHardwareManager.FEATURE_HIGH_TOUCH_SENSITIVITY)) {
             return;
         }
-        final boolean enabled = LineageSettings.System.getInt(mContext.getContentResolver(),
-                LineageSettings.System.HIGH_TOUCH_SENSITIVITY_ENABLE, 0) == 1;
+        final boolean enabled = Settings.System.getInt(mContext.getContentResolver(),
+                Settings.System.HIGH_TOUCH_SENSITIVITY_ENABLE, 0) == 1;
         mLineageHardware.set(LineageHardwareManager.FEATURE_HIGH_TOUCH_SENSITIVITY, enabled);
     }
 
@@ -3098,8 +3096,8 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         if (!mLineageHardware.isSupported(LineageHardwareManager.FEATURE_TOUCH_HOVERING)) {
             return;
         }
-        final boolean enabled = LineageSettings.Secure.getInt(mContext.getContentResolver(),
-                LineageSettings.Secure.FEATURE_TOUCH_HOVERING, 0) == 1;
+        final boolean enabled = Settings.Secure.getInt(mContext.getContentResolver(),
+                Settings.Secure.FEATURE_TOUCH_HOVERING, 0) == 1;
         mLineageHardware.set(LineageHardwareManager.FEATURE_TOUCH_HOVERING, enabled);
     }
 

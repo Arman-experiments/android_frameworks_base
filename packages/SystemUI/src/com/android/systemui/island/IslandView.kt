@@ -38,6 +38,7 @@ import android.media.AudioManager
 import android.os.AsyncTask
 import android.os.Bundle
 import android.os.Handler
+import android.os.Looper
 import android.os.UserHandle
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -52,9 +53,8 @@ import android.text.style.StyleSpan
 import android.text.TextUtils
 import android.util.AttributeSet
 import android.util.IconDrawableFactory
-import android.util.Log
-import android.view.animation.AccelerateInterpolator
 import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.AccelerateInterpolator
 import android.view.MotionEvent
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
@@ -66,12 +66,10 @@ import android.view.ViewTreeObserver
 import androidx.transition.AutoTransition
 import androidx.transition.TransitionManager
 import com.android.systemui.res.R
-import java.lang.reflect.Method
 import com.android.systemui.shared.system.TaskStackChangeListener
 import com.android.systemui.shared.system.TaskStackChangeListeners
-import com.android.systemui.statusbar.notification.collection.NotificationEntry
+import com.android.systemui.statusbar.notification.headsup.HeadsUpManager
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout
-import com.android.systemui.island.NotificationHandler
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 
 import com.android.settingslib.drawable.CircleFramedDrawable
@@ -86,7 +84,7 @@ import java.util.Locale
 class IslandView : ExtendedFloatingActionButton {
 
     private var notificationStackScroller: NotificationStackScrollLayout? = null
-    private var notificationHandler: NotificationHandler? = null
+    private var headsUpManager: HeadsUpManager? = null
 
     private var subtitleColor: Int = Color.parseColor("#66000000")
     private var titleSpannable: SpannableString = SpannableString("")
@@ -112,7 +110,10 @@ class IslandView : ExtendedFloatingActionButton {
     private var telecomManager: TelecomManager? = null
     private var vibrator: Vibrator? = null
 
-    private val bgExecutor: Executor = Executors.newSingleThreadExecutor()
+    private val bgExecutor = Executors.newSingleThreadExecutor()
+    private val handler = Handler(Looper.getMainLooper())
+    private val lock = Any()
+    private val bitmapPool = mutableListOf<Bitmap>()
 
     private val taskStackChangeListener = object : TaskStackChangeListener {
         override fun onTaskStackChanged() {
@@ -146,13 +147,7 @@ class IslandView : ExtendedFloatingActionButton {
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         TaskStackChangeListeners.getInstance().unregisterTaskStackListener(taskStackChangeListener)
-    }
-    
-    private fun updateForegroundTaskSync() {
-        try {
-            val focusedStack = ActivityTaskManager.getService().getFocusedRootTaskInfo()
-            topActivityPackage = focusedStack?.topActivity?.packageName ?: ""
-        } catch (e: Exception) {}
+        cleanUpResources()
     }
 
     fun init(context: Context) {
@@ -161,20 +156,34 @@ class IslandView : ExtendedFloatingActionButton {
         vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         TaskStackChangeListeners.getInstance().registerTaskStackListener(taskStackChangeListener)
     }
+    
+    private fun updateForegroundTaskSync() {
+        synchronized(lock) {
+            try {
+                val focusedStack = ActivityTaskManager.getService().focusedRootTaskInfo
+                topActivityPackage = focusedStack?.topActivity?.packageName ?: ""
+            } catch (e: Exception) {}
+        }
+    }
+    
+    private fun vibrate(effect: VibrationEffect) {
+        Executors.newSingleThreadExecutor().execute {
+            vibrator?.vibrate(effect)
+        }
+    }
 
     fun setScroller(scroller: NotificationStackScrollLayout?) {
         this.notificationStackScroller = scroller
     }
 
-    fun setNotificationHandler(handler: NotificationHandler?) {
-        this.notificationHandler = handler
+    fun setHeadsupManager(headsUp: HeadsUpManager?) {
+        this.headsUpManager = headsUp
     }
 
     private fun removeHun() {
-        val sbn = notificationHandler?.getTopNotification() ?: return
-        val key = sbn.key
-        val reason = "HUN removed" // Provide a meaningful reason for the removal
-        notificationHandler?.removeNotification(key, true /* releaseImmediately */, false /* animate */, reason)
+        val key = headsUpManager?.getTopEntry()?.row?.entry?.key ?: return
+        val reason = "HUN removed"
+        headsUpManager?.removeNotification(key, true /* releaseImmediately */, false /* animate */, reason)
     }
 
     fun showIsland(show: Boolean, expandedFraction: Float) {
@@ -209,14 +218,31 @@ class IslandView : ExtendedFloatingActionButton {
             isDismissed = false
             isIslandAnimating = true
 
-            val animatorSet = AnimatorSet().apply {
-                duration = 600
+            scaleX = 0f
+            scaleY = 0f
+            alpha = 0f
+
+            val expandAnimatorSet = AnimatorSet().apply {
+                duration = 400
                 interpolator = AccelerateDecelerateInterpolator()
                 playTogether(
                     ObjectAnimator.ofFloat(this@IslandView, View.SCALE_X, 0f, 1.1f, 1f),
                     ObjectAnimator.ofFloat(this@IslandView, View.SCALE_Y, 0f, 1.1f, 1f),
                     ObjectAnimator.ofFloat(this@IslandView, View.ALPHA, 0f, 1f)
                 )
+            }
+
+            val bounceAnimatorSet = AnimatorSet().apply {
+                duration = 200
+                interpolator = AccelerateDecelerateInterpolator()
+                playTogether(
+                    ObjectAnimator.ofFloat(this@IslandView, View.SCALE_X, 1f, 0.95f, 1f),
+                    ObjectAnimator.ofFloat(this@IslandView, View.SCALE_Y, 1f, 0.95f, 1f)
+                )
+            }
+
+            AnimatorSet().apply {
+                playSequentially(expandAnimatorSet, bounceAnimatorSet)
                 start()
             }
 
@@ -235,17 +261,18 @@ class IslandView : ExtendedFloatingActionButton {
         post {
             resetLayout()
             shrink()
-
-            val animatorSet = AnimatorSet().apply {
-                duration = 600
-                interpolator = AccelerateDecelerateInterpolator()
-                playTogether(
-                    ObjectAnimator.ofFloat(this@IslandView, View.SCALE_X, 1f, 0.9f, 0f),
-                    ObjectAnimator.ofFloat(this@IslandView, View.SCALE_Y, 1f, 0.9f, 0f),
-                    ObjectAnimator.ofFloat(this@IslandView, View.ALPHA, 1f, 0f)
-                )
-                start()
+            
+            val collapseAnimatorSet = AnimatorSet().apply {
+            	duration = 400
+            	interpolator = AccelerateDecelerateInterpolator()
+            	playTogether(
+            	    ObjectAnimator.ofFloat(this@IslandView, View.SCALE_X, 1f, 0.9f, 0f),
+            	    ObjectAnimator.ofFloat(this@IslandView, View.SCALE_Y, 1f, 0.9f, 0f),
+            	    ObjectAnimator.ofFloat(this@IslandView, View.ALPHA, 1f, 0f)
+            	)
             }
+
+            collapseAnimatorSet.start()
 
             postOnAnimationDelayed({
                 hide()
@@ -265,6 +292,8 @@ class IslandView : ExtendedFloatingActionButton {
     fun cleanUpResources() {
         recycleBitmap((this.icon as? BitmapDrawable)?.bitmap)
         this.icon = null
+        bitmapPool.forEach { it.recycle() }
+        bitmapPool.clear()
         vibrator?.cancel()
         vibrator = null
         this.visibility = View.GONE
@@ -302,7 +331,7 @@ class IslandView : ExtendedFloatingActionButton {
     }
 
     private fun prepareIslandContent() {
-        val sbn = notificationHandler?.getTopNotification() ?: return
+        val sbn = headsUpManager?.getTopEntry()?.row?.entry?.sbn ?: return
         val notification = sbn.notification
         val (islandTitle, islandText) = resolveNotificationContent(notification)
         val iconDrawable = sequenceOf(
@@ -338,6 +367,7 @@ class IslandView : ExtendedFloatingActionButton {
         val resources = context.resources
         val bitmap = drawableToBitmap(iconDrawable)
         val roundedIcon = CircleFramedDrawable(bitmap, this.iconSize)
+        recycleBitmap((this.icon as? BitmapDrawable)?.bitmap)
         this.icon = roundedIcon
         this.iconTint = null
         this.bringToFront()
@@ -354,6 +384,25 @@ class IslandView : ExtendedFloatingActionButton {
             ?: notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
             ?: ""
         return titleText.toString() to contentText.toString()
+    }
+
+    fun prepareNotificationContent(title: String, content: String): Pair<String, String> {
+        val splitter = "|||"
+        val contentText = "$title$splitter$content"
+        val notificationContent = filterNotifContent(contentText)
+        val (notifTitleText, notifContentText) = notificationContent.split(splitter, limit = 2)
+        return Pair(notifTitleText.trim(), notifContentText.trim())
+    }
+
+    fun filterNotifContent(text: String): String {
+        val splitter = "|||"
+        val (title, content) = text.split(splitter, limit = 2)
+        var notifTitleContent = title.removeSuffix(":").trim()
+        notifTitleContent = notifTitleContent.replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase() else it.toString()
+        }
+        val filteredContent = content.toLowerCase().replace(notifTitleContent.toLowerCase(), "").trim().replaceFirst(notifTitleContent, notifTitleContent, ignoreCase = true)
+        return "$notifTitleContent$splitter$filteredContent"
     }
 
     fun getApplicationInfo(sbn: StatusBarNotification): ApplicationInfo {
@@ -375,47 +424,39 @@ class IslandView : ExtendedFloatingActionButton {
 
     fun getActiveAppVolumePackage(): String {
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val appVolumes = getAppVolumes(audioManager)
-        for (av in appVolumes) {
-            try {
-                val isActiveMethod = av.javaClass.getMethod("isActive")
-                val isActive = isActiveMethod.invoke(av) as Boolean
-                if (isActive) {
-                    val packageNameField = av.javaClass.getField("packageName")
-                    return packageNameField.get(av) as String
-                }
-            } catch (e: Exception) {
+        for (av in audioManager.listAppVolumes()) {
+            if (av.isActive) {
+                return av.getPackageName()
             }
         }
         return ""
-    }
-
-    private fun getAppVolumes(audioManager: AudioManager): List<Any> {
-        try {
-            val method = AudioManager::class.java.getDeclaredMethod("listAppVolumes")
-            method.isAccessible = true
-            @Suppress("UNCHECKED_CAST")
-            return method.invoke(audioManager) as List<Any>
-        } catch (e: Exception) {
-            return emptyList() 
-        }
     }
 
     fun drawableToBitmap(drawable: Drawable): Bitmap {
         if (drawable is BitmapDrawable) {
             return drawable.bitmap
         }
-        val bitmap = Bitmap.createBitmap(drawable.intrinsicWidth, drawable.intrinsicHeight, Bitmap.Config.ARGB_8888)
+        val width = drawable.intrinsicWidth.coerceAtLeast(1)
+        val height = drawable.intrinsicHeight.coerceAtLeast(1)
+        val bitmap = getBitmapFromPool(width, height)
         val canvas = Canvas(bitmap)
         drawable.setBounds(0, 0, canvas.width, canvas.height)
         drawable.draw(canvas)
-        recycleBitmap((this.icon as? BitmapDrawable)?.bitmap)
         return bitmap
+    }
+    
+    private fun getBitmapFromPool(width: Int, height: Int): Bitmap {
+        return bitmapPool.find { it.width == width && it.height == height }?.also {
+            bitmapPool.remove(it)
+            it.eraseColor(Color.TRANSPARENT)
+        } ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     }
 
     private fun recycleBitmap(bitmap: Bitmap?) {
-        if (bitmap != null && !bitmap.isRecycled) {
-            bitmap.recycle()
+        bitmap?.let {
+            if (!it.isRecycled) {
+                bitmapPool.add(it)
+            }
         }
     }
 
@@ -552,7 +593,7 @@ class IslandView : ExtendedFloatingActionButton {
                 expandIslandView()
             }, 50)
         }
-        AsyncTask.execute { vibrator?.vibrate(effectClick) }
+        vibrate(effectClick)
     }
 
     private fun onSingleTap(pendingIntent: PendingIntent?, packageName: String) {
@@ -576,7 +617,7 @@ class IslandView : ExtendedFloatingActionButton {
                 appIntent?.let { context.startActivityAsUser(it, UserHandle.CURRENT) }
             }
         }
-        AsyncTask.execute { vibrator?.vibrate(effectTick) }
+        vibrate(effectTick)
     }
 
     private fun isDeviceRinging(): Boolean {

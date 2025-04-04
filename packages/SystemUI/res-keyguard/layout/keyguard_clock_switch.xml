@@ -57,22 +57,17 @@
                android:layout_width="match_parent"
                android:layout_height="wrap_content" />
 
-      <include layout="@layout/keyguard_weather"
-               android:id="@+id/keyguard_weather"
-               android:layout_width="match_parent"
-               android:layout_height="wrap_content" />
-
-      <include 
-        android:id="@+id/aod_ls"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        layout="@layout/keyguard_aod_style" />
-
-      <include 
-        android:id="@+id/clock_ls"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        layout="@layout/keyguard_clock_style" />
+        <include layout="@layout/current_weather_view"
+            android:id="@+id/weather_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+            
+        <include 
+            android:id="@+id/clock_ls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            layout="@layout/keyguard_clock_style" />
 
       <include 
         android:id="@+id/keyguard_info_widgets"
@@ -84,16 +79,6 @@
         android:id="@+id/keyguard_widgets"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
-
-    <com.android.systemui.notifications.ui.PeekDisplayHolderLinearLayout
-        android:id="@+id/peek_display_area_top"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content">
-        <com.android.systemui.notifications.ui.PeekDisplayView
-            android:id="@+id/peek_display_top"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"/>
-    </com.android.systemui.notifications.ui.PeekDisplayHolderLinearLayout>
 
       <com.android.systemui.statusbar.phone.NotificationIconContainer
           android:id="@+id/left_aligned_notification_icon_container"

@@ -36,7 +36,6 @@ import static android.app.WindowConfiguration.ACTIVITY_TYPE_RECENTS;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
-import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.content.Intent.ACTION_VIEW;
@@ -716,7 +715,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                     | START_FLAG_NATIVE_DEBUGGING | START_FLAG_TRACK_ALLOCATION)) != 0;
             final boolean requestProfile = profilerInfo != null;
             if (requestDebug || requestProfile) {
-                final boolean debuggable = (Build.IS_DEBUGGABLE
+                final boolean debuggable = (Build.IS_ENG
                         || (aInfo.applicationInfo.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0)
                         && !aInfo.processName.equals("system");
                 if ((requestDebug && !debuggable) || (requestProfile
@@ -1610,19 +1609,16 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         }
     }
 
-    @VisibleForTesting
-    void moveHomeRootTaskToFrontIfNeeded(int flags, TaskDisplayArea taskDisplayArea,
+    private void moveHomeRootTaskToFrontIfNeeded(int flags, TaskDisplayArea taskDisplayArea,
             String reason) {
         final Task focusedRootTask = taskDisplayArea.getFocusedRootTask();
 
         if ((taskDisplayArea.getWindowingMode() == WINDOWING_MODE_FULLSCREEN
                 && (flags & ActivityManager.MOVE_TASK_WITH_HOME) != 0)
-                || (focusedRootTask != null && focusedRootTask.isActivityTypeRecents()
-                && focusedRootTask.getWindowingMode() != WINDOWING_MODE_MULTI_WINDOW)) {
+                || (focusedRootTask != null && focusedRootTask.isActivityTypeRecents())) {
             // We move root home task to front when we are on a fullscreen display area and
             // caller has requested the home activity to move with it. Or the previous root task
-            // is recents and we are not on multi-window mode.
-
+            // is recents.
             taskDisplayArea.moveHomeRootTaskToFront(reason);
         }
     }
@@ -2065,10 +2061,6 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         checkReadyForSleepLocked(false /* allowDelay */);
 
         return timedout;
-    }
-
-    public ActivityRecord getTopResumedActivity() {
-        return mTopResumedActivity;
     }
 
     void comeOutOfSleepIfNeededLocked() {
@@ -2812,13 +2804,6 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                     mWindowManager.executeAppTransition();
                     throw new IllegalArgumentException(
                             "startActivityFromRecents: Task " + taskId + " not found.");
-                }
-
-
-                if (task.getRootTask() != null
-                        && task.getRootTask().getWindowingMode() == WINDOWING_MODE_MULTI_WINDOW) {
-                    // Don't move home forward if task is in multi window mode
-                    moveHomeTaskForward = false;
                 }
 
                 if (moveHomeTaskForward) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2024 crDroid Android Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
  * except in compliance with the License. You may obtain a copy of the License at
@@ -78,10 +78,10 @@ open class LandscapeBatteryDrawable(private val context: Context, frameColor: In
     // Colors can be configured based on battery level (see res/values/arrays.xml)
     private var colorLevels: IntArray
 
-    private var fillColor: Int = Color.WHITE
-    private var backgroundColor: Int = Color.WHITE
+    private var fillColor: Int = Color.MAGENTA
+    private var backgroundColor: Int = Color.MAGENTA
     // updated whenever level changes
-    private var levelColor: Int = Color.WHITE
+    private var levelColor: Int = Color.MAGENTA
 
     // Dual tone implies that battery level is a clipped overlay over top of the whole shape
     private var dualTone = false
@@ -450,6 +450,9 @@ open class LandscapeBatteryDrawable(private val context: Context, frameColor: In
         val plusPathString = context.resources.getString(
                 com.android.internal.R.string.config_batterymeterLandPowersavePath)
         plusPath.set(PathParser.createPathFromPathData(plusPathString))
+
+        dualTone = context.resources.getBoolean(
+                com.android.internal.R.bool.config_batterymeterDualTone)
     }
 
     companion object {

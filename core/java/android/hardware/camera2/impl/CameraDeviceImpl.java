@@ -19,9 +19,9 @@ package android.hardware.camera2.impl;
 import static com.android.internal.util.function.pooled.PooledLambda.obtainRunnable;
 
 import android.annotation.FlaggedApi;
+import android.app.ActivityThread;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
-import android.app.ActivityThread;
 import android.app.compat.CompatChanges;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledSince;
@@ -114,6 +114,8 @@ public class CameraDeviceImpl extends CameraDevice
 
     private static final int REQUEST_ID_NONE = -1;
 
+    private int customOpMode = 0;
+
     /**
      * Starting {@link Build.VERSION_CODES#VANILLA_ICE_CREAM},
      * {@link #isSessionConfigurationSupported} also checks for compatibility of session parameters
@@ -123,8 +125,6 @@ public class CameraDeviceImpl extends CameraDevice
     @ChangeId
     @EnabledSince(targetSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
     static final long CHECK_PARAMS_IN_IS_SESSION_CONFIGURATION_SUPPORTED = 320741775;
-
-    private int customOpMode = 0;
 
     // TODO: guard every function with if (!mRemoteDevice) check (if it was closed)
     private ICameraDeviceUserWrapper mRemoteDevice;
@@ -1794,7 +1794,6 @@ public class CameraDeviceImpl extends CameraDevice
 
     private boolean checkPrivilegedAppList() {
         String packageName = ActivityThread.currentOpPackageName();
-        if (packageName.equals("com.google.android.GoogleCamera")) return true;
         String packageList = SystemProperties.get("persist.vendor.camera.privapp.list");
 
         if (packageList.length() > 0) {

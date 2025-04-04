@@ -10431,8 +10431,7 @@ public class TelephonyManager {
             if (telephony != null) {
                 return telephony.getAllowedNetworkTypesForReason(getSubId(), reason);
             } else {
-                Rlog.d(TAG, "telephony service is null.");
-                return -1; // NETWORK_MODE_UNKNOWN
+                throw new IllegalStateException("telephony service is null.");
             }
         } catch (RemoteException ex) {
             Rlog.e(TAG, "getAllowedNetworkTypesForReason RemoteException", ex);
@@ -13346,7 +13345,7 @@ public class TelephonyManager {
         }
 
         public @ModemActivityInfoError int getErrorCode() {
-            return 0;
+            return mErrorCode;
         }
 
         @Override
@@ -14770,8 +14769,7 @@ public class TelephonyManager {
             if (service != null) {
                 return service.isDataEnabledForReason(subId, reason);
             } else {
-                Log.d(TAG, "Telephony service is null.");
-                return false;
+                throw new IllegalStateException("telephony service is null.");
             }
         } catch (RemoteException ex) {
             Log.e(TAG, "Telephony#isDataEnabledForReason RemoteException", ex);
@@ -16395,8 +16393,7 @@ public class TelephonyManager {
                     return new Pair<Integer, Integer>(version / 100, version % 100);
                 }
             } else {
-                Log.d(TAG, "telephony service is null.");
-                return HAL_VERSION_UNKNOWN;
+                throw new IllegalStateException("telephony service is null.");
             }
         } catch (RemoteException e) {
             Log.e(TAG, "getHalVersion() RemoteException", e);
@@ -19503,8 +19500,7 @@ public class TelephonyManager {
             if (telephony != null) {
                 return telephony.isNullCipherNotificationsEnabled();
             } else {
-                Log.d(TAG, "Telephony service is null.");
-                return false;
+                throw new IllegalStateException("telephony service is null.");
             }
         } catch (RemoteException ex) {
             Rlog.e(TAG, "isNullCipherNotificationsEnabled RemoteException", ex);

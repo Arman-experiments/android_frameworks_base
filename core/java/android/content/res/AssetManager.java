@@ -81,7 +81,6 @@ public final class AssetManager implements AutoCloseable {
     public static final String FRAMEWORK_APK_PATH = getFrameworkApkPath();
     private static final String FRAMEWORK_APK_PATH_DEVICE = "/system/framework/framework-res.apk";
     private static final String FRAMEWORK_APK_PATH_RAVENWOOD = "ravenwood-data/framework-res.apk";
-    private static final String LINEAGE_APK_PATH = "/system/framework/org.lineageos.platform-res.apk";
 
     private static final Object sSync = new Object();
 
@@ -289,7 +288,6 @@ public final class AssetManager implements AutoCloseable {
             for (String idmapPath : systemIdmapPaths) {
                 apkAssets.add(ApkAssets.loadOverlayFromPath(idmapPath, ApkAssets.PROPERTY_SYSTEM));
             }
-            apkAssets.add(ApkAssets.loadFromPath(LINEAGE_APK_PATH, ApkAssets.PROPERTY_SYSTEM));
 
             sSystemApkAssetsSet = new ArraySet<>(apkAssets);
             sSystemApkAssets = apkAssets.toArray(new ApkAssets[0]);
@@ -970,14 +968,8 @@ public final class AssetManager implements AutoCloseable {
 
     @Nullable
     CharSequence getPooledStringForCookie(int cookie, int id) {
-        ApkAssets[] apkAssets = getApkAssets();
-
-        if (cookie > 0 && cookie <= apkAssets.length) {
-            // map cookies starting at 1.
-            return apkAssets[cookie - 1].getStringFromPool(id);
-        }
-
-        return null;
+        // Cookies map to ApkAssets starting at 1.
+        return getApkAssets()[cookie - 1].getStringFromPool(id);
     }
 
     /**

@@ -33,12 +33,12 @@
     <bool name="def_accelerometer_rotation">false</bool>
     <!-- Default screen brightness, from 0 to 255.  102 is 40%. -->
     <integer name="def_screen_brightness">102</integer>
-    <bool name="def_screen_brightness_automatic_mode">false</bool>
+    <bool name="def_screen_brightness_automatic_mode">true</bool>
     <fraction name="def_window_animation_scale">100%</fraction>
     <fraction name="def_window_transition_scale">100%</fraction>
     <bool name="def_haptic_feedback">true</bool>
 
-    <bool name="def_bluetooth_on">true</bool>
+    <bool name="def_bluetooth_on">false</bool>
     <bool name="def_wifi_display_on">false</bool>
     <bool name="def_install_non_market_apps">false</bool>
     <!-- 0 == off, 3 == on -->
@@ -341,7 +341,4 @@
 
     <!-- The default ringer mode. See `AudioManager` for list of valid values. -->
     <integer name="def_ringer_mode">2</integer>
-
-    <!-- Default for Settings.Global.TETHER_DUN_REQUIRED -->
-    <integer name="def_tether_dun_required">0</integer>
 </resources>

@@ -684,10 +684,7 @@ public class ScreenDecorations implements
             removeHwcOverlay();
         }
 
-        final boolean available = mContext.getResources().getBoolean(
-                    com.android.internal.R.bool.config_displayInversionAvailable);
-        if (!available) return;
-        if ((hasOverlays() || hasHwcOverlay())) {
+        if (hasOverlays() || hasHwcOverlay()) {
             if (mIsRegistered) {
                 return;
             }
@@ -1195,12 +1192,7 @@ public class ScreenDecorations implements
                 }
             }
         }
-        if (!DEBUG_DISABLE_SCREEN_DECORATIONS) {
-            mRoundedCornerResDelegate.dump(pw, args);
-        } else {
-            pw.println("  RoundedCornerResDelegate state:" +
-                       " skipped due to ScreenDecorations disabled");
-        }
+        mRoundedCornerResDelegate.dump(pw, args);
         mDebugRoundedCornerDelegate.dump(pw);
     }
 

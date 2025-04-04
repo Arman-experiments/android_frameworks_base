@@ -42,6 +42,7 @@ import android.graphics.Rect;
 import android.hardware.biometrics.BiometricFingerprintConstants;
 import android.hardware.biometrics.BiometricPrompt;
 import android.hardware.biometrics.SensorProperties;
+import android.hardware.display.ColorDisplayManager;
 import android.hardware.display.DisplayManager;
 import android.hardware.fingerprint.FingerprintManager;
 import android.hardware.fingerprint.FingerprintSensorProperties;
@@ -78,6 +79,7 @@ import com.android.internal.R;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.logging.InstanceId;
 import com.android.internal.util.LatencyTracker;
+import com.android.internal.util.infinity.udfps.CustomUdfpsUtils;
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.server.LocalServices;
 import com.android.systemui.Dumpable;
@@ -238,13 +240,16 @@ public class UdfpsController implements DozeReceiver, Dumpable {
     private boolean mScreenOffFod;
 
     private UdfpsAnimation mUdfpsAnimation;
-
-    PowerManagerInternal mPowerManagerInternal = LocalServices.getService(PowerManagerInternal.class);
+    private boolean mDisableNightMode;
+    private boolean mNightModeActive;
+    private int mAutoModeState;
 
     private boolean mDisableSmartPixels;
     private boolean mSmartPixelsFlag;
     private boolean mSmartPixelsEnabled;
     private boolean mSmartPixelsOnPowerSave;
+
+    PowerManagerInternal mPowerManagerInternal = LocalServices.getService(PowerManagerInternal.class);
 
     @VisibleForTesting
     public static final VibrationAttributes UDFPS_VIBRATION_ATTRIBUTES =
@@ -314,6 +319,9 @@ public class UdfpsController implements DozeReceiver, Dumpable {
         @Override
         public void showUdfpsOverlay(long requestId, int sensorId, int reason,
                 @NonNull IUdfpsOverlayControllerCallback callback) {
+            if (mDisableNightMode) {
+                disableNightMode();
+            }
             mUdfpsOverlayInteractor.setRequestId(requestId);
             mFgExecutor.execute(() -> UdfpsController.this.showUdfpsOverlay(
                     new UdfpsControllerOverlay(
@@ -354,6 +362,9 @@ public class UdfpsController implements DozeReceiver, Dumpable {
 
         @Override
         public void hideUdfpsOverlay(int sensorId) {
+            if (mDisableNightMode) {
+                setNightMode(mNightModeActive, mAutoModeState);
+            }
             mFgExecutor.execute(() -> {
                 if (mKeyguardUpdateMonitor.isFingerprintDetectionRunning()) {
                     // if we get here, we expect keyguardUpdateMonitor's fingerprintRunningState
@@ -398,9 +409,6 @@ public class UdfpsController implements DozeReceiver, Dumpable {
                         return;
                     }
                     mAcquiredReceived = true;
-                    final View view = mOverlay.getTouchOverlay();
-                    unconfigureDisplay(view);
-                    tryAodSendFingerUp();
                 });
             } else {
                 boolean acquiredVendor = acquiredInfo == FINGERPRINT_ACQUIRED_VENDOR;
@@ -838,6 +846,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
         udfpsHapticsSimulator.setUdfpsController(this);
         udfpsShell.setUdfpsOverlayController(mUdfpsOverlayController);
         mUdfpsVendorCode = mContext.getResources().getInteger(com.android.systemui.res.R.integer.config_udfpsVendorCode);
+        mDisableNightMode = CustomUdfpsUtils.hasUdfpsSupport(mContext);
         mDisableSmartPixels = mContext.getResources().getBoolean(com.android.systemui.res.R.bool.config_disableSmartPixelsOnUDFPS);
         boolean screenOffFodSupported = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_supportScreenOffUdfps) ||
@@ -860,13 +869,13 @@ public class UdfpsController implements DozeReceiver, Dumpable {
             );
         }
 
-        if (com.android.internal.util.android.Utils.isPackageInstalled(mContext,
-                "com.crdroid.udfps.animations")) {
+        if (com.android.internal.util.infinity.InfinityUtils.isPackageInstalled(mContext,
+                "com.infinity.udfps.animations")) {
             updateUdfpsAnimation();
             mConfigurationController.addCallback(mConfigurationListener);
         }
     }
-
+    
     private void updateUdfpsAnimation() {
         if (mUdfpsAnimation != null) {
             mUdfpsAnimation.removeAnimation();
@@ -877,6 +886,23 @@ public class UdfpsController implements DozeReceiver, Dumpable {
             mUdfpsAnimation.updatePosition();
         }
     }
+
+    private void disableNightMode() {
+        ColorDisplayManager colorDisplayManager = mContext.getSystemService(ColorDisplayManager.class);
+        mAutoModeState = colorDisplayManager.getNightDisplayAutoMode();
+        mNightModeActive = colorDisplayManager.isNightDisplayActivated();
+        colorDisplayManager.setNightDisplayActivated(false);
+    }
+
+    private void setNightMode(boolean activated, int autoMode) {
+        ColorDisplayManager colorDisplayManager = mContext.getSystemService(ColorDisplayManager.class);
+        colorDisplayManager.setNightDisplayAutoMode(0);
+        if (autoMode == 0) {
+            colorDisplayManager.setNightDisplayActivated(activated);
+        } else if (autoMode == 1 || autoMode == 2) {
+            colorDisplayManager.setNightDisplayAutoMode(autoMode);
+        }
+    }        
 
     private void isSmartPixelsEnabled() {
         if (!mSmartPixelsFlag) {
@@ -1193,17 +1219,9 @@ public class UdfpsController implements DozeReceiver, Dumpable {
                     + " current: " + mOverlay.getRequestId());
             return;
         }
-
-        final View view = mOverlay.getTouchOverlay();
-
         if (mPowerManagerInternal != null) {
             mPowerManagerInternal.setPowerMode(PowerManagerInternal.MODE_LAUNCH, true);
         }
-
-        if (view != null && view.getViewRootImpl() != null) {
-            view.getViewRootImpl().notifyRendererOfExpensiveFrame();
-        }
-
         if (mDisableSmartPixels) {
             if (!mSmartPixelsFlag && (mSmartPixelsEnabled || mSmartPixelsOnPowerSave)) {
                 disableSmartPixels();
@@ -1227,6 +1245,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
                 minor, major, orientation, time, gestureStart, isAod);
         Trace.endAsyncSection("UdfpsController.e2e.onPointerDown", 0);
 
+        final View view = mOverlay.getTouchOverlay();
         if (view != null && isOptical()) {
             if (mIgnoreRefreshRate) {
                 dispatchOnUiReady(requestId);
@@ -1240,10 +1259,6 @@ public class UdfpsController implements DozeReceiver, Dumpable {
                 cb.onFingerDown();
             }
             showUdfpsAnimation();
-        }
-
-        if (view != null && view.getViewRootImpl() != null) {
-            view.getViewRootImpl().notifyRendererOfExpensiveFrame();
         }
     }
 

@@ -77,8 +77,8 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
     private static final int TOTAL_NUM_TRACKS = 1;
     private static final int VIDEO_FRAME_RATE = 30;
     private static final int VIDEO_FRAME_RATE_TO_RESOLUTION_RATIO = 6;
-    private static final int LOW_VIDEO_FRAME_RATE_TO_RESOLUTION_RATIO = 2;
     private static final int LOW_VIDEO_FRAME_RATE = 25;
+    private static final int LOW_VIDEO_BIT_RATE = 1750000;
     private static final int AUDIO_BIT_RATE = 196000;
     private static final int AUDIO_SAMPLE_RATE = 44100;
     private static final int MAX_DURATION_MS = 60 * 60 * 1000;
@@ -187,19 +187,20 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
         DisplayManager dm = mContext.getSystemService(DisplayManager.class);
         Display display = dm.getDisplay(mDisplayId);
         display.getRealMetrics(metrics);
-        int refreshRate = mLowQuality ? LOW_VIDEO_FRAME_RATE : (int) display.getRefreshRate();
+        int refreshRate = mLowQuality ? LOW_VIDEO_FRAME_RATE :
+                (int) display.getRefreshRate();
         if (mMaxRefreshRate != 0 && refreshRate > mMaxRefreshRate) refreshRate = mMaxRefreshRate;
         int[] dimens = getSupportedSize(metrics.widthPixels, metrics.heightPixels, refreshRate);
         int width = dimens[0];
         int height = dimens[1];
         refreshRate = dimens[2];
-        int resRatio = mLowQuality ? LOW_VIDEO_FRAME_RATE_TO_RESOLUTION_RATIO
-                : VIDEO_FRAME_RATE_TO_RESOLUTION_RATIO;
-        int vidBitRate = width * height * refreshRate / VIDEO_FRAME_RATE * resRatio;
+        int vidBitRate = mLowQuality ? LOW_VIDEO_BIT_RATE :
+                width * height * refreshRate / VIDEO_FRAME_RATE
+                * VIDEO_FRAME_RATE_TO_RESOLUTION_RATIO;
         boolean unlimit = Settings.System.getInt(
                 mContext.getContentResolver(),
                 Settings.System.UNLIMIT_SCREENRECORD, 0) != 0;
-        long maxFilesize = mLongerDuration ? MAX_FILESIZE_BYTES_LONGER : MAX_FILESIZE_BYTES;
+        long maxFilesize = mLongerDuration ? MAX_FILESIZE_BYTES_LONGER : MAX_FILESIZE_BYTES;                 
         if (!mHEVC) {
             mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
             mMediaRecorder.setVideoEncodingProfileLevel(

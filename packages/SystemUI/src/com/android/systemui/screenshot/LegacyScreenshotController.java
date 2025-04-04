@@ -45,6 +45,7 @@ import android.graphics.Rect;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Process;
+import android.os.RemoteException;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.VibrationEffect;
@@ -66,6 +67,7 @@ import android.window.WindowContext;
 
 import com.android.internal.logging.UiEventLogger;
 import com.android.internal.policy.PhoneWindow;
+import com.android.internal.statusbar.IStatusBarService;
 import com.android.settingslib.applications.InterestingConfigChanges;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.broadcast.BroadcastSender;
@@ -74,6 +76,7 @@ import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.res.R;
 import com.android.systemui.screenshot.TakeScreenshotService.RequestCallback;
+import com.android.systemui.screenshot.scroll.ScrollCaptureController;
 import com.android.systemui.screenshot.scroll.ScrollCaptureExecutor;
 import com.android.systemui.util.Assert;
 
@@ -130,6 +133,7 @@ public class LegacyScreenshotController implements InteractiveScreenshotHandler 
     private final ScreenshotNotificationSmartActionsProvider
             mScreenshotNotificationSmartActionsProvider;
     private final TimeoutHandler mScreenshotHandler;
+    private final IStatusBarService mStatusBarService;
     private final UserManager mUserManager;
     private final AssistContentRequester mAssistContentRequester;
     private final ActionExecutor mActionExecutor;
@@ -174,6 +178,7 @@ public class LegacyScreenshotController implements InteractiveScreenshotHandler 
             BroadcastDispatcher broadcastDispatcher,
             ScreenshotNotificationSmartActionsProvider screenshotNotificationSmartActionsProvider,
             ScreenshotActionsController.Factory screenshotActionsControllerFactory,
+            IStatusBarService statusBarService,
             ActionExecutor.Factory actionExecutorFactory,
             UserManager userManager,
             AssistContentRequester assistContentRequester,
@@ -191,6 +196,7 @@ public class LegacyScreenshotController implements InteractiveScreenshotHandler 
         mMainExecutor = mainExecutor;
         mScrollCaptureExecutor = scrollCaptureExecutor;
         mScreenshotNotificationSmartActionsProvider = screenshotNotificationSmartActionsProvider;
+        mStatusBarService = statusBarService;
         mBgExecutor = Executors.newSingleThreadExecutor();
         mBroadcastSender = broadcastSender;
         mBroadcastDispatcher = broadcastDispatcher;
@@ -269,6 +275,11 @@ public class LegacyScreenshotController implements InteractiveScreenshotHandler 
         Assert.isMainThread();
 
         mCurrentRequestCallback = requestCallback;
+        if (screenshot.getType() == WindowManager.TAKE_SCREENSHOT_SELECTED_REGION) {
+            startPartialScreenshotActivity(Process.myUserHandle());
+            finisher.accept(null);
+            return;
+        }
 
         if (screenshot.getBitmap() == null) {
             Log.e(TAG, "handleScreenshot: Screenshot bitmap was null");
@@ -446,7 +457,8 @@ public class LegacyScreenshotController implements InteractiveScreenshotHandler 
 
             @Override
             public void onTouchOutside() {
-                mViewProxy.requestDismissal(SCREENSHOT_DISMISSED_OTHER);
+                // TODO(159460485): Remove this when focus is handled properly in the system
+                setWindowFocusable(false);
             }
         });
 
@@ -500,6 +512,29 @@ public class LegacyScreenshotController implements InteractiveScreenshotHandler 
                     return Unit.INSTANCE;
                 }
         );
+    }
+
+    private void startPartialScreenshotActivity(UserHandle owner) {
+        Bitmap newScreenshot = mImageCapture.captureDisplay(mDisplay.getDisplayId(),
+                getFullScreenRect());
+        ScrollCaptureController.BitmapScreenshot bitmapScreenshot =
+                new ScrollCaptureController.BitmapScreenshot(mContext, newScreenshot);
+
+        mScrollCaptureExecutor.executeBatchScrollCapture(bitmapScreenshot,
+                () -> {
+                    final Intent intent = ActionIntentCreator.INSTANCE.createLongScreenshotIntent(
+                            owner, mContext);
+                    mContext.startActivity(intent);
+
+                    try {
+                        mStatusBarService.collapsePanels();
+                    } catch (RemoteException e) {
+                        Log.e(TAG, "Error during collapsing panels", e);
+                    }
+                },
+                (destination, onTransitionEnd, longScreenshot) -> {
+                    onTransitionEnd.run();
+                });
     }
 
     private void onScrollButtonClicked(UserHandle owner, ScrollCaptureResponse response) {

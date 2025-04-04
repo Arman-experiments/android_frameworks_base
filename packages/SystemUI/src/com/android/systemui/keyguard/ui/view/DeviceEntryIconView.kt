@@ -71,8 +71,8 @@ constructor(
 
     private val fingerprintDrawable: UdfpsIconDrawable = UdfpsFpIconDrawable(context)
 
-    private val packageInstalled = com.android.internal.util.android.Utils.isPackageInstalled(
-        context, "com.crdroid.udfps.icons"
+    private val packageInstalled = com.android.internal.util.infinity.InfinityUtils.isPackageInstalled(
+        context, "com.infinity.udfps.icons"
     )
 
     init {
@@ -155,14 +155,20 @@ constructor(
             R.id.unlocked,
         )
         // FINGERPRINT
-        LottieCompositionFactory.fromRawRes(mContext, R.raw.udfps_lockscreen_fp).addListener { result ->
-            aodFpDrawable.setComposition(result)
+        if (customUdfpsIcon) {
+            fingerprintDrawable.setBounds(0, 0, bgView.width, bgView.height)
+            animatedIconDrawable.addState(
+                getIconState(IconType.FINGERPRINT, false),
+                fingerprintDrawable,
+                R.id.locked_fp
+            )
+        } else {
+            animatedIconDrawable.addState(
+                getIconState(IconType.FINGERPRINT, false),
+                context.getDrawable(R.drawable.ic_fingerprint)!!,
+                R.id.locked_fp
+            )
         }
-        animatedIconDrawable.addState(
-            getIconState(IconType.FINGERPRINT, false),
-            aodFpDrawable,
-            R.id.locked_fp,
-        )
 
         // AOD states
         // LOCK
@@ -178,6 +184,9 @@ constructor(
             R.id.unlocked_aod,
         )
         // FINGERPRINT
+        LottieCompositionFactory.fromRawRes(mContext, R.raw.udfps_aod_fp).addListener { result ->
+            aodFpDrawable.setComposition(result)
+        }
         animatedIconDrawable.addState(
             getIconState(IconType.FINGERPRINT, true),
             aodFpDrawable,

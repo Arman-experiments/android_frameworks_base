@@ -89,7 +89,6 @@ final class ElectronBeam implements ScreenStateAnimator {
 
     // Set to true when the animation context has been fully prepared.
     private boolean mPrepared;
-    private boolean mCreatedResources;
     private int mMode;
 
     private final DisplayManagerInternal mDisplayManagerInternal;
@@ -147,6 +146,12 @@ final class ElectronBeam implements ScreenStateAnimator {
         mDisplayManagerInternal = LocalServices.getService(DisplayManagerInternal.class);
     }
 
+    @Override
+    public void destroy() {
+        // Implementation of the destroy method specific to ElectronBeam
+        // You need to provide the actual implementation here
+    }
+
     /**
      * Warms up the electron beam in preparation for turning on or off.
      * This method prepares a GL context, and captures a screen shot.
@@ -196,7 +201,6 @@ final class ElectronBeam implements ScreenStateAnimator {
         }
 
         // Done.
-        mCreatedResources = true;
         mLastWasProtectedContent = isProtected;
         mLastWasWideColor = isWideColor;
 
@@ -216,31 +220,6 @@ final class ElectronBeam implements ScreenStateAnimator {
     }
 
     /**
-     * Dismisses the electron beam animation resources.
-     *
-     * This function destroys the resources that are created for the electron beam
-     * animation but does not clean up the surface.
-     */
-    public void dismissResources() {
-        if (DEBUG) {
-            Slog.d(TAG, "dismissResources");
-        }
-
-        if (mCreatedResources) {
-            attachEglContext();
-            try {
-                destroyScreenshotTexture();
-                destroyEglSurface();
-            } finally {
-                detachEglContext();
-            }
-            // This is being called with no active context so shouldn't be
-            // needed but is safer to not change for now.
-            mCreatedResources = false;
-        }
-    }
-
-    /**
      * Dismisses the electron beam animation surface and cleans up.
      *
      * To prevent stray photons from leaking out after the electron beam has been
@@ -253,36 +232,13 @@ final class ElectronBeam implements ScreenStateAnimator {
         }
 
         if (mPrepared) {
-            dismissResources();
+            destroyScreenshotTexture();
+            destroyEglSurface();
             destroySurface();
             mPrepared = false;
         }
     }
 
-    /**
-     * Destroys electron beam animation and its resources
-     *
-     * This method should be called when the electron beam is no longer in use; i.e. when
-     * the {@link #mDisplayId display} has been removed.
-     */
-    public void destroy() {
-        if (DEBUG) {
-            Slog.d(TAG, "destroy");
-        }
-        if (mPrepared) {
-            if (mCreatedResources) {
-                attachEglContext();
-                try {
-                    destroyScreenshotTexture();
-                    destroyEglSurface();
-                } finally {
-                    detachEglContext();
-                }
-            }
-            destroyEglContext();
-            destroySurface();
-        }
-    }
 
     /**
      * Draws an animation frame showing the electron beam activated at the
@@ -835,12 +791,6 @@ final class ElectronBeam implements ScreenStateAnimator {
 
     private static float sigmoid(float x, float s) {
         return 1.0f / (1.0f + (float)Math.exp(-x * s));
-    }
-
-    private void destroyEglContext() {
-        if (mEglDisplay != null && mEglContext != null) {
-            EGL14.eglDestroyContext(mEglDisplay, mEglContext);
-        }
     }
 
     private static FloatBuffer createNativeFloatBuffer(int size) {

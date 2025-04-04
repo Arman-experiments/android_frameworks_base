@@ -607,7 +607,7 @@ constructor(
             val layoutParams =
                 FrameLayout.LayoutParams(
                     if (clockStyle != 0) 0 else FrameLayout.LayoutParams.WRAP_CONTENT,
-                    if (clockStyle != 0) 0 else resources.getDimensionPixelSize(customR.dimen.small_clock_height)
+                    if (clockStyle != 0) 0 else resources.getDimensionPixelSize(com.android.systemui.customization.R.dimen.small_clock_height),
                 )
             layoutParams.topMargin =
                 SystemBarUtils.getStatusBarHeight(previewContext) +

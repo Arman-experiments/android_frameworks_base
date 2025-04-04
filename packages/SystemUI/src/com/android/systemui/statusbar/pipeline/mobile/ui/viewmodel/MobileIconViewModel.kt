@@ -257,11 +257,13 @@ private class CellularIconViewModel(
                 iconInteractor.networkTypeIconGroup,
                 showNetworkTypeIcon,
                 iconInteractor.shouldShowFourgIcon,
-            ) { networkTypeIconGroup, shouldShow, shouldShowFourgIcon ->
+                iconInteractor.shouldShowFivegIcon,
+            ) { networkTypeIconGroup, shouldShow, shouldShowFourgIcon, shouldShowFivegIcon ->
                 val desc =
                     if (networkTypeIconGroup.contentDescription != 0) {
                         var contDesc: Int = networkTypeIconGroup.contentDescription
                         if (shouldShowFourgIcon) contDesc = convertLteToFourg(contDesc)
+                        if (shouldShowFivegIcon) contDesc = convertTo5G(contDesc)
                         ContentDescription.Resource(contDesc)
                     }
                     else null
@@ -269,6 +271,7 @@ private class CellularIconViewModel(
                     if (networkTypeIconGroup.iconId != 0) {
                         var contIcon: Int = networkTypeIconGroup.iconId
                         if (shouldShowFourgIcon) contIcon = convertLteToFourg(contIcon)
+                        if (shouldShowFivegIcon) contIcon = convertTo5G(contIcon)
                         Icon.Resource(contIcon, desc)
                     }
                     else null
@@ -276,6 +279,8 @@ private class CellularIconViewModel(
                     !shouldShow -> null
                     shouldShowFourgIcon ||
                     !shouldShowFourgIcon -> icon
+                    shouldShowFivegIcon ||
+                    !shouldShowFivegIcon -> icon
                     else -> icon
                 }
             }
@@ -303,6 +308,33 @@ private class CellularIconViewModel(
             else -> {}
         }
         return res
+    }
+    
+    private fun convertTo5G(res: Int): Int {
+	when (res) {
+            com.android.settingslib.R.string.data_connection_lte,
+	    com.android.settingslib.R.string.data_connection_4g_lte,
+	    com.android.settingslib.R.string.data_connection_4g -> {
+		return com.android.settingslib.R.string.data_connection_5g as Int
+	    }
+	    com.android.settingslib.R.string.data_connection_lte_plus,
+	    com.android.settingslib.R.string.data_connection_4g_lte_plus,
+	    com.android.settingslib.R.string.data_connection_4g_plus -> {
+	        return com.android.settingslib.R.string.data_connection_5g_plus as Int
+	    }
+	    TelephonyIcons.ICON_LTE,
+	    TelephonyIcons.ICON_4G_LTE,
+	    TelephonyIcons.ICON_4G -> {
+		return TelephonyIcons.ICON_5G as Int
+	    }
+	    TelephonyIcons.ICON_LTE_PLUS,
+	    TelephonyIcons.ICON_4G_LTE_PLUS,
+	    TelephonyIcons.ICON_4G_PLUS -> {
+		return TelephonyIcons.ICON_5G_PLUS as Int
+            }
+	    else -> {}
+	}
+	return res
     }
 
     override val networkTypeBackground =

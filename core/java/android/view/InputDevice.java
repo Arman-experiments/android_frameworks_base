@@ -358,10 +358,11 @@ public final class InputDevice implements Parcelable {
     /**
      * The input source is a specific virtual event sent from navigation bar.
      *
-     * @see com.android.systemui.navigationbar.buttons.KeyButtonView#sendEvent()
+     * @see com.android.systemui.statusbar.policy.KeyButtonView#sendEvent()
+     * @author Carlo Savignano
      * @hide
      */
-    public static final int SOURCE_NAVIGATION_BAR = 0x06000000 | SOURCE_CLASS_BUTTON;
+    public static final int SOURCE_NAVIGATION_BAR = 0x8000000 | SOURCE_CLASS_BUTTON;
 
     /**
      * A special input source constant that is used when filtering input devices

@@ -62,9 +62,9 @@ public class BrightnessSliderController extends ViewController<BrightnessSliderV
     private Listener mListener;
     @Nullable
     private ToggleSlider mMirror;
-    private ImageView mIcon;
     @Nullable
     private MirrorController mMirrorController;
+    private ImageView mIcon;
     private boolean mTracking;
     private final FalsingManager mFalsingManager;
     private final UiEventLogger mUiEventLogger;
@@ -77,9 +77,7 @@ public class BrightnessSliderController extends ViewController<BrightnessSliderV
     private final Gefingerpoken mOnInterceptListener = new Gefingerpoken() {
         @Override
         public boolean onInterceptTouchEvent(MotionEvent ev) {
-            if (mBrightnessSliderHapticPlugin != null) {
-                mBrightnessSliderHapticPlugin.onTouchEvent(ev);
-            }
+            mBrightnessSliderHapticPlugin.onTouchEvent(ev);
             int action = ev.getActionMasked();
             if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
                 mFalsingManager.isFalseTouch(Classifier.BRIGHTNESS_SLIDER);
@@ -166,12 +164,6 @@ public class BrightnessSliderController extends ViewController<BrightnessSliderV
                 mActivityStarter.postStartActivityDismissingKeyguard(intent, 0);
                 return true;
             });
-        }
-    }
-
-    public void setLayoutSize() {
-        if (mMirrorController != null && mView != null) {
-            mMirrorController.setLocationAndSize(mView);
         }
     }
 
@@ -265,10 +257,10 @@ public class BrightnessSliderController extends ViewController<BrightnessSliderV
             new SeekBar.OnSeekBarChangeListener() {
         @Override
         public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-            mView.setPercentage(progress);
+            mView.GetValueBrightness(progress);
             if (mListener != null) {
                 mListener.onChanged(mTracking, progress, false);
-                if (fromUser && mBrightnessSliderHapticPlugin != null) {
+                if (fromUser) {
                     mBrightnessSliderHapticPlugin.onProgressChanged(progress, true);
                 }
             }
@@ -280,9 +272,7 @@ public class BrightnessSliderController extends ViewController<BrightnessSliderV
             mUiEventLogger.log(BrightnessSliderEvent.BRIGHTNESS_SLIDER_STARTED_TRACKING_TOUCH);
             if (mListener != null) {
                 mListener.onChanged(mTracking, getValue(), false);
-                if (mBrightnessSliderHapticPlugin != null) {
-                    mBrightnessSliderHapticPlugin.onStartTrackingTouch();
-                }
+                mBrightnessSliderHapticPlugin.onStartTrackingTouch();
             }
 
             if (mMirrorController != null) {
@@ -297,9 +287,7 @@ public class BrightnessSliderController extends ViewController<BrightnessSliderV
             mUiEventLogger.log(BrightnessSliderEvent.BRIGHTNESS_SLIDER_STOPPED_TRACKING_TOUCH);
             if (mListener != null) {
                 mListener.onChanged(mTracking, getValue(), true);
-                if (mBrightnessSliderHapticPlugin != null) {
-                    mBrightnessSliderHapticPlugin.onStopTrackingTouch();
-                }
+                mBrightnessSliderHapticPlugin.onStopTrackingTouch();
             }
 
             if (mMirrorController != null) {
@@ -358,7 +346,8 @@ public class BrightnessSliderController extends ViewController<BrightnessSliderV
                     mMSDLPlayer,
                     mSystemClock,
                     new HapticSlider.SeekBar(root.requireViewById(R.id.slider)));
-            return new BrightnessSliderController(root, mFalsingManager, mUiEventLogger, null,
+            HapticSliderViewBinder.bind(viewRoot, plugin);
+            return new BrightnessSliderController(root, mFalsingManager, mUiEventLogger, plugin,
                     mActivityStarter, mBrightnessWarningToast);
         }
 

@@ -452,8 +452,7 @@ public class AutomaticBrightnessController {
     public void configure(int state, @Nullable BrightnessConfiguration configuration,
             float brightness, boolean userChangedBrightness, float adjustment,
             boolean userChangedAutoBrightnessAdjustment, int displayPolicy, int displayState,
-            boolean useNormalBrightnessForDoze, boolean shouldResetShortTermModel,
-            boolean autoBrightnessOneShot) {
+            boolean useNormalBrightnessForDoze, boolean shouldResetShortTermModel, boolean autoBrightnessOneShot) {
         mState = state;
         boolean changed = setBrightnessConfiguration(configuration, shouldResetShortTermModel);
         changed |= setDisplayPolicy(displayPolicy);

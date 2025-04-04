@@ -355,7 +355,9 @@
   <java-symbol type="bool" name="config_enableDefaultHdrConversionPassthrough" />
   <java-symbol type="bool" name="config_allowAnimationsInLowPowerMode" />
   <java-symbol type="bool" name="config_useDevInputEventForAudioJack" />
+  <java-symbol type="bool" name="config_safe_media_volume_enabled" />
   <java-symbol type="bool" name="config_safe_media_disable_on_volume_up" />
+  <java-symbol type="bool" name="config_safe_sound_dosage_enabled" />
   <java-symbol type="bool" name="config_camera_sound_forced" />
   <java-symbol type="bool" name="config_dontPreferApn" />
   <java-symbol type="bool" name="config_restartRadioAfterProvisioning" />
@@ -4107,6 +4109,7 @@
   <java-symbol type="dimen" name="config_inCallNotificationVolume" />
   <java-symbol type="string" name="config_inCallNotificationSound" />
   <java-symbol type="string" name="config_cameraShutterSound" />
+  <java-symbol type="string" name="config_screenshotSound" />
   <java-symbol type="integer" name="config_autoGroupAtCount" />
   <java-symbol type="bool" name="config_dozeAlwaysOnDisplayAvailable" />
   <java-symbol type="bool" name="config_dozePickupGestureEnabled" />
@@ -4401,8 +4404,8 @@
 
   <!-- Display White-Balance -->
   <java-symbol type="integer" name="config_displayWhiteBalanceBrightnessSensorRate" />
-  <java-symbol type="integer" name="config_displayWhiteBalanceBrightnessFilterHorizon" id="0x010e006b" />
-  <java-symbol type="dimen" name="config_displayWhiteBalanceBrightnessFilterIntercept" id="0x010500cd" />
+  <java-symbol type="integer" name="config_displayWhiteBalanceBrightnessFilterHorizon" />
+  <java-symbol type="dimen" name="config_displayWhiteBalanceBrightnessFilterIntercept" />
   <java-symbol type="string" name="config_displayWhiteBalanceColorTemperatureSensorName" />
   <java-symbol type="integer" name="config_displayWhiteBalanceColorTemperatureSensorRate" />
   <java-symbol type="integer" name="config_displayWhiteBalanceColorTemperatureFilterHorizon" />
@@ -4728,8 +4731,6 @@
   <java-symbol type="bool" name="config_expandLockScreenUserSwitcher" />
 
   <java-symbol type="string" name="loading" />
-  <java-symbol type="drawable" name="ic_android"/>
-  <java-symbol type="drawable" name="ic_app_icon"/>
 
   <java-symbol type="array" name="config_toastCrossUserPackages" />
 
@@ -4922,6 +4923,7 @@
   <java-symbol type="bool" name="config_voice_data_sms_auto_fallback" />
 
   <java-symbol type="attr" name="colorAccentPrimary" />
+  <java-symbol type="attr" name="colorAccentCustom" />
   <java-symbol type="attr" name="colorAccentSecondary" />
   <java-symbol type="attr" name="colorAccentTertiary" />
   <java-symbol type="attr" name="colorAccentPrimaryVariant" />

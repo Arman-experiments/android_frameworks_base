@@ -86,7 +86,7 @@ public enum ScrimState {
             mBehindAlpha = mClipQsScrim ? mCustomScrimAlpha : mScrimBehindAlphaKeyguard;
             mNotifAlpha = mClipQsScrim ? mScrimBehindAlphaKeyguard : 0;
             if (mClipQsScrim) {
-                updateScrimColor(mScrimBehind, mCustomScrimAlpha, Color.TRANSPARENT);
+                updateScrimColor(mScrimBehind, mCustomScrimAlpha, mBackgroundColor);
             }
         }
     },
@@ -100,7 +100,7 @@ public enum ScrimState {
             mFrontTint = mBackgroundColor;
             mFrontAlpha = .66f;
 
-            mBehindTint = Color.TRANSPARENT;
+            mBehindTint = mBackgroundColor;
             mBehindAlpha = mCustomScrimAlpha;
         }
     },
@@ -111,8 +111,8 @@ public enum ScrimState {
             mNotifTint = previousState.mNotifTint;
             mNotifAlpha = previousState.mNotifAlpha;
 
-            mBehindTint = previousState.mBehindTint;
-            mBehindAlpha = previousState.mBehindAlpha;
+            mBehindTint = mBackgroundColor;
+            mBehindAlpha = mCustomScrimAlpha;
 
             mFrontTint = mBackgroundColor;
             mFrontAlpha = .66f;
@@ -126,7 +126,7 @@ public enum ScrimState {
         @Override
         public void prepare(ScrimState previousState) {
             mBehindAlpha = mClipQsScrim ? 1 : mDefaultScrimAlpha;
-            mBehindTint = Color.TRANSPARENT;
+            mBehindTint = mBackgroundColor;
             mNotifAlpha = mClipQsScrim ? mDefaultScrimAlpha : 0;
             mNotifTint = Color.TRANSPARENT;
             mFrontAlpha = 0f;
@@ -162,10 +162,10 @@ public enum ScrimState {
             mBehindAlpha = mClipQsScrim ? mCustomScrimAlpha : mDefaultScrimAlpha;
             mNotifAlpha = mCustomScrimAlpha;
             mFrontAlpha = 0f;
-            mBehindTint = mClipQsScrim ? Color.TRANSPARENT : mBackgroundColor;
+            mBehindTint = Color.TRANSPARENT;
 
             if (mClipQsScrim) {
-                updateScrimColor(mScrimBehind, mCustomScrimAlpha, Color.TRANSPARENT);
+                updateScrimColor(mScrimBehind, mCustomScrimAlpha, mBackgroundColor);
             }
         }
     },
@@ -275,7 +275,7 @@ public enum ScrimState {
             }
 
             if (mClipQsScrim) {
-                updateScrimColor(mScrimBehind, mCustomScrimAlpha, Color.TRANSPARENT);
+                updateScrimColor(mScrimBehind, mCustomScrimAlpha, mBackgroundColor);
             }
         }
     },
@@ -372,7 +372,7 @@ public enum ScrimState {
 
     public void init(ScrimView scrimInFront, ScrimView scrimBehind, DozeParameters dozeParameters,
             DockManager dockManager) {
-        mBackgroundColor = scrimBehind.getContext().getColor(R.color.shade_scrim_background_dark);
+        mBackgroundColor = scrimBehind.getContext().getColor(R.color.shade_scrim_background);
         mScrimInFront = scrimInFront;
         mScrimBehind = scrimBehind;
 

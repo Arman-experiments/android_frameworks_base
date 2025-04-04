@@ -3,13 +3,10 @@ package com.android.systemui.navigationbar.gestural
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Canvas
-import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
-import android.provider.Settings
 import android.util.MathUtils.min
-import android.view.ContextThemeWrapper
 import android.view.View
 import androidx.dynamicanimation.animation.FloatPropertyCompat
 import androidx.dynamicanimation.animation.SpringAnimation
@@ -18,11 +15,8 @@ import com.android.internal.util.LatencyTracker
 import com.android.settingslib.Utils
 import com.android.systemui.navigationbar.gestural.BackPanelController.DelayedOnAnimationEndListener
 
-import com.android.systemui.res.R
-
 private const val TAG = "BackPanel"
 private const val DEBUG = false
-private const val BACK_GESTURE_STYLE_CLASSIC = "back_gesture_style_classic"
 
 class BackPanel(context: Context, private val latencyTracker: LatencyTracker) : View(context) {
 
@@ -41,9 +35,6 @@ class BackPanel(context: Context, private val latencyTracker: LatencyTracker) : 
     // Arrow background color and shape
     private var arrowBackgroundRect = RectF()
     private var arrowBackgroundPaint = Paint()
-    
-    private val arrowColorLight: Int
-    private val arrowColorDark: Int
 
     // True if the panel is currently on the left of the screen
     var isLeftPanel = false
@@ -130,8 +121,6 @@ class BackPanel(context: Context, private val latencyTracker: LatencyTracker) : 
             minimumValue = 0f,
             maximumValue = 1f,
         )
-
-    var triggerLongSwipe = false
 
     private val allAnimatedFloat =
         setOf(
@@ -291,23 +280,6 @@ class BackPanel(context: Context, private val latencyTracker: LatencyTracker) : 
     }
 
     init {
-        val lightThemeWrapper = ContextThemeWrapper(
-            context,
-            Utils.getThemeAttr(context, R.attr.lightIconTheme)
-        )
-        arrowColorLight = Utils.getColorAttrDefaultColor(
-            lightThemeWrapper,
-            R.attr.singleToneColor
-        )
-
-        val darkThemeWrapper = ContextThemeWrapper(
-            context,
-            Utils.getThemeAttr(context, R.attr.darkIconTheme)
-        )
-        arrowColorDark = Utils.getColorAttrDefaultColor(
-            darkThemeWrapper,
-            R.attr.singleToneColor
-        )
         visibility = GONE
         arrowPaint.apply {
             style = Paint.Style.STROKE
@@ -320,24 +292,12 @@ class BackPanel(context: Context, private val latencyTracker: LatencyTracker) : 
         }
     }
 
-    /**
-     * Checks if the classic (old style) back gesture is enabled in settings
-     * @return true if classic style is enabled, false otherwise
-     */
-    private fun isClassicBackGestureEnabled(): Boolean {
-        return Settings.System.getInt(context.contentResolver, 
-            BACK_GESTURE_STYLE_CLASSIC, 0) == 1
-    }
-
     private fun calculateArrowPath(dx: Float, dy: Float): Path {
         arrowPath.reset()
         arrowPath.moveTo(dx, -dy)
         arrowPath.lineTo(0f, 0f)
         arrowPath.lineTo(dx, dy)
         arrowPath.moveTo(dx, -dy)
-        if (triggerLongSwipe) {
-            arrowPath.addPath(arrowPath, arrowPaint.strokeWidth * 2.0f * -1, 0.0f)
-        }
         return arrowPath
     }
 
@@ -527,7 +487,7 @@ class BackPanel(context: Context, private val latencyTracker: LatencyTracker) : 
                 )
         canvas.drawPath(
             arrowBackground,
-            arrowBackgroundPaint.apply { alpha = 0 }
+            arrowBackgroundPaint.apply { alpha = (255 * backgroundAlpha.pos).toInt() },
         )
 
         val dx = arrowLength.pos
@@ -549,21 +509,10 @@ class BackPanel(context: Context, private val latencyTracker: LatencyTracker) : 
             }
         }
 
+        val arrowPath = calculateArrowPath(dx = dx, dy = dy)
         val arrowPaint =
             arrowPaint.apply { alpha = (255 * min(arrowAlpha.pos, backgroundAlpha.pos)).toInt() }
-        if (isLeftPanel) {
-            canvas.scale(-1f, 1f, dx / 2f, dy / 2f)
-        }
-        
-        // Use classic or new style based on settings
-        if (isClassicBackGestureEnabled()) {
-            // Classic style - draw as lines
-            canvas.drawPath(calculateArrowPath(dx = dx, dy = dy), arrowPaint)
-        } else {
-            // New style - draw as circles
-            canvas.drawPath(calculateArrowPathEx(arrowPath, arrowPaint, x = dx, y = dy), arrowPaint)
-        }
-        
+        canvas.drawPath(arrowPath, arrowPaint)
         canvas.restore()
 
         if (trackingBackArrowLatency) {
@@ -599,85 +548,4 @@ class BackPanel(context: Context, private val latencyTracker: LatencyTracker) : 
                 )
             addRoundRect(this@toPathWithRoundCorners, corners, Path.Direction.CW)
         }
-
-    fun setIsDark(isDark: Boolean) {
-        arrowPaint.setColor(getArrowColor(isDark))
-        invalidate()
-    }
-
-    fun getArrowColor(isDark: Boolean): Int {
-        return if (isDark) arrowColorDark else arrowColorLight
-    }
-
-    fun getArrowBoundingBox(): RectF {
-        return getArrowBoundingBox(width, height, backgroundWidth.pos, scale.pos, 
-            scalePivotX.pos, arrowLength.pos, arrowHeight.pos, horizontalTranslation.pos, 
-            verticalTranslation.pos, isLeftPanel, arrowsPointLeft, arrowPath)
-    }
-    
-    fun getArrowBoundingBox(
-        width: Int,
-        height: Int,
-        backgroundWidth: Float,
-        scale: Float,
-        scalePivotX: Float,
-        dx: Float,
-        dy: Float,
-        hTranslation: Float,
-        vTranslation: Float,
-        isLeftPanel: Boolean,
-        arrowsPointLeft: Boolean,
-        arrowPath: Path
-    ): RectF {
-        val matrix = Matrix()
-        
-        if (!isLeftPanel) {
-            matrix.preScale(-1f, 1f, width / 2f, 0f)
-        }
-        
-        matrix.preTranslate(hTranslation, (height * 0.5f) + vTranslation)
-        matrix.preScale(scale, scale, scalePivotX, 0f)
-        
-        val adjustedBackgroundWidth = if (dx > 0) backgroundWidth - dx else backgroundWidth
-        matrix.preTranslate(adjustedBackgroundWidth / 2, 0f)
-        
-        if (arrowsPointLeft xor isLeftPanel) {
-            matrix.preScale(-1f, 1f, 0f, 0f)
-            matrix.preTranslate(-dx, 0f)
-        }
-        
-        val rectF = RectF()
-        arrowPath.computeBounds(rectF, true)
-        matrix.mapRect(rectF)
-        return rectF
-    }
-
-    fun calculateArrowPathEx(
-        arrowPath: Path,
-        paint: Paint,
-        x: Float,
-        y: Float
-    ): Path {
-        arrowPath.reset()
-        val strokeWidth = paint.strokeWidth
-        val adjustedX = if (x < strokeWidth) 0f else x
-        
-        arrowPath.addCircle(0f, 0f, strokeWidth, Path.Direction.CW)
-        
-        for (i in 0 until 3) {
-            val ratio = (i + 1).toFloat() / 3
-            val xPos = (adjustedX * ratio)
-            val yPos = (y * ratio)
-            
-            arrowPath.addCircle(xPos, yPos, strokeWidth, Path.Direction.CW)
-            arrowPath.addCircle(xPos, -yPos, strokeWidth, Path.Direction.CW)
-        }
-        
-        paint.style = Paint.Style.FILL
-        return arrowPath
-    }
-    
-    fun getIsLeftPanel(): Boolean {
-        return isLeftPanel
-    }
 }

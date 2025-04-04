@@ -33,6 +33,7 @@ import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.statusbar.phone.StatusBarLocation;
+import com.android.systemui.statusbar.phone.ui.StatusBarIconController;
 import com.android.systemui.statusbar.policy.BatteryController;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.tuner.TunerService;
@@ -60,6 +61,7 @@ public class BatteryMeterViewController extends ViewController<BatteryMeterView>
     private final BatteryController mBatteryController;
 
     private final SettingObserver mSettingObserver;
+
     private final StatusBarLocation mLocation;
 
     private final ConfigurationController.ConfigurationListener mConfigurationListener =
@@ -78,8 +80,6 @@ public class BatteryMeterViewController extends ViewController<BatteryMeterView>
                     int batteryStyle = TunerService.parseInteger(newValue,
                             BatteryMeterView.BATTERY_STYLE_PORTRAIT);
                     mView.setBatteryStyle(batteryStyle);
-                    mView.setVisibility(
-                        batteryStyle == BatteryMeterView.BATTERY_STYLE_HIDDEN ? View.GONE : View.VISIBLE);
                     break;
                 case STATUS_BAR_SHOW_BATTERY_PERCENT:
                     int showBatteryPercent =

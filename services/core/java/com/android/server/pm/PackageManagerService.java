@@ -349,7 +349,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     public static final boolean DEBUG_PACKAGE_SCANNING = false;
     static final boolean DEBUG_VERIFY = false;
     public static final boolean DEBUG_PERMISSIONS = false;
-    public static final boolean DEBUG_COMPRESSION = Build.IS_DEBUGGABLE;
+    public static final boolean DEBUG_COMPRESSION = Build.IS_ENG;
     public static final boolean TRACE_SNAPSHOTS = false;
     private static final boolean DEBUG_PER_UID_READ_TIMEOUTS = false;
 
@@ -359,7 +359,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     public static final boolean DEBUG_DEXOPT = false;
 
     static final boolean DEBUG_ABI_SELECTION = false;
-    public static final boolean DEBUG_INSTANT = Build.IS_DEBUGGABLE;
+    public static final boolean DEBUG_INSTANT = Build.IS_ENG;
 
     static final String SHELL_PACKAGE_NAME = "com.android.shell";
 
@@ -910,6 +910,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     private final LegacyPermissionManagerInternal mLegacyPermissionManager;
 
     private final PackageProperty mPackageProperty = new PackageProperty();
+
+    ArrayList<ComponentName> mDisabledComponentsList;
+    ArrayList<ComponentName> mForceEnabledComponentsList;
 
     final PendingPackageBroadcasts mPendingBroadcasts;
 
@@ -1814,6 +1817,38 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }
     }
 
+    private void loadForceEnabledComponents(){
+        String[] components = mContext.getResources().getStringArray(
+                    com.android.internal.R.array.config_forceEnabledComponents);
+        for (String name : components) {
+            ComponentName cn = ComponentName.unflattenFromString(name);
+            mForceEnabledComponentsList.add(cn);
+        }
+    }
+
+    private void enableComponents(String[] components, boolean enable) {
+        // Disable or enable components marked at build-time
+        for (String name : components) {
+            ComponentName cn = ComponentName.unflattenFromString(name);
+            if (!enable) {
+                mDisabledComponentsList.add(cn);
+            }
+            Slog.v(TAG, "Changing enabled state of " + name + " to " + enable);
+            String className = cn.getClassName();
+            PackageSetting pkgSetting = mSettings.mPackages.get(cn.getPackageName());
+            if (pkgSetting == null || pkgSetting.getPkg() == null
+                    || !AndroidPackageUtils.hasComponentClassName(pkgSetting.getPkg(), className)) {
+                Slog.w(TAG, "Unable to change enabled state of " + name + " to " + enable);
+                continue;
+            }
+            if (enable) {
+                pkgSetting.enableComponentLPw(className, UserHandle.USER_OWNER);
+            } else {
+                pkgSetting.disableComponentLPw(className, UserHandle.USER_OWNER);
+            }
+        }
+    }
+
     // Link watchables to the class
     @SuppressWarnings("GuardedBy")
     private void registerObservers(boolean verify) {
@@ -2242,12 +2277,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             mIsUpgrade =
                     !partitionsFingerprint.equals(ver.fingerprint);
             if (mIsUpgrade) {
-                SystemProperties.set("persist.sys.is_upgrade", "1");
                 PackageManagerServiceUtils.logCriticalInfo(Log.INFO,
                         "Upgrading from " + ver.fingerprint + " (" + ver.buildFingerprint + ") to "
                                 + PackagePartitions.FINGERPRINT
                                 + " (" + Build.VERSION.INCREMENTAL + ")");
-                SystemProperties.set("persist.sys.is_upgrade", "0");
             }
             mPriorSdkVersion = mIsUpgrade ? ver.sdkVersion : -1;
             mInitAppsHelper = new InitAppsHelper(this, mApexManager, mInstallPackageHelper,
@@ -2388,6 +2421,19 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
                 }
             }
+
+            // Disable components marked for disabling at build-time
+            mDisabledComponentsList = new ArrayList<ComponentName>();
+            enableComponents(mContext.getResources().getStringArray(
+                    com.android.internal.R.array.config_deviceDisabledComponents), false);
+            enableComponents(mContext.getResources().getStringArray(
+                    com.android.internal.R.array.config_globallyDisabledComponents), false);
+
+            // Enable components marked for forced-enable at build-time
+            mForceEnabledComponentsList = new ArrayList<ComponentName>();
+            enableComponents(mContext.getResources().getStringArray(
+                    com.android.internal.R.array.config_forceEnabledComponents), true);
+            loadForceEnabledComponents();
 
             // If this is first boot after an OTA, then we need to clear code cache directories.
             // Note that we do *not* clear the application profiles. These remain valid
@@ -2650,7 +2696,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     "Required services extension package failed due to "
                             + "config_servicesExtensionPackage is empty.");
         }
-        String servicesExtensionPackage = configServicesExtensionPackage;
+        String servicesExtensionPackage = ensureSystemPackageName(computer,
+                configServicesExtensionPackage);
         if (TextUtils.isEmpty(servicesExtensionPackage)) {
             throw new RuntimeException(
                     "Required services extension package is missing, "
@@ -2791,7 +2838,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     @Nullable ComponentName getInstantAppResolver(@NonNull Computer snapshot) {
         final String[] packageArray =
                 mContext.getResources().getStringArray(R.array.config_ephemeralResolverPackage);
-        if (packageArray.length == 0 && !Build.IS_DEBUGGABLE) {
+        if (packageArray.length == 0 && !Build.IS_ENG) {
             if (DEBUG_INSTANT) {
                 Slog.d(TAG, "Ephemeral resolver NOT found; empty package list");
             }
@@ -2802,7 +2849,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         final int resolveFlags =
                 MATCH_DIRECT_BOOT_AWARE
                 | MATCH_DIRECT_BOOT_UNAWARE
-                | (!Build.IS_DEBUGGABLE ? MATCH_SYSTEM_ONLY : 0);
+                | (!Build.IS_ENG ? MATCH_SYSTEM_ONLY : 0);
         final Intent resolverIntent = new Intent(Intent.ACTION_RESOLVE_INSTANT_APP_PACKAGE);
         List<ResolveInfo> resolvers = snapshot.queryIntentServicesInternal(resolverIntent, null,
                 resolveFlags, UserHandle.USER_SYSTEM, callingUid, Process.INVALID_PID,
@@ -2824,7 +2871,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             }
 
             final String packageName = info.serviceInfo.packageName;
-            if (!possiblePackages.contains(packageName) && !Build.IS_DEBUGGABLE) {
+            if (!possiblePackages.contains(packageName) && !Build.IS_ENG) {
                 if (DEBUG_INSTANT) {
                     Slog.d(TAG, "Ephemeral resolver not in allowed package list;"
                             + " pkg: " + packageName + ", info:" + info);
@@ -5175,7 +5222,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
         @Override
         public IBinder getHoldLockToken() {
-            if (!Build.IS_DEBUGGABLE) {
+            if (!Build.IS_ENG) {
                 throw new SecurityException("getHoldLockToken requires a debuggable build");
             }
 
@@ -6084,6 +6131,20 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 callingPackage = Integer.toString(Binder.getCallingUid());
             }
 
+            // Don't allow to enable components marked for disabling at build-time
+            if (mDisabledComponentsList.contains(componentName)) {
+                Slog.d(TAG, "Ignoring attempt to set enabled state of disabled component "
+                        + componentName.flattenToString());
+                return;
+            }
+
+            // Don't allow to control components forced enabled at build-time
+            if (mForceEnabledComponentsList.contains(componentName)) {
+                Slog.d(TAG, "Ignoring attempt to control forced enabled component "
+                        + componentName.flattenToString());
+                return;
+            }
+
             setEnabledSettings(List.of(new PackageManager.ComponentEnabledSetting(componentName, newState, flags)),
                     userId, callingPackage);
         }
@@ -6938,16 +6999,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 SparseArray<String> profileOwnerPackages) {
             mProtectedPackages.setDeviceAndProfileOwnerPackages(
                     deviceOwnerUserId, deviceOwnerPackage, profileOwnerPackages);
-            final ArraySet<Integer> usersWithPoOrDo = new ArraySet<>();
-            if (deviceOwnerPackage != null) {
-                usersWithPoOrDo.add(deviceOwnerUserId);
-            }
-            final int sz = profileOwnerPackages.size();
-            for (int i = 0; i < sz; i++) {
-                if (profileOwnerPackages.valueAt(i) != null) {
-                    removeAllNonSystemPackageSuspensions(profileOwnerPackages.keyAt(i));
-                }
-            }
         }
 
         @Override
@@ -7699,7 +7750,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
     @Override
     public void verifyHoldLockToken(IBinder token) {
-        if (!Build.IS_DEBUGGABLE) {
+        if (!Build.IS_ENG) {
             throw new SecurityException("holdLock requires a debuggable build");
         }
 

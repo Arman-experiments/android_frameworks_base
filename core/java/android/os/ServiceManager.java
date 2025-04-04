@@ -295,7 +295,7 @@ public final class ServiceManager {
     public static boolean isDeclared(@NonNull String name) {
         try {
             return getIServiceManager().isDeclared(name);
-        } catch (Exception e) {
+        } catch (RemoteException | SecurityException e) {
             Log.e(TAG, "error in isDeclared", e);
             return false;
         }

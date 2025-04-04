@@ -822,7 +822,7 @@ public class FrameworkServicesModule {
     static ViewCapture provideViewCapture(Context context) {
         return ViewCaptureFactory.getInstance(context);
     }
-
+    
     @Provides
     @Singleton
     static ImsManager provideImsManager(Context context) {

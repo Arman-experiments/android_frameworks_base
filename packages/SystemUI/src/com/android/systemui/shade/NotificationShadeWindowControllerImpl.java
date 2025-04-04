@@ -80,8 +80,6 @@ import com.android.systemui.util.settings.SecureSettings;
 
 import dagger.Lazy;
 
-import lineageos.providers.LineageSettings;
-
 import java.io.PrintWriter;
 import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
@@ -116,7 +114,6 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
     private final long mLockScreenDisplayTimeout;
     private final float mKeyguardPreferredRefreshRate; // takes precedence over max
     private final float mKeyguardMaxRefreshRate;
-    private final float mAODMaxRefreshRate;
     private final KeyguardViewMediator mKeyguardViewMediator;
     private final KeyguardBypassController mKeyguardBypassController;
     private final Executor mBackgroundExecutor;
@@ -226,11 +223,6 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
         // know that we're not falsing (because we unlocked.)
         mKeyguardMaxRefreshRate = context.getResources()
                 .getInteger(R.integer.config_keyguardMaxRefreshRate);
-
-        // Same as described above but limited to AOD
-        // Allows using a different rate for each
-        mAODMaxRefreshRate = context.getResources()
-                .getInteger(R.integer.config_aodMaxRefreshRate);
     }
 
     /**
@@ -277,16 +269,11 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
     }
 
     private boolean shouldEnableKeyguardScreenRotation() {
-        boolean enableAccelerometerRotation =
-                Settings.System.getInt(mContext.getContentResolver(),
-                Settings.System.ACCELEROMETER_ROTATION, 0) != 0;
         boolean enableLockScreenRotation =
-                LineageSettings.System.getInt(mContext.getContentResolver(),
-                LineageSettings.System.LOCKSCREEN_ROTATION,
-                mContext.getResources().getBoolean(org.lineageos.platform.internal.R.bool.
-                        config_lockScreenRotationEnabledByDefault) ? 1 : 0) != 0;
+                Settings.System.getInt(mContext.getContentResolver(),
+                Settings.System.LOCKSCREEN_ROTATION, 0) != 0;
         return mKeyguardStateController.isKeyguardScreenRotationAllowed()
-                && (enableLockScreenRotation && enableAccelerometerRotation);
+                && enableLockScreenRotation;
     }
 
     /**
@@ -386,7 +373,6 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
     private void applyKeyguardFlags(NotificationShadeWindowState state) {
         final boolean keyguardOrAod = state.keyguardShowing
                 || (state.dozing && mDozeParameters.getAlwaysOn());
-        boolean wasKeyguardRateSet = false;
         if ((keyguardOrAod && !state.mediaBackdropShowing && !state.lightRevealScrimOpaque)
                 || mKeyguardViewMediator.isAnimatingBetweenKeyguardAndSurfaceBehind()) {
             // Show the wallpaper if we're on keyguard/AOD and the wallpaper is not occluded by a
@@ -417,7 +403,6 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
                 // Both max and min display refresh rate must be set to take effect:
                 mLpChanged.preferredMaxDisplayRefreshRate = mKeyguardPreferredRefreshRate;
                 mLpChanged.preferredMinDisplayRefreshRate = mKeyguardPreferredRefreshRate;
-                wasKeyguardRateSet = true;
             } else {
                 mLpChanged.preferredMaxDisplayRefreshRate = 0;
                 mLpChanged.preferredMinDisplayRefreshRate = 0;
@@ -430,7 +415,6 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
                     && !state.keyguardFadingAway && !state.keyguardGoingAway;
             if (state.dozing || bypassOnKeyguard) {
                 mLpChanged.preferredMaxDisplayRefreshRate = mKeyguardMaxRefreshRate;
-                wasKeyguardRateSet = true;
             } else {
                 mLpChanged.preferredMaxDisplayRefreshRate = 0;
             }
@@ -448,19 +432,6 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
             mLpChanged.inputFeatures |= LayoutParams.INPUT_FEATURE_SENSITIVE_FOR_PRIVACY;
         } else {
             mLpChanged.inputFeatures &= ~LayoutParams.INPUT_FEATURE_SENSITIVE_FOR_PRIVACY;
-        }
-
-        if (mAODMaxRefreshRate > 0) {
-            if (state.dozing) {
-                // limit on AOD & ambient if we have that set
-                // overrides set max keyguard rate
-                mLpChanged.preferredMaxDisplayRefreshRate = mAODMaxRefreshRate;
-            } else if (!wasKeyguardRateSet) {
-                // un-limit when out, but only if max keyguard rate wasn't set
-                mLpChanged.preferredMaxDisplayRefreshRate = 0;
-            }
-            Trace.setCounter("display_max_refresh_rate",
-                        (long) mLpChanged.preferredMaxDisplayRefreshRate);
         }
     }
 
@@ -1113,10 +1084,7 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
 
         public void observe(Context context) {
             context.getContentResolver().registerContentObserver(
-                    Settings.System.getUriFor(Settings.System.ACCELEROMETER_ROTATION),
-                    false, this);
-            context.getContentResolver().registerContentObserver(
-                    LineageSettings.System.getUriFor(LineageSettings.System.LOCKSCREEN_ROTATION),
+                    Settings.System.getUriFor(Settings.System.LOCKSCREEN_ROTATION),
                     false, this);
         }
 

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) 2024 Project Infinity X
+     SPDX-License-Identifier: Apache-2.0
+-->
+<resources>
+
+    <!-- Cardinal directions for the compass tile -->
+    <string-array name="cardinal_directions">
+        <item>@string/quick_settings_compass_N</item>  <!-- North -->
+        <item>@string/quick_settings_compass_NE</item> <!-- North east -->
+        <item>@string/quick_settings_compass_E</item>  <!-- East -->
+        <item>@string/quick_settings_compass_SE</item> <!-- South east -->
+        <item>@string/quick_settings_compass_S</item>  <!-- South -->
+        <item>@string/quick_settings_compass_SW</item> <!-- South west -->
+        <item>@string/quick_settings_compass_W</item>  <!-- West -->
+        <item>@string/quick_settings_compass_NW</item> <!-- North west -->
+    </string-array>
+    
+    <!-- Array of brightness-alpha LUT for framework dimming -->
+     <string-array name="config_udfpsDimmingBrightnessAlphaArray" translatable="false">
+           <item>0,255</item>
+           <item>1,248</item>
+           <item>2,242</item>
+           <item>3,238</item>
+           <item>4,236</item>
+           <item>6,236</item>
+           <item>10,234</item>
+           <item>20,228</item>
+           <item>30,222</item>
+           <item>45,217</item>
+           <item>70,209</item>
+           <item>100,200</item>
+           <item>150,191</item>
+           <item>227,178</item>
+           <item>300,167</item>
+           <item>400,154</item>
+           <item>500,143</item>
+           <item>600,133</item>
+           <item>800,117</item>
+           <item>1023,109</item>
+           <item>1130,95</item>
+           <item>1211,89</item>
+           <item>1394,79</item>
+           <item>1598,69</item>
+           <item>1817,53</item>
+           <item>2047,46</item>
+           <item>4095,0</item>
+     </string-array>
+</resources>

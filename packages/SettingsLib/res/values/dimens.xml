@@ -117,4 +117,8 @@
     <dimen name="dialog_side_padding">24dp</dimen>
     <dimen name="dialog_button_bar_top_padding">32dp</dimen>
     <dimen name="button_corner_radius">28dp</dimen>
+    
+    <!-- Mobiledata type -->
+    <dimen name="mobiledata_type_size">17dp</dimen>
+    <dimen name="mobiledata_type_enlarge_size">18dp</dimen>
 </resources>

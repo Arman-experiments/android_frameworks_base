@@ -109,6 +109,7 @@ public class SystemSettings {
                 Settings.System.LOCALE_PREFERENCES,
                 Settings.System.MOUSE_REVERSE_VERTICAL_SCROLLING,
                 Settings.System.MOUSE_SWAP_PRIMARY_BUTTON,
+                Settings.System.HAPTIC_ON_VOLUME_SLIDER,
                 Settings.System.TOUCHPAD_POINTER_SPEED,
                 Settings.System.TOUCHPAD_NATURAL_SCROLLING,
                 Settings.System.TOUCHPAD_TAP_TO_CLICK,
@@ -117,12 +118,16 @@ public class SystemSettings {
                 Settings.System.CAMERA_FLASH_NOTIFICATION,
                 Settings.System.SCREEN_FLASH_NOTIFICATION,
                 Settings.System.SCREEN_FLASH_NOTIFICATION_COLOR,
+                Settings.System.STATUS_BAR_LOGO,
+        	Settings.System.STATUS_BAR_LOGO_POSITION,
+        	Settings.System.STATUS_BAR_LOGO_STYLE,
+        	Settings.System.STATUS_BAR_LOGO_COLOR,
+        	Settings.System.STATUS_BAR_LOGO_COLOR_PICKER,
                 Settings.System.NOTIFICATION_COOLDOWN_ENABLED,
                 Settings.System.NOTIFICATION_COOLDOWN_ALL,
                 Settings.System.NOTIFICATION_COOLDOWN_VIBRATE_UNLOCKED,
                 Settings.System.PREFERRED_REGION,
-                // Evolution X additions
-                Settings.System.MAX_VISIBLE_NOTIFICATION_ICONS
+                Settings.System.LOCKSCREEN_ROTATION
         ));
         if (Flags.backUpSmoothDisplayAndForcePeakRefreshRate()) {
             settings.add(Settings.System.PEAK_REFRESH_RATE);

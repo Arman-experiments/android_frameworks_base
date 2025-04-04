@@ -48,7 +48,7 @@ import com.android.systemui.statusbar.policy.KeyguardStateController;
 import javax.inject.Inject;
 
 public class DataSaverTile extends SecureQSTile<BooleanState> implements
-        DataSaverController.Listener{
+        DataSaverController.Listener {
 
     public static final String TILE_SPEC = "saver";
 

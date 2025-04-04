@@ -170,7 +170,6 @@ import com.android.server.am.PlatformCompatCache.CachedCompatChangeId;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
 import com.android.server.wm.WindowProcessController;
 
-import java.io.File;
 import java.io.PrintWriter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -384,11 +383,6 @@ public class OomAdjuster {
     final ProcessList mProcessList;
     final ActivityManagerGlobalLock mProcLock;
 
-    // Min aging threshold in milliseconds to consider a B-service
-    int mMinBServiceAgingTime = 5000;
-    // Threshold for B-services when in memory pressure
-    int mBServiceAppThreshold = 5;
-
     private final int mNumSlots;
     protected final ArrayList<ProcessRecord> mTmpProcessList = new ArrayList<ProcessRecord>();
     protected final ArrayList<ProcessRecord> mTmpProcessList2 = new ArrayList<ProcessRecord>();
@@ -534,20 +528,6 @@ public class OomAdjuster {
         mTmpQueue = new ArrayDeque<ProcessRecord>(mConstants.CUR_MAX_CACHED_PROCESSES << 1);
         mNumSlots = ((CACHED_APP_MAX_ADJ - CACHED_APP_MIN_ADJ + 1) >> 1)
                 / CACHED_APP_IMPORTANCE_LEVELS;
-
-        // Enable Proactive Kills on devices with modern kernel mm setup
-        conditionallyEnableProactiveKills();
-    }
-
-    void conditionallyEnableProactiveKills() {
-        File mglru = new File("/sys/kernel/mm/lru_gen/enabled");
-        File psi = new File("/proc/pressure/memory");
-        File lmk_kernel = new File("/sys/module/lowmemorykiller/parameters/minfree");
-
-        if (!lmk_kernel.exists() && mglru.exists() && psi.exists()) {
-            Slog.i(TAG, "Detected kernel with modern mm setup, enabling Proactive Kills.");
-            mProactiveKillsEnabled = true;
-        }
     }
 
     void setProcessGroup(int pid, int group, String processName) {
@@ -1362,8 +1342,6 @@ public class OomAdjuster {
         return CachedAppOptimizer.getFreeSwapPercent();
     }
 
-    private boolean mProactiveKillsEnabled = mConstants.PROACTIVE_KILLS_ENABLED;
-
     @GuardedBy({"mService", "mProcLock"})
     private void updateAndTrimProcessLSP(final long now, final long nowElapsed,
             final long oldTime, final ActiveUids activeUids, @OomAdjReason int oomAdjReason,
@@ -1377,52 +1355,24 @@ public class OomAdjuster {
                 mNextNoKillDebugMessageTime = now + 5000; // Every 5 seconds
             }
         }
-        final int emptyProcessLimit = mConstants.CUR_MAX_EMPTY_PROCESSES;
-        final int cachedProcessLimit = (mConstants.CUR_MAX_CACHED_PROCESSES - emptyProcessLimit);
+        final int emptyProcessLimit = doKillExcessiveProcesses
+                ? mConstants.CUR_MAX_EMPTY_PROCESSES : Integer.MAX_VALUE;
+        final int cachedProcessLimit = doKillExcessiveProcesses
+                ? (mConstants.CUR_MAX_CACHED_PROCESSES - emptyProcessLimit) : Integer.MAX_VALUE;
         int lastCachedGroup = 0;
         int lastCachedGroupUid = 0;
         int numCached = 0;
         int numCachedExtraGroup = 0;
         int numEmpty = 0;
         int numTrimming = 0;
-        ProcessRecord selectedAppRecord = null;
-        long serviceLastActivity = 0;
-        int numBServices = 0;
 
+        boolean proactiveKillsEnabled = mConstants.PROACTIVE_KILLS_ENABLED;
         double lowSwapThresholdPercent = mConstants.LOW_SWAP_THRESHOLD_PERCENT;
-        double freeSwapPercent = mProactiveKillsEnabled ? getFreeSwapPercent() : 1.00;
+        double freeSwapPercent =  proactiveKillsEnabled ? getFreeSwapPercent() : 1.00;
         ProcessRecord lruCachedApp = null;
 
         for (int i = numLru - 1; i >= 0; i--) {
             ProcessRecord app = lruList.get(i);
-            if (app.mState.isServiceB()
-                    && (app.mState.getCurAdj() == ProcessList.SERVICE_B_ADJ)) {
-                numBServices++;
-                for (int s = app.mServices.numberOfRunningServices() - 1; s >= 0; s--) {
-                    ServiceRecord sr = app.mServices.getRunningServiceAt(s);
-                    if (DEBUG_OOM_ADJ) Slog.d(TAG,"app.processName = " + app.processName
-                            + " serviceb = " + app.mState.isServiceB() + " s = " + s + " sr.lastActivity = "
-                            + sr.lastActivity + " packageName = " + sr.packageName
-                            + " processName = " + sr.processName);
-                    if (SystemClock.uptimeMillis() - sr.lastActivity
-                            < mMinBServiceAgingTime) {
-                        if (DEBUG_OOM_ADJ) {
-                            Slog.d(TAG,"Not aged enough!!!");
-                        }
-                        continue;
-                    }
-                    if (serviceLastActivity == 0) {
-                        serviceLastActivity = sr.lastActivity;
-                        selectedAppRecord = app;
-                    } else if (sr.lastActivity < serviceLastActivity) {
-                        serviceLastActivity = sr.lastActivity;
-                        selectedAppRecord = app;
-                    }
-                }
-            }
-            if (DEBUG_OOM_ADJ && selectedAppRecord != null) Slog.d(TAG,
-                    "Identified app.processName = " + selectedAppRecord.processName
-                    + " app.pid = " + selectedAppRecord.getPid());
             final ProcessStateRecord state = app.mState;
             if (!app.isKilledByAm() && app.getThread() != null) {
                 if (!Flags.fixApplyOomadjOrder()) {
@@ -1468,7 +1418,7 @@ public class OomAdjuster {
                                     ApplicationExitInfo.REASON_OTHER,
                                     ApplicationExitInfo.SUBREASON_TOO_MANY_CACHED,
                                     true);
-                        } else if (mProactiveKillsEnabled) {
+                        } else if (proactiveKillsEnabled) {
                             lruCachedApp = app;
                         }
                         break;
@@ -1489,7 +1439,7 @@ public class OomAdjuster {
                                         ApplicationExitInfo.REASON_OTHER,
                                         ApplicationExitInfo.SUBREASON_TOO_MANY_EMPTY,
                                         true);
-                            } else if (mProactiveKillsEnabled) {
+                            } else if (proactiveKillsEnabled) {
                                 lruCachedApp = app;
                             }
                         }
@@ -1549,7 +1499,7 @@ public class OomAdjuster {
             mProcsToOomAdj.clear();
         }
 
-        if (mProactiveKillsEnabled                               // Proactive kills enabled?
+        if (proactiveKillsEnabled                               // Proactive kills enabled?
                 && doKillExcessiveProcesses                     // Should kill excessive processes?
                 && freeSwapPercent < lowSwapThresholdPercent    // Swap below threshold?
                 && lruCachedApp != null                         // If no cached app, let LMKD decide
@@ -1562,15 +1512,6 @@ public class OomAdjuster {
         }
 
         mLastFreeSwapPercent = freeSwapPercent;
-
-        if ((numBServices > mBServiceAppThreshold) && (true == mService.mAppProfiler.allowLowerMemLevelLocked())
-                && (selectedAppRecord != null)) {
-            ProcessList.setOomAdj(selectedAppRecord.getPid(), selectedAppRecord.info.uid,
-                    ProcessList.CACHED_APP_MAX_ADJ);
-            selectedAppRecord.mState.setSetAdj(selectedAppRecord.mState.getCurAdj());
-            if (DEBUG_OOM_ADJ) Slog.d(TAG,"app.processName = " + selectedAppRecord.processName
-                        + " app.pid = " + selectedAppRecord.getPid() + " is moved to higher adj");
-        }
 
         mService.mAppProfiler.updateLowMemStateLSP(numCached, numEmpty, numTrimming, now);
     }

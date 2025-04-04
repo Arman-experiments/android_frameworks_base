@@ -18,7 +18,6 @@ package com.android.systemui.statusbar.notification.row;
 
 import android.content.Context;
 import android.content.res.Resources;
-import android.provider.Settings;
 import android.graphics.Canvas;
 import android.graphics.Outline;
 import android.graphics.Path;
@@ -217,9 +216,7 @@ public abstract class ExpandableOutlineView extends ExpandableView {
         if (mAlwaysRoundBothCorners) {
             maxRadius = res.getDimension(R.dimen.notification_shadow_radius);
         } else {
-	    maxRadius = Settings.System.getInt(mContext.getContentResolver(),
-                    Settings.System.NOTIFICATION_CORNER_RADIUS,
-                    res.getDimensionPixelSize(R.dimen.notification_corner_radius));
+            maxRadius = res.getDimensionPixelSize(R.dimen.notification_corner_radius);
         }
         if (mRoundableState == null) {
             mRoundableState = new RoundableState(this, this, maxRadius);

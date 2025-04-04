@@ -39,6 +39,18 @@
         android:layout_height="match_parent"
         android:layout_width="match_parent" />
 
+    <include layout="@layout/ambient_custom_image"
+         android:id="@+id/image_container"
+         android:layout_width="match_parent"
+         android:layout_height="match_parent"
+         android:visibility="gone" />
+
+    <include layout="@layout/ambient_text"
+        android:id="@+id/text_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
     <include layout="@layout/edge_light_layout"
          android:id="@+id/edge_light_container"
          android:layout_width="match_parent"
@@ -60,11 +72,6 @@
         <include
             layout="@layout/keyguard_status_view"
             android:visibility="gone"/>
-
-        <View
-            android:id="@+id/depth_wallpaper_placeholder"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
 
         <com.android.systemui.pulse.VisualizerView
             android:id="@+id/visualizerview"

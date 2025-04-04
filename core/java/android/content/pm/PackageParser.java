@@ -165,13 +165,13 @@ public class PackageParser {
     public static final boolean DEBUG_JAR = false;
     public static final boolean DEBUG_PARSER = false;
     public static final boolean DEBUG_BACKUP = false;
-    public static final boolean LOG_PARSE_TIMINGS = Build.IS_DEBUGGABLE;
+    public static final boolean LOG_PARSE_TIMINGS = Build.IS_ENG;
     public static final int LOG_PARSE_TIMINGS_THRESHOLD_MS = 100;
 
     private static final String PROPERTY_CHILD_PACKAGES_ENABLED =
             "persist.sys.child_packages_enabled";
 
-    public static final boolean MULTI_PACKAGE_APK_ENABLED = Build.IS_DEBUGGABLE &&
+    public static final boolean MULTI_PACKAGE_APK_ENABLED = Build.IS_ENG &&
             SystemProperties.getBoolean(PROPERTY_CHILD_PACKAGES_ENABLED, false);
 
     public static final float DEFAULT_PRE_O_MAX_ASPECT_RATIO = 1.86f;
@@ -5523,20 +5523,6 @@ public class PackageParser {
 
         if (data == null) {
             data = new Bundle();
-            data.putBoolean("batch_opted_out_by_default", true);
-            data.putBoolean("com.ad4screen.no_geoloc", true);
-            data.putBoolean("com.facebook.sdk.AutoLogAppEventsEnabled", false);
-            data.putBoolean("com.mixpanel.android.MPConfig.UseIpAddressForGeolocation", false);
-            data.putBoolean("com.webengage.sdk.android.location_tracking", false);
-            data.putBoolean("firebase_analytics_collection_deactivated", true);
-            data.putBoolean("firebase_analytics_collection_enabled", false);
-            data.putBoolean("firebase_crash_collection_enabled", false);
-            data.putBoolean("firebase_performance_collection_deactivated", true);
-            data.putBoolean("google_analytics_adid_collection_enabled", false);
-            data.putBoolean("google_analytics_ssaid_collection_enabled", false);
-            data.putBoolean("google_analytics_default_allow_ad_personalization_signals", false);
-            data.putString("com.ad4screen.tracking_mode", "Restricted");
-            data.putString("com.sprooki.LOCATION_SERVICES", "disable");
         }
 
         String name = sa.getNonConfigurationString(

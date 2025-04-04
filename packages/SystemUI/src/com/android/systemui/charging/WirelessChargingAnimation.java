@@ -23,6 +23,8 @@ import android.graphics.PixelFormat;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.UserHandle;
+import android.provider.Settings;
 import android.util.Log;
 import android.util.Slog;
 import android.view.Gravity;
@@ -125,6 +127,7 @@ public class WirelessChargingAnimation {
         private WirelessChargingLayout mNextView;
         private ViewCaptureAwareWindowManager mWM;
         private Callback mCallback;
+        private boolean mChargingAnimationBg;
 
         public WirelessChargingView(Context context, @Nullable Looper looper,
                 int transmittingBatteryLevel, int batteryLevel, Callback callback,
@@ -137,6 +140,9 @@ public class WirelessChargingAnimation {
             mUiEventLogger = uiEventLogger;
             mWM = viewCaptureAwareWindowManager;
 
+            mChargingAnimationBg = Settings.System.getIntForUser(context.getContentResolver(),
+                     Settings.System.CHARGING_ANIMATION_BG, 0, UserHandle.USER_CURRENT) != 0;
+
             final WindowManager.LayoutParams params = mParams;
             params.height = WindowManager.LayoutParams.MATCH_PARENT;
             params.width = WindowManager.LayoutParams.MATCH_PARENT;
@@ -147,8 +153,14 @@ public class WirelessChargingAnimation {
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
             params.setFitInsetsTypes(0 /* ignore all system bar insets */);
             params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                    | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
-            params.setTrustedOverlay();
+                    | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                    | WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+
+            if (mChargingAnimationBg) {
+                params.dimAmount = 1f;
+            } else {
+                    params.dimAmount = 0.6f;
+            }
 
             if (looper == null) {
                 // Use Looper.myLooper() if looper is not specified.

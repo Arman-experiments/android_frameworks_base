@@ -102,6 +102,7 @@ import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
+import android.provider.Settings;
 import android.util.ArraySet;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -133,6 +134,7 @@ import com.android.internal.protolog.ProtoLog;
 import com.android.internal.statusbar.LetterboxDetails;
 import com.android.internal.util.ScreenshotHelper;
 import com.android.internal.util.ScreenshotRequest;
+import com.android.internal.util.infinity.InfinityUtils;
 import com.android.internal.util.function.TriFunction;
 import com.android.internal.view.AppearanceRegion;
 import com.android.internal.widget.PointerLocationView;
@@ -143,8 +145,6 @@ import com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs;
 import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.wallpaper.WallpaperManagerInternal;
 import com.android.wm.shell.Flags;
-
-import lineageos.providers.LineageSettings;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -240,7 +240,6 @@ public class DisplayPolicy {
 
     private volatile boolean mHasStatusBar;
     private volatile boolean mHasNavigationBar;
-    private volatile int mForceNavbar = -1;
     private volatile boolean mTaskBarEnabled;
     // Can the navigation bar ever move to the side?
     private volatile boolean mNavigationBarCanMove;
@@ -406,11 +405,11 @@ public class DisplayPolicy {
             super(handler);
 
             ContentResolver resolver = mContext.getContentResolver();
-            resolver.registerContentObserver(LineageSettings.System.getUriFor(
-                    LineageSettings.System.FORCE_SHOW_NAVBAR), false, this,
+            resolver.registerContentObserver(Settings.System.getUriFor(
+                    Settings.System.FORCE_SHOW_NAVBAR), false, this,
                     UserHandle.USER_ALL);
-            resolver.registerContentObserver(LineageSettings.System.getUriFor(
-                    LineageSettings.System.ENABLE_TASKBAR), false, this,
+            resolver.registerContentObserver(Settings.System.getUriFor(
+                    Settings.System.ENABLE_TASKBAR), false, this,
                     UserHandle.USER_ALL);
 
             updateSettings();
@@ -533,32 +532,6 @@ public class DisplayPolicy {
                     if (mService.mPowerManagerInternal != null) {
                         mService.mPowerManagerInternal.setPowerBoost(
                                 Boost.INTERACTION, duration);
-                    }
-                }
-
-                @Override
-                public void onVerticalFling(int duration) {
-                    if (mService.mPowerManagerInternal != null) {
-                        mService.mPowerManagerInternal.setPowerBoost(
-                                Boost.INTERACTION, duration + 320);
-                    }
-                }
-
-                @Override
-                public void onHorizontalFling(int duration) {
-                    if (mService.mPowerManagerInternal != null) {
-                        mService.mPowerManagerInternal.setPowerBoost(
-                                Boost.INTERACTION, duration + 160);
-                    }
-                }
-
-                @Override
-                public void onScroll(boolean started) {
-                    if (started) {
-                        if (mService.mPowerManagerInternal != null) {
-                            mService.mPowerManagerInternal.setPowerBoost(
-                                 Boost.DISPLAY_UPDATE_IMMINENT, 500);
-                        }
                     }
                 }
 
@@ -702,19 +675,10 @@ public class DisplayPolicy {
 
         if (mDisplayContent.isDefaultDisplay) {
             mHasStatusBar = true;
-            mHasNavigationBar = mContext.getResources().getBoolean(R.bool.config_showNavigationBar);
-
-            // Allow a system property to override this. Used by the emulator.
-            // See also hasNavigationBar().
-            String navBarOverride = SystemProperties.get("qemu.hw.mainkeys");
-            if ("1".equals(navBarOverride)) {
-                mHasNavigationBar = false;
-            } else if ("0".equals(navBarOverride)) {
-                mHasNavigationBar = true;
-            }
 
             // Register content observer only for main display
             mSettingsObserver = new SettingsObserver(mHandler);
+            updateSettings();
         } else {
             mHasStatusBar = false;
             mHasNavigationBar = mDisplayContent.isSystemDecorationsSupported();
@@ -764,11 +728,11 @@ public class DisplayPolicy {
     public void updateSettings() {
         ContentResolver resolver = mContext.getContentResolver();
 
-        mForceNavbar = LineageSettings.System.getIntForUser(resolver,
-                LineageSettings.System.FORCE_SHOW_NAVBAR, 0,
-                UserHandle.USER_CURRENT);
-        mTaskBarEnabled = LineageSettings.System.getIntForUser(resolver,
-                LineageSettings.System.ENABLE_TASKBAR, isTablet() ? 1 : 0,
+        mHasNavigationBar = Settings.System.getIntForUser(resolver,
+                 Settings.System.FORCE_SHOW_NAVBAR, InfinityUtils.hasNavbarByDefault(mContext) ? 1 : 0,
+                 UserHandle.USER_CURRENT) != 0;
+        mTaskBarEnabled = Settings.System.getIntForUser(resolver,
+                Settings.System.ENABLE_TASKBAR, isTablet() ? 1 : 0,
                 UserHandle.USER_CURRENT) != 0;
     }
     
@@ -824,7 +788,7 @@ public class DisplayPolicy {
     }
 
     public boolean hasNavigationBar() {
-        return mHasNavigationBar || mForceNavbar == 1;
+        return mHasNavigationBar;
     }
 
     public boolean hasStatusBar() {

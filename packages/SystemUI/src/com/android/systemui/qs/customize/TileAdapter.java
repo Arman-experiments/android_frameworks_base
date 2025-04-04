@@ -367,7 +367,7 @@ public class TileAdapter extends RecyclerView.Adapter<Holder> implements TileSta
             } else if (!canRemoveTiles() && mCurrentDrag.getAdapterPosition() < mEditIndex) {
                 titleText = res.getString(R.string.drag_to_remove_disabled, mMinNumTiles);
             } else {
-                titleText = res.getString(R.string.drag_to_tap_to_remove_tiles);
+                titleText = res.getString(R.string.drag_to_remove_tiles);
             }
 
             ((TextView) holder.itemView.findViewById(android.R.id.title)).setText(titleText);
@@ -902,9 +902,7 @@ public class TileAdapter extends RecyclerView.Adapter<Holder> implements TileSta
             buttonMinWidth = t.getDimensionPixelSize(android.R.styleable.View_minWidth, 0);
             t.recycle();
         }
-        return res.getDimensionPixelSize(TileUtils.canShowQsWidgets(context) 
-                    ? R.dimen.qs_controls_padding_top 
-                    : R.dimen.qs_panel_padding_top)
+        return res.getDimensionPixelSize(R.dimen.qs_panel_padding_top)
                 + res.getDimensionPixelSize(R.dimen.brightness_mirror_height)
                 + res.getDimensionPixelSize(R.dimen.qs_brightness_margin_top)
                 + res.getDimensionPixelSize(R.dimen.qs_brightness_margin_bottom)

@@ -803,10 +803,6 @@ public class InputManagerService extends IInputManager.Stub
     }
 
     private void removeSpyWindowGestureMonitor(IBinder inputChannelToken) {
-        if (inputChannelToken == null) {
-            return; // Handle the null inputChannelToken gracefully
-        }
-
         final GestureMonitorSpyWindow monitor;
         synchronized (mInputMonitors) {
             monitor = mInputMonitors.remove(inputChannelToken);
@@ -827,9 +823,8 @@ public class InputManagerService extends IInputManager.Stub
     @Override // Binder call
     public InputMonitor monitorGestureInput(IBinder monitorToken, @NonNull String requestedName,
             int displayId) {
-        boolean isExempted = com.android.internal.util.android.BypassUtils.shouldBypassTaskPermission(Binder.getCallingUid());
         if (!checkCallingPermission(android.Manifest.permission.MONITOR_INPUT,
-                "monitorGestureInput()") && !isExempted) {
+                "monitorGestureInput()")) {
             throw new SecurityException("Requires MONITOR_INPUT permission");
         }
         Objects.requireNonNull(requestedName, "name must not be null.");

@@ -970,7 +970,7 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
                     int a = findConfigAttrib(egl, display, config,
                             EGL10.EGL_ALPHA_SIZE, 0);
                     if ((r == mRedSize) && (g == mGreenSize)
-                            && (b == mBlueSize) && (a >= mAlphaSize)) {
+                            && (b == mBlueSize) && (a == mAlphaSize)) {
                         return config;
                     }
                 }
@@ -1255,8 +1255,7 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
             super();
             mWidth = 0;
             mHeight = 0;
-            // Render will be requested later when it'll be really needed
-            mRequestRender = false;
+            mRequestRender = true;
             mRenderMode = RENDERMODE_CONTINUOUSLY;
             mWantRenderNotification = false;
             mGLSurfaceViewWeakRef = glSurfaceViewWeakRef;

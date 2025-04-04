@@ -261,7 +261,6 @@ import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.FastPrintWriter;
 import com.android.internal.util.FrameworkStatsLog;
-import com.android.internal.util.android.cutout.CutoutFullscreenController;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.server.LocalManagerRegistry;
 import com.android.server.LocalServices;
@@ -291,7 +290,7 @@ import com.android.server.uri.UriGrantsManagerInternal;
 import com.android.server.wallpaper.WallpaperManagerInternal;
 import com.android.wm.shell.Flags;
 
-import org.lineageos.internal.applications.LineageActivityManager;
+import com.android.internal.util.infinity.cutout.CutoutFullscreenController;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -408,7 +407,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
      * @see WindowManagerThreadPriorityBooster
      */
     final Object mGlobalLockWithoutBoost = mGlobalLock;
-    public ActivityTaskSupervisor mTaskSupervisor;
+    ActivityTaskSupervisor mTaskSupervisor;
     ActivityClientController mActivityClientController;
     RootWindowContainer mRootWindowContainer;
     WindowManagerService mWindowManager;
@@ -782,8 +781,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     @Nullable
     private ActivityRecord mTracedResumedActivity;
 
-    boolean toastWindow = false;
-
     /** If non-null, we are tracking the time the user spends in the currently focused app. */
     AppTimeTracker mCurAppTimeTracker;
 
@@ -810,9 +807,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     private int mDeviceOwnerUid = Process.INVALID_UID;
 
     private Set<Integer> mProfileOwnerUids = new ArraySet<Integer>();
-
-    // Lineage sdk activity related helper
-    private LineageActivityManager mLineageActivityManager;
 
     private CutoutFullscreenController mCutoutFullscreenController;
 
@@ -919,10 +913,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
     public void installSystemProviders() {
         mSettingsObserver = new SettingObserver();
-
-        // LineageActivityManager depends on settings so we can initialize only
-        // after providers are available.
-        mLineageActivityManager = new LineageActivityManager(mContext);
 
         // Force full screen for devices with cutout
         mCutoutFullscreenController = new CutoutFullscreenController(mContext);
@@ -3375,9 +3365,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     }
 
     static void enforceTaskPermission(String func) {
-        if (com.android.internal.util.android.BypassUtils.shouldBypassTaskPermission(Binder.getCallingUid())) {
-            return;
-        }
         if (checkCallingPermission(MANAGE_ACTIVITY_TASKS) == PackageManager.PERMISSION_GRANTED) {
             return;
         }
@@ -5549,18 +5536,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         return mCompatModePackages.compatibilityInfoForPackageLocked(ai);
     }
 
-    void setToastWindow() {
-        toastWindow = true;
-    }
-
-    void resetToastWindow() {
-        toastWindow = false;
-    }
-
-    boolean getToastWindow() {
-        return toastWindow;
-    }
-
     /**
      * Returns the PackageManager. Used by classes hosted by {@link ActivityTaskManagerService}. The
      * PackageManager could be unavailable at construction time and therefore needs to be accessed
@@ -6519,7 +6494,19 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
                 if (!isBuildConsistent) {
                     Slog.e(TAG, "Build fingerprint is not consistent, warning user");
-                    // Do not emit warning about vendor mismatch
+                    mUiHandler.post(() -> {
+                        if (mShowDialogs) {
+                            AlertDialog d = new BaseErrorDialog(mUiContext);
+                            d.getWindow().setType(WindowManager.LayoutParams.TYPE_SYSTEM_ERROR);
+                            d.setCancelable(false);
+                            d.setTitle(mUiContext.getText(R.string.android_system_label));
+                            d.setMessage(mUiContext.getText(R.string.system_error_manufacturer));
+                            d.setButton(DialogInterface.BUTTON_POSITIVE,
+                                    mUiContext.getText(R.string.ok),
+                                    mUiHandler.obtainMessage(DISMISS_DIALOG_UI_MSG, d));
+                            d.show();
+                        }
+                    });
                 }
             }
             Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
@@ -7648,11 +7635,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         return sIsPip2ExperimentEnabled;
     }
 
-    public boolean shouldForceLongScreen(String packageName) {
-        return mLineageActivityManager.shouldForceLongScreen(packageName);
-    }
-
     public boolean shouldForceCutoutFullscreen(String packageName) {
-        return mCutoutFullscreenController.shouldForceCutoutFullscreen(packageName);
+        synchronized (this) {
+            return mCutoutFullscreenController.shouldForceCutoutFullscreen(packageName);
+        }
     }
 }

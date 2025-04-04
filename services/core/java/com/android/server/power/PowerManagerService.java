@@ -18,7 +18,6 @@ package com.android.server.power;
 
 import static android.hardware.display.DisplayManagerInternal.DisplayPowerRequest.policyToString;
 import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_CRITICAL;
-import static android.os.PowerManager.BRIGHTNESS_OFF_FLOAT;
 import static android.os.PowerManager.GO_TO_SLEEP_REASON_DISPLAY_GROUPS_TURNED_OFF;
 import static android.os.PowerManager.GO_TO_SLEEP_REASON_DISPLAY_GROUP_REMOVED;
 import static android.os.PowerManager.WAKE_REASON_DISPLAY_GROUP_ADDED;
@@ -150,8 +149,6 @@ import com.android.server.power.batterysaver.BatterySavingStats;
 import com.android.server.power.feature.PowerManagerFlags;
 
 import dalvik.annotation.optimization.NeverCompile;
-
-import lineageos.providers.LineageSettings;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -323,8 +320,6 @@ public final class PowerManagerService extends SystemService
     private static final IntArray DEFAULT_DISPLAY_GROUP_IDS =
             IntArray.wrap(new int[]{Display.DEFAULT_DISPLAY_GROUP});
 
-    private static final int DEFAULT_BUTTON_ON_DURATION = 5 * 1000;
-
     private final Context mContext;
     private final ServiceThread mHandlerThread;
     private final Handler mHandler;
@@ -362,15 +357,6 @@ public final class PowerManagerService extends SystemService
     private SettingsObserver mSettingsObserver;
     private DreamManagerInternal mDreamManager;
     private LogicalLight mAttentionLight;
-    private LogicalLight mButtonsLight;
-    private LogicalLight mKeyboardLight;
-
-    private int mButtonTimeout;
-    private float mButtonBrightness;
-    private boolean mKeyboardVisible;
-    private float mKeyboardBrightness;
-
-    private boolean mButtonLightOnKeypressOnly;
 
     private final InattentiveSleepWarningController mInattentiveSleepWarningOverlayController;
     private final AmbientDisplaySuppressionController mAmbientDisplaySuppressionController;
@@ -640,10 +626,6 @@ public final class PowerManagerService extends SystemService
     // (when {@link #mProximityPositive} is set to false).
     private boolean mInterceptedPowerKeyForProximity;
 
-    // Button and keyboard brightness
-    public final float mButtonBrightnessDefault;
-    public final float mKeyboardBrightnessDefault;
-
     // Screen brightness setting limits.
     public final float mScreenBrightnessMinimum;
     public final float mScreenBrightnessMaximum;
@@ -654,11 +636,6 @@ public final class PowerManagerService extends SystemService
     @VisibleForTesting
     boolean mIsFaceDown = false;
     private long mLastFlipTime = 0L;
-
-    // The button brightness setting override from the window manager
-    // to allow the current foreground activity to override the button brightness.
-    private float mButtonBrightnessOverrideFromWindowManager =
-            PowerManager.BRIGHTNESS_INVALID_FLOAT;
 
     // The window manager has determined the user to be inactive via other means.
     // Set this to false to disable.
@@ -1261,13 +1238,6 @@ public final class PowerManagerService extends SystemService
         mUseAutoSuspend = mContext.getResources().getBoolean(com.android.internal.R.bool
                 .config_useAutoSuspend);
 
-        mButtonBrightnessDefault = mContext.getResources().getFloat(
-                org.lineageos.platform.internal.R.dimen
-                        .config_buttonBrightnessSettingDefaultFloat);
-        mKeyboardBrightnessDefault = mContext.getResources().getFloat(
-                org.lineageos.platform.internal.R.dimen
-                        .config_keyboardBrightnessSettingDefaultFloat);
-
         // Save brightness values:
         // Get float values from config.
         // Store float if valid
@@ -1445,8 +1415,6 @@ public final class PowerManagerService extends SystemService
 
             mLightsManager = getLocalService(LightsManager.class);
             mAttentionLight = mLightsManager.getLight(LightsManager.LIGHT_ID_ATTENTION);
-            mButtonsLight = mLightsManager.getLight(LightsManager.LIGHT_ID_BUTTONS);
-            mKeyboardLight = mLightsManager.getLight(LightsManager.LIGHT_ID_KEYBOARD);
             updateDeviceConfigLocked();
             mDeviceConfigProvider.addOnPropertiesChangedListener(BackgroundThread.getExecutor(),
                     properties -> {
@@ -1543,28 +1511,14 @@ public final class PowerManagerService extends SystemService
         resolver.registerContentObserver(Settings.Global.getUriFor(
                 Settings.Global.DEVICE_DEMO_MODE),
                 false, mSettingsObserver, UserHandle.USER_SYSTEM);
-
-        // Register for Lineage settings changes.
-        resolver.registerContentObserver(LineageSettings.System.getUriFor(
-                LineageSettings.System.PROXIMITY_ON_WAKE),
+        resolver.registerContentObserver(Settings.System.getUriFor(
+                Settings.System.PROXIMITY_ON_WAKE),
                 false, mSettingsObserver, UserHandle.USER_ALL);
-        resolver.registerContentObserver(LineageSettings.Global.getUriFor(
-                LineageSettings.Global.WAKE_WHEN_PLUGGED_OR_UNPLUGGED),
+        resolver.registerContentObserver(Settings.System.getUriFor(
+                Settings.System.WAKE_WHEN_PLUGGED_OR_UNPLUGGED),
                 false, mSettingsObserver, UserHandle.USER_ALL);
-        resolver.registerContentObserver(LineageSettings.Secure.getUriFor(
-                LineageSettings.Secure.BUTTON_BRIGHTNESS),
-                false, mSettingsObserver, UserHandle.USER_ALL);
-        resolver.registerContentObserver(LineageSettings.Secure.getUriFor(
-                LineageSettings.Secure.BUTTON_BACKLIGHT_TIMEOUT),
-                false, mSettingsObserver, UserHandle.USER_ALL);
-        resolver.registerContentObserver(LineageSettings.System.getUriFor(
-                LineageSettings.System.BUTTON_BACKLIGHT_ONLY_WHEN_PRESSED),
-                false, mSettingsObserver, UserHandle.USER_ALL);
-        resolver.registerContentObserver(LineageSettings.Secure.getUriFor(
-                LineageSettings.Secure.KEYBOARD_BRIGHTNESS),
-                false, mSettingsObserver, UserHandle.USER_ALL);
-        resolver.registerContentObserver(LineageSettings.System.getUriFor(
-                LineageSettings.System.FORCE_SHOW_NAVBAR),
+        resolver.registerContentObserver(Settings.System.getUriFor(
+                Settings.System.FORCE_SHOW_NAVBAR),
                 false, mSettingsObserver, UserHandle.USER_ALL);
 
         // Register for broadcasts from other components of the system.
@@ -1638,11 +1592,11 @@ public final class PowerManagerService extends SystemService
                 com.android.internal.R.bool.config_supportDoubleTapWake);
 
         mProximityWakeSupported = resources.getBoolean(
-                org.lineageos.platform.internal.R.bool.config_proximityCheckOnWake);
+                com.android.internal.R.bool.config_proximityCheckOnWake);
         mProximityWakeEnabledByDefaultConfig = resources.getBoolean(
-                org.lineageos.platform.internal.R.bool.config_proximityCheckOnWakeEnabledByDefault);
+                com.android.internal.R.bool.config_proximityCheckOnWakeEnabledByDefault);
         mProximityTimeOut = resources.getInteger(
-                org.lineageos.platform.internal.R.integer.config_proximityCheckTimeout);
+                com.android.internal.R.integer.config_proximityCheckTimeout);
         if (mProximityWakeSupported) {
             mProximityWakeLock = mContext.getSystemService(PowerManager.class)
                     .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ProximityWakeLock");
@@ -1678,12 +1632,12 @@ public final class PowerManagerService extends SystemService
                 Settings.Global.STAY_ON_WHILE_PLUGGED_IN, BatteryManager.BATTERY_PLUGGED_AC);
         mTheaterModeEnabled = Settings.Global.getInt(mContext.getContentResolver(),
                 Settings.Global.THEATER_MODE_ON, 0) == 1;
-        mWakeUpWhenPluggedOrUnpluggedSetting = LineageSettings.Global.getInt(resolver,
-                LineageSettings.Global.WAKE_WHEN_PLUGGED_OR_UNPLUGGED,
-                (mWakeUpWhenPluggedOrUnpluggedConfig ? 1 : 0)) == 1;
         mAlwaysOnEnabled = mAmbientDisplayConfiguration.alwaysOnEnabledSetting(UserHandle.USER_CURRENT);
-        mAlwaysOnChargingEnabled = mAmbientDisplayConfiguration.alwaysOnChargingEnabledSetting(
-                    UserHandle.USER_CURRENT);
+        mAlwaysOnChargingEnabled = (mAmbientDisplayConfiguration.alwaysOnChargingEnabledSetting(
+                    UserHandle.USER_CURRENT) && mIsPowered);
+        mWakeUpWhenPluggedOrUnpluggedSetting = Settings.System.getIntForUser(resolver,
+                Settings.System.WAKE_WHEN_PLUGGED_OR_UNPLUGGED,
+                (mWakeUpWhenPluggedOrUnpluggedConfig ? 1 : 0), UserHandle.USER_CURRENT) == 1;
 
         if (mSupportsDoubleTapWakeConfig) {
             boolean doubleTapWakeEnabled = Settings.Secure.getIntForUser(resolver,
@@ -1701,25 +1655,12 @@ public final class PowerManagerService extends SystemService
             mSystemProperties.set(SYSTEM_PROPERTY_RETAIL_DEMO_ENABLED, retailDemoValue);
         }
 
-        mProximityWakeEnabled = LineageSettings.System.getInt(resolver,
-                LineageSettings.System.PROXIMITY_ON_WAKE,
+        mProximityWakeEnabled = Settings.System.getInt(resolver,
+                Settings.System.PROXIMITY_ON_WAKE,
                 mProximityWakeEnabledByDefaultConfig ? 1 : 0) == 1;
 
-        mButtonTimeout = LineageSettings.Secure.getIntForUser(resolver,
-                LineageSettings.Secure.BUTTON_BACKLIGHT_TIMEOUT,
-                DEFAULT_BUTTON_ON_DURATION, UserHandle.USER_CURRENT);
-        mButtonBrightness = LineageSettings.Secure.getFloatForUser(resolver,
-                LineageSettings.Secure.BUTTON_BRIGHTNESS, mButtonBrightnessDefault,
-                UserHandle.USER_CURRENT);
-        mButtonLightOnKeypressOnly = LineageSettings.System.getIntForUser(resolver,
-                LineageSettings.System.BUTTON_BACKLIGHT_ONLY_WHEN_PRESSED,
-                0, UserHandle.USER_CURRENT) == 1;
-        mKeyboardBrightness = LineageSettings.Secure.getFloatForUser(resolver,
-                LineageSettings.Secure.KEYBOARD_BRIGHTNESS, mKeyboardBrightnessDefault,
-                UserHandle.USER_CURRENT);
-
-        mForceNavbar = LineageSettings.System.getIntForUser(resolver,
-                LineageSettings.System.FORCE_SHOW_NAVBAR,
+        mForceNavbar = Settings.System.getIntForUser(resolver,
+                Settings.System.FORCE_SHOW_NAVBAR,
                 0, UserHandle.USER_CURRENT) == 1;
 
         mDirty |= DIRTY_SETTINGS;
@@ -2262,9 +2203,7 @@ public final class PowerManagerService extends SystemService
 
         Trace.traceBegin(Trace.TRACE_TAG_POWER, "userActivity");
         try {
-            if (eventTime > mLastInteractivePowerHintTime &&
-                    event != PowerManager.USER_ACTIVITY_EVENT_OTHER &&
-                    event != PowerManager.USER_ACTIVITY_EVENT_TOUCH) {
+            if (eventTime > mLastInteractivePowerHintTime) {
                 setPowerBoostInternal(Boost.INTERACTION, 0);
                 mLastInteractivePowerHintTime = eventTime;
             }
@@ -2302,14 +2241,6 @@ public final class PowerManagerService extends SystemService
                 }
             } else {
                 if (eventTime > powerGroup.getLastUserActivityTimeLocked()) {
-                    powerGroup.setButtonPressedLocked(
-                            event == PowerManager.USER_ACTIVITY_EVENT_BUTTON);
-                    if (eventTime == powerGroup.getLastWakeTimeLocked() ||
-                            (mButtonLightOnKeypressOnly && powerGroup.getButtonPressedLocked() &&
-                            (flags & PowerManager.USER_ACTIVITY_FLAG_NO_BUTTON_LIGHTS) == 0)) {
-                        powerGroup.setButtonPressedLocked(true);
-                        powerGroup.setLastButtonActivityTimeLocked(eventTime);
-                    }
                     powerGroup.setLastUserActivityTimeLocked(eventTime, event);
                     mDirty |= DIRTY_USER_ACTIVITY;
                     if (event == PowerManager.USER_ACTIVITY_EVENT_BUTTON) {
@@ -2868,7 +2799,7 @@ public final class PowerManagerService extends SystemService
         if (mAlwaysOnEnabled && getGlobalWakefulnessLocked() == WAKEFULNESS_DOZING) {
             return false;
         }
-
+        
         // On Always On Charging, SystemUI shows the charging indicator
         if (mAlwaysOnChargingEnabled && mIsPowered && getGlobalWakefulnessLocked() == WAKEFULNESS_DOZING) {
             return false;
@@ -3156,80 +3087,10 @@ public final class PowerManagerService extends SystemService
                     groupNextTimeout = lastUserActivityTime + screenOffTimeout - screenDimDuration;
                     if (now < groupNextTimeout) {
                         groupUserActivitySummary = USER_ACTIVITY_SCREEN_BRIGHT;
-                        if (wakefulness == WAKEFULNESS_AWAKE) {
-                            if (mButtonsLight != null) {
-                                float buttonBrightness = BRIGHTNESS_OFF_FLOAT;
-                                if (!mForceNavbar) {
-                                    if (isValidBrightness(
-                                            mButtonBrightnessOverrideFromWindowManager)) {
-                                        if (mButtonBrightnessOverrideFromWindowManager >
-                                                PowerManager.BRIGHTNESS_MIN) {
-                                            buttonBrightness =
-                                                    mButtonBrightnessOverrideFromWindowManager;
-                                        }
-                                    } else if (isValidButtonBrightness(mButtonBrightness)) {
-                                        buttonBrightness = mButtonBrightness;
-                                    }
-                                }
-
-                                if (!mButtonLightOnKeypressOnly) {
-                                    powerGroup.setLastButtonActivityTimeLocked(
-                                            lastUserActivityTime);
-                                }
-                                final long lastButtonActivityTimeout = mButtonTimeout +
-                                        powerGroup.getLastButtonActivityTimeLocked();
-
-                                if (mButtonTimeout != 0 && now > lastButtonActivityTimeout) {
-                                    mButtonsLight.setBrightness(BRIGHTNESS_OFF_FLOAT);
-                                    powerGroup.setButtonOnLocked(false);
-                                } else {
-                                    if (!mProximityPositive && (!mButtonLightOnKeypressOnly ||
-                                            powerGroup.getButtonPressedLocked())) {
-                                        mButtonsLight.setBrightness(buttonBrightness);
-                                        powerGroup.setButtonPressedLocked(false);
-                                        if (buttonBrightness != BRIGHTNESS_OFF_FLOAT &&
-                                                mButtonTimeout != 0) {
-                                            powerGroup.setButtonOnLocked(true);
-                                            if (now + mButtonTimeout < nextTimeout) {
-                                                groupNextTimeout = now + mButtonTimeout;
-                                            }
-                                        }
-                                    } else if (mButtonLightOnKeypressOnly &&
-                                            lastButtonActivityTimeout < nextTimeout &&
-                                            powerGroup.getButtonOnLocked()) {
-                                        groupNextTimeout = lastButtonActivityTimeout;
-                                    }
-                                }
-                            }
-
-                            if (mKeyboardLight != null) {
-                                float keyboardBrightness = BRIGHTNESS_OFF_FLOAT;
-                                if (isValidBrightness(mButtonBrightnessOverrideFromWindowManager)) {
-                                    if (mButtonBrightnessOverrideFromWindowManager >
-                                            PowerManager.BRIGHTNESS_MIN) {
-                                        keyboardBrightness =
-                                                mButtonBrightnessOverrideFromWindowManager;
-                                    }
-                                } else if (isValidKeyboardBrightness(mKeyboardBrightness)) {
-                                    keyboardBrightness = mKeyboardBrightness;
-                                }
-                                mKeyboardLight.setBrightness(mKeyboardVisible ?
-                                        keyboardBrightness : BRIGHTNESS_OFF_FLOAT);
-                            }
-                        }
                     } else {
                         groupNextTimeout = lastUserActivityTime + screenOffTimeout;
                         if (now < groupNextTimeout) {
                             groupUserActivitySummary = USER_ACTIVITY_SCREEN_DIM;
-                            if (wakefulness == WAKEFULNESS_AWAKE) {
-                                if (mButtonsLight != null) {
-                                    mButtonsLight.setBrightness(BRIGHTNESS_OFF_FLOAT);
-                                    powerGroup.setButtonOnLocked(false);
-                                }
-                                if (mKeyboardLight != null) {
-                                    mKeyboardLight.setBrightness(BRIGHTNESS_OFF_FLOAT);
-                                }
-                            }
                         }
                     }
                 }
@@ -3962,14 +3823,6 @@ public final class PowerManagerService extends SystemService
         return value >= PowerManager.BRIGHTNESS_MIN && value <= PowerManager.BRIGHTNESS_MAX;
     }
 
-    private static boolean isValidButtonBrightness(float value) {
-        return value > PowerManager.BRIGHTNESS_MIN && value <= PowerManager.BRIGHTNESS_MAX;
-    }
-
-    private static boolean isValidKeyboardBrightness(float value) {
-        return value > PowerManager.BRIGHTNESS_MIN && value <= PowerManager.BRIGHTNESS_MAX;
-    }
-
     @VisibleForTesting
     int getDreamsBatteryLevelDrain() {
         return mDreamsBatteryLevelDrain;
@@ -4255,7 +4108,7 @@ public final class PowerManagerService extends SystemService
     }
 
     private void shutdownOrRebootInternal(final @HaltMode int haltMode, final boolean confirm,
-            @Nullable final String reason, boolean wait, boolean custom) {
+            @Nullable final String reason, boolean wait, final boolean custom) {
         if (PowerManager.REBOOT_USERSPACE.equals(reason)) {
             if (!PowerManager.isRebootingUserspaceSupportedImpl()) {
                 throw new UnsupportedOperationException(
@@ -4282,7 +4135,7 @@ public final class PowerManagerService extends SystemService
                         ShutdownThread.rebootSafeMode(getUiContext(), confirm);
                     } else if (haltMode == HALT_MODE_REBOOT) {
                         if (custom) {
-                            ShutdownThread.rebootCustom(getUiContext(), reason, confirm);
+                            ShutdownThread.advancedReboot(getUiContext(), reason, confirm);
                         } else {
                             ShutdownThread.reboot(getUiContext(), reason, confirm);
                         }
@@ -4670,17 +4523,6 @@ public final class PowerManagerService extends SystemService
         }
     }
 
-    private void setButtonBrightnessOverrideFromWindowManagerInternal(float brightness) {
-        synchronized (mLock) {
-            if (!BrightnessSynchronizer.floatEquals(mButtonBrightnessOverrideFromWindowManager,
-                    brightness)) {
-                mButtonBrightnessOverrideFromWindowManager = brightness;
-                mDirty |= DIRTY_SETTINGS;
-                updatePowerStateLocked();
-            }
-        }
-    }
-
     private void setUserInactiveOverrideFromWindowManagerInternal() {
         synchronized (mLock) {
             mUserInactiveOverrideFromWindowManager = true;
@@ -5019,11 +4861,6 @@ public final class PowerManagerService extends SystemService
                     + mMaximumScreenOffTimeoutFromDeviceAdmin + " (enforced="
                     + isMaximumScreenOffTimeoutFromDeviceAdminEnforcedLocked() + ")");
             pw.println("  mStayOnWhilePluggedInSetting=" + mStayOnWhilePluggedInSetting);
-            pw.println("  mButtonTimeout=" + mButtonTimeout);
-            pw.println("  mButtonBrightness=" + mButtonBrightness);
-            pw.println("  mButtonBrightnessOverrideFromWindowManager="
-                    + mButtonBrightnessOverrideFromWindowManager);
-            pw.println("  mKeyboardBrightness=" + mKeyboardBrightness);
             pw.println("  mUserActivityTimeoutOverrideFromWindowManager="
                     + mUserActivityTimeoutOverrideFromWindowManager);
             pw.println("  mUserInactiveOverrideFromWindowManager="
@@ -6391,10 +6228,6 @@ public final class PowerManagerService extends SystemService
                     return android.companion.virtualdevice.flags.Flags.deviceAwareDisplayPower()
                             && info != null && isValidBrightnessValue(info.brightnessDim)
                             ? info.brightnessDim : mScreenBrightnessDim;
-                case PowerManager.BRIGHTNESS_CONSTRAINT_TYPE_DEFAULT_BUTTON:
-                    return mButtonBrightnessDefault;
-                case PowerManager.BRIGHTNESS_CONSTRAINT_TYPE_DEFAULT_KEYBOARD:
-                    return mKeyboardBrightnessDefault;
                 default:
                     return PowerManager.BRIGHTNESS_INVALID_FLOAT;
             }
@@ -6976,6 +6809,28 @@ public final class PowerManagerService extends SystemService
         }
 
         /**
+         * Reboots the device with custom progress message.
+         *
+         * @param confirm If true, shows a reboot confirmation dialog.
+         * @param reason The reason for the reboot, or null if none.
+         * @param wait If true, this call waits for the reboot to complete and does not return.
+         */
+        @Override // Binder call
+        public void advancedReboot(boolean confirm, String reason, boolean wait) {
+            mContext.enforceCallingOrSelfPermission(android.Manifest.permission.REBOOT, null);
+            if (PowerManager.REBOOT_RECOVERY.equals(reason)) {
+                mContext.enforceCallingOrSelfPermission(android.Manifest.permission.RECOVERY, null);
+            }
+
+            final long ident = Binder.clearCallingIdentity();
+            try {
+                shutdownOrRebootInternal(HALT_MODE_REBOOT, confirm, reason, wait, true);
+            } finally {
+                Binder.restoreCallingIdentity(ident);
+            }
+        }
+
+        /**
          * Reboots the device into safe mode
          *
          * @param confirm If true, shows a reboot confirmation dialog.
@@ -6990,28 +6845,6 @@ public final class PowerManagerService extends SystemService
             final long ident = Binder.clearCallingIdentity();
             try {
                 shutdownOrRebootInternal(HALT_MODE_REBOOT_SAFE_MODE, confirm, reason, wait, false);
-            } finally {
-                Binder.restoreCallingIdentity(ident);
-            }
-        }
-
-        /**
-         * Reboots the device.
-         *
-         * @param confirm If true, shows a reboot confirmation dialog.
-         * @param reason The reason for the reboot, or null if none.
-         * @param wait If true, this call waits for the reboot to complete and does not return.
-         */
-        @Override // Binder call
-        public void rebootCustom(boolean confirm, String reason, boolean wait) {
-            mContext.enforceCallingOrSelfPermission(android.Manifest.permission.REBOOT, null);
-            if (PowerManager.REBOOT_RECOVERY.equals(reason)) {
-                mContext.enforceCallingOrSelfPermission(android.Manifest.permission.RECOVERY, null);
-            }
-
-            final long ident = Binder.clearCallingIdentity();
-            try {
-                shutdownOrRebootInternal(HALT_MODE_REBOOT, confirm, reason, wait, true);
             } finally {
                 Binder.restoreCallingIdentity(ident);
             }
@@ -7099,22 +6932,6 @@ public final class PowerManagerService extends SystemService
                 setAttentionLightInternal(on, color);
             } finally {
                 Binder.restoreCallingIdentity(ident);
-            }
-        }
-
-        @Override // Binder call
-        public void setKeyboardVisibility(boolean visible) {
-            synchronized (mLock) {
-                if (DEBUG_SPEW) {
-                    Slog.d(TAG, "setKeyboardVisibility: " + visible);
-                }
-                if (mKeyboardVisible != visible) {
-                    mKeyboardVisible = visible;
-                    synchronized (mLock) {
-                        mDirty |= DIRTY_USER_ACTIVITY;
-                        updatePowerStateLocked();
-                    }
-                }
             }
         }
 
@@ -7428,18 +7245,6 @@ public final class PowerManagerService extends SystemService
 
     @VisibleForTesting
     final class LocalService extends PowerManagerInternal {
-        @Override
-        public void setButtonBrightnessOverrideFromWindowManager(float screenBrightness) {
-            mContext.enforceCallingOrSelfPermission(android.Manifest.permission.DEVICE_POWER, null);
-
-            final long ident = Binder.clearCallingIdentity();
-            try {
-                setButtonBrightnessOverrideFromWindowManagerInternal(screenBrightness);
-            } finally {
-                Binder.restoreCallingIdentity(ident);
-            }
-        }
-
         @Override
         public void setDozeOverrideFromDreamManager(
                 int screenState, int reason, float screenBrightnessFloat, int screenBrightnessInt,

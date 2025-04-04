@@ -88,11 +88,7 @@ public final class VibratorHelper {
             boolean insistent) {
         try {
             if (pattern != null) {
-            	if (pattern.length == 1) {
-            		return VibrationEffect.createOneShot(pattern[0], VibrationEffect.DEFAULT_AMPLITUDE);
-            	} else {
-                	return VibrationEffect.createWaveform(pattern, /* repeat= */ insistent ? 0 : -1);
-                }
+                return VibrationEffect.createWaveform(pattern, /* repeat= */ insistent ? 0 : -1);
             }
         } catch (IllegalArgumentException e) {
             Slog.e(TAG, "Error creating vibration waveform with pattern: "

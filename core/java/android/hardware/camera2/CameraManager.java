@@ -32,7 +32,6 @@ import android.annotation.TestApi;
 import android.app.ActivityManager;
 import android.app.CameraCompatTaskInfo;
 import android.app.TaskInfo;
-import android.app.ActivityThread;
 import android.app.compat.CompatChanges;
 import android.companion.virtual.VirtualDeviceManager;
 import android.compat.annotation.ChangeId;
@@ -3107,7 +3106,7 @@ public final class CameraManager {
 
         private void onStatusChangedLocked(int status, DeviceCameraInfo info) {
             if (!Camera.shouldExposeAuxCamera() && Integer.parseInt(info.mCameraId) >= 2) {
-                Log.w(TAG, String.format("Ignoring status update of camera %d", info.mDeviceId));
+                Log.w(TAG, "[soar.cts] ignore the status update of camera: " + info.mCameraId);
                 return;
             }
 
@@ -3275,10 +3274,11 @@ public final class CameraManager {
              * if the package name does not falls in this bucket
              */
             boolean exposeAuxCamera = Camera.shouldExposeAuxCamera();
-            if (exposeAuxCamera == false && Integer.parseInt(info.mCameraId) >= 2) {
+            if (!exposeAuxCamera == false && Integer.parseInt(info.mCameraId) >= 2) {
                 Log.w(TAG, "ignore the torch status update of camera: " + info.mCameraId);
                 return;
             }
+
 
             if (!validTorchStatus(status)) {
                 Log.e(TAG, String.format(

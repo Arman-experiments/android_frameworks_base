@@ -57,12 +57,16 @@
         android:key="bluetooth"
         android:title="@string/quick_settings_bluetooth_label" />
 
+    <com.android.systemui.tuner.StatusBarSwitch
+        android:icon="@drawable/ic_statusbar_camera"
+        android:key="cameratoggle"
+        android:title="@string/quick_settings_camera_label" />
+
     <!-- nfc -->
     <com.android.systemui.tuner.StatusBarSwitch
-        android:icon="@drawable/ic_statusbar_nfc"
         android:key="nfc"
-        android:persistent="false"
-        android:title="@string/status_bar_nfc" />
+        android:title="@string/status_bar_nfc"
+        android:icon="@drawable/ic_statusbar_nfc" />
 
     <!-- tty -->
     <!-- speakerphone -->
@@ -87,6 +91,12 @@
         android:key="wifi"
         android:title="@string/quick_settings_wifi_label" />
 
+    <com.android.systemui.tuner.TunerSwitch
+        android:icon="@drawable/ic_statusbar_wifi_standard"
+        android:key="show_wifi_standard_icon"
+        android:title="@string/status_bar_wifi_standard"
+        sysui:defValue="false" />
+
     <com.android.systemui.tuner.StatusBarSwitch
         android:icon="@drawable/ic_statusbar_ethernet"
         android:key="ethernet"
@@ -96,16 +106,6 @@
         android:icon="@drawable/ic_statusbar_mobile_network"
         android:key="mobile"
         android:title="@string/quick_settings_cellular_detail_title" />
-
-    <com.android.systemui.tuner.StatusBarSwitch
-        android:icon="@drawable/ic_statusbar_data_saver"
-        android:key="data_saver"
-        android:title="@string/status_bar_data_saver" />
-
-    <com.android.systemui.tuner.StatusBarSwitch
-        android:icon="@drawable/ic_statusbar_phone"
-        android:key="call_strength"
-        android:title="@string/status_bar_call_strength" />
 
     <com.android.systemui.tuner.StatusBarSwitch
         android:icon="@drawable/ic_statusbar_airplanemode"
@@ -137,11 +137,15 @@
         android:title="@string/legacy_vpn_name" />
 
     <com.android.systemui.tuner.StatusBarSwitch
+        android:icon="@*android:drawable/ic_battery"
+        android:title="@string/battery"
+        android:summary="%s"
+        android:entries="@array/battery_options" />
+
+    <com.android.systemui.tuner.StatusBarSwitch
         android:icon="@drawable/ic_statusbar_alarm"
         android:key="alarm_clock"
         android:title="@string/status_bar_alarm" />
-
-    <!-- secure -->
 
     <com.android.systemui.tuner.TunerSwitch
         android:icon="@drawable/ic_statusbar_priority"

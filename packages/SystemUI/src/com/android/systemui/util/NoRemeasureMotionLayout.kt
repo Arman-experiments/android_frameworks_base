@@ -20,6 +20,7 @@ import android.content.Context
 import android.util.AttributeSet
 import android.view.Choreographer
 import androidx.constraintlayout.motion.widget.MotionLayout
+import com.android.app.tracing.traceSection
 
 /**
  * [MotionLayout] that avoids remeasuring with the same inputs in the same frame.
@@ -47,10 +48,11 @@ class NoRemeasureMotionLayout @JvmOverloads constructor(
             setMeasuredDimension(measuredWidth, measuredHeight)
             return
         }
-
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        lastWidthSpec = widthMeasureSpec
-        lastHeightSpec = heightMeasureSpec
-        lastFrame = Choreographer.getMainThreadInstance()?.frameTime
+        traceSection("NoRemeasureMotionLayout - measure") {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+            lastWidthSpec = widthMeasureSpec
+            lastHeightSpec = heightMeasureSpec
+            lastFrame = Choreographer.getMainThreadInstance()?.frameTime
+        }
     }
 }

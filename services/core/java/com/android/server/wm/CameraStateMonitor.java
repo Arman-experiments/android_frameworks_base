@@ -110,10 +110,8 @@ class CameraStateMonitor {
     }
 
     void startListeningToCameraState() {
-        if (mCameraManager != null) {
-            mCameraManager.registerAvailabilityCallback(
-                    mWmService.mContext.getMainExecutor(), mAvailabilityCallback);
-        }
+        mCameraManager.registerAvailabilityCallback(
+                mWmService.mContext.getMainExecutor(), mAvailabilityCallback);
         mIsRunning = true;
     }
 

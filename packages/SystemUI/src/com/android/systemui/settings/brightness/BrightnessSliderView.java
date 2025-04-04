@@ -17,13 +17,21 @@
 package com.android.systemui.settings.brightness;
 
 import android.content.Context;
+import android.content.ContentResolver;
+import android.content.res.Configuration;
+import android.content.res.Resources;
+import android.database.ContentObserver;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.DrawableWrapper;
 import android.graphics.drawable.LayerDrawable;
+import android.os.Handler;
+import android.os.UserHandle;
+import android.provider.Settings;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
@@ -38,20 +46,18 @@ import com.android.systemui.res.R;
 import java.util.Collections;
 
 /**
- * {@code LinearLayout} used to show and manipulate a {@link ToggleSeekBar}.
+ * {@code FrameLayout} used to show and manipulate a {@link ToggleSeekBar}.
  *
  */
 public class BrightnessSliderView extends LinearLayout {
 
     @NonNull
-    private TextView mPercentageView;
+    private TextView mTextPersen;
     private ToggleSeekBar mSlider;
     private DispatchTouchEventListener mListener;
     private Gefingerpoken mOnInterceptListener;
     @Nullable
     private Drawable mProgressDrawable;
-    @Nullable
-    private Drawable mProgressBgDrawable;
     private float mScale = 1f;
     private final Rect mSystemGestureExclusionRect = new Rect();
 
@@ -72,9 +78,12 @@ public class BrightnessSliderView extends LinearLayout {
         mSlider = requireViewById(R.id.slider);
         mSlider.setAccessibilityLabel(getContentDescription().toString());
         setBoundaryOffset();
-
-        mPercentageView = requireViewById(R.id.brightness_percentage);
-        setPercentage(getValue());
+        mTextPersen = requireViewById(R.id.percentbrightness);    
+	    Handler h = new Handler();
+        TextBrightness text = new TextBrightness(h);
+        text.BTObserver();
+	    ShowingTextBrightness();
+	    GetValueBrightness(mSlider.getProgress());
 
         // Finds the progress drawable. Assumes brightness_progress_drawable.xml
         try {
@@ -83,10 +92,50 @@ public class BrightnessSliderView extends LinearLayout {
                     .findDrawableByLayerId(android.R.id.progress);
             LayerDrawable actualProgressSlider = (LayerDrawable) progressSlider.getDrawable();
             mProgressDrawable = actualProgressSlider.findDrawableByLayerId(R.id.slider_foreground);
-            mProgressBgDrawable = progress.findDrawableByLayerId(android.R.id.background);
         } catch (Exception e) {
             // Nothing to do, mProgressDrawable will be null.
         }
+    }
+    
+    public void GetValueBrightness(int value) {
+            int make100 = value * 100 / mSlider.getMax();
+            mTextPersen.setText(String.valueOf(make100) + "%");
+    }
+
+    private void ShowingTextBrightness() {
+            int showHide = Settings.System.getInt(getContext().getContentResolver(),"BRIGHTNESS_TEXTVIEW", 0);
+	    if (showHide == 1) {
+	    LinearLayout.LayoutParams bright = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT); 
+            bright.setMargins(20, 0, 0, 0);
+	    mTextPersen.setLayoutParams(bright);								 
+            mTextPersen.setVisibility(View.VISIBLE);
+            } else {
+            LinearLayout.LayoutParams bright = new LinearLayout.LayoutParams(0, 0); 
+            bright.setMargins(0, 0, 0, 0);
+	    mTextPersen.setLayoutParams(bright);	
+            mTextPersen.setVisibility(View.GONE);
+            }
+
+    }
+
+    public class TextBrightness extends ContentObserver {
+            public TextBrightness(Handler h) {
+            super(h);
+            BTObserver();
+            }
+
+            @Override
+            public void onChange(boolean selfChange) {
+                   super.onChange(selfChange);
+                   ShowingTextBrightness();
+            }
+
+            public void BTObserver()
+            {
+                   ContentResolver cr = getContext().getContentResolver();
+                   cr.registerContentObserver(Settings.System.getUriFor("BRIGHTNESS_TEXTVIEW"), false, this);  
+            }
     }
 
     private void setBoundaryOffset() {
@@ -107,13 +156,6 @@ public class BrightnessSliderView extends LinearLayout {
     public void setOnDispatchTouchEventListener(
             DispatchTouchEventListener listener) {
         mListener = listener;
-    }
-
-    public void setPercentage(int value) {
-        if (mPercentageView != null) {
-            int percentage = value * 100 / getMax();
-            mPercentageView.setText(String.valueOf(percentage) + "%");
-        }
     }
 
     @Override
@@ -228,14 +270,10 @@ public class BrightnessSliderView extends LinearLayout {
 
     private void applySliderScale() {
         if (mProgressDrawable != null) {
-            Rect r = mProgressDrawable.getBounds();
+            final Rect r = mProgressDrawable.getBounds();
             int height = (int) (mProgressDrawable.getIntrinsicHeight() * mScale);
             int inset = (mProgressDrawable.getIntrinsicHeight() - height) / 2;
             mProgressDrawable.setBounds(r.left, inset, r.right, inset + height);
-            if (mProgressBgDrawable != null) {
-                r = mProgressBgDrawable.getBounds();
-                mProgressBgDrawable.setBounds(r.left, inset, r.right, inset + height);
-            }
         }
     }
 

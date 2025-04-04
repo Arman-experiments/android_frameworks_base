@@ -20,6 +20,8 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.os.PersistableBundle;
+import android.os.UserHandle;
+import android.provider.Settings;
 import android.telephony.Annotation;
 import android.telephony.CarrierConfigManager;
 import android.telephony.SubscriptionInfo;
@@ -150,7 +152,20 @@ public class MobileMappings {
         networkToIconLookup.put(toIconKey(TelephonyManager.NETWORK_TYPE_HSPA), hGroup);
         networkToIconLookup.put(toIconKey(TelephonyManager.NETWORK_TYPE_HSPAP), hPlusGroup);
 
-        if (config.show4gForLte) {
+        if (config.show5gForLte) {
+            networkToIconLookup.put(toIconKey(
+                    TelephonyManager.NETWORK_TYPE_LTE),
+                    TelephonyIcons.NR_5G);
+            if (config.hideLtePlus) {
+                networkToIconLookup.put(toDisplayIconKey(
+                        TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_LTE_CA),
+                        TelephonyIcons.NR_5G);
+            } else {
+                networkToIconLookup.put(toDisplayIconKey(
+                        TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_LTE_CA),
+                        TelephonyIcons.NR_5G_PLUS);
+            }
+        } else if (config.show4gForLte) {
             networkToIconLookup.put(toIconKey(
                     TelephonyManager.NETWORK_TYPE_LTE),
                     TelephonyIcons.FOUR_G);
@@ -221,6 +236,7 @@ public class MobileMappings {
         public boolean hspaDataDistinguishable;
         public boolean alwaysShowDataRatIcon = false;
         public MobileIconGroup mobileIconGroup5gPlus = TelephonyIcons.NR_5G_PLUS;
+        public boolean show5gForLte = false;
 
         /**
          * Reads the latest configs.
@@ -234,6 +250,10 @@ public class MobileMappings {
                     res.getBoolean(com.android.internal.R.bool.config_alwaysUseCdmaRssi);
             config.hspaDataDistinguishable =
                     res.getBoolean(R.bool.config_hspa_data_distinguishable);
+
+            config.show5gForLte = Settings.System.getIntForUser(context.getContentResolver(),
+                     Settings.System.SHOW_FIVEG_ICON, 0,
+                     UserHandle.USER_CURRENT) == 1;
 
             CarrierConfigManager configMgr = (CarrierConfigManager)
                     context.getSystemService(Context.CARRIER_CONFIG_SERVICE);

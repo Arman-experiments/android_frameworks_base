@@ -36,8 +36,10 @@ private const val TAG = "SeekBarObserver"
  *
  * <p>Updates the seek bar views in response to changes to the model.
  */
-open class SeekBarObserver(private val holder: MediaViewHolder) :
-    Observer<SeekBarViewModel.Progress> {
+open class SeekBarObserver(
+    private val holder: MediaViewHolder,
+    private var alwaysOnTime: Boolean
+) : Observer<SeekBarViewModel.Progress> {
 
     companion object {
         @JvmStatic val RESET_ANIMATION_DURATION_MS: Int = 750
@@ -118,8 +120,9 @@ open class SeekBarObserver(private val holder: MediaViewHolder) :
         holder.seekBar.thumb.alpha = if (data.seekAvailable) 255 else 0
         holder.seekBar.isEnabled = data.seekAvailable
         progressDrawable?.animate =
-            data.playing && !data.scrubbing && animationEnabled && data.listening
-        progressDrawable?.transitionEnabled = !data.seekAvailable
+            data.playing && !data.scrubbing && animationEnabled && data.listening && data.enableSquiggle
+        progressDrawable?.minWaveEndpoint = if (data.seekAvailable) 0f else 0.2f
+        progressDrawable?.matchedWaveEndpoint = if (data.seekAvailable) 1f else 0.6f
 
         if (holder.seekBar.maxHeight != seekBarEnabledMaxHeight) {
             holder.seekBar.maxHeight = seekBarEnabledMaxHeight
@@ -129,7 +132,7 @@ open class SeekBarObserver(private val holder: MediaViewHolder) :
         holder.seekBar.setMax(data.duration)
         val totalTimeString =
             DateUtils.formatElapsedTime(data.duration / DateUtils.SECOND_IN_MILLIS)
-        if (data.scrubbing) {
+        if (data.scrubbing || alwaysOnTime) {
             holder.scrubbingTotalTimeView.text = totalTimeString
         }
 
@@ -149,7 +152,7 @@ open class SeekBarObserver(private val holder: MediaViewHolder) :
             }
 
             val elapsedTimeString = DateUtils.formatElapsedTime(it / DateUtils.SECOND_IN_MILLIS)
-            if (data.scrubbing) {
+            if (data.scrubbing || alwaysOnTime) {
                 holder.scrubbingElapsedTimeView.text = elapsedTimeString
             }
 
@@ -183,5 +186,9 @@ open class SeekBarObserver(private val holder: MediaViewHolder) :
         val rightPadding = holder.seekBar.paddingRight
         val bottomPadding = holder.seekBar.paddingBottom
         holder.seekBar.setPadding(leftPadding, padding, rightPadding, bottomPadding)
+    }
+
+    fun setAlwaysOnTime(enabled: Boolean) {
+        alwaysOnTime = enabled
     }
 }

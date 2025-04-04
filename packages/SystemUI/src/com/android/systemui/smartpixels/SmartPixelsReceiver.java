@@ -73,7 +73,7 @@ public class SmartPixelsReceiver extends BroadcastReceiver implements CoreStarta
    }
 
    private void registerReceiver() {
-       mContext.registerReceiver(this, mFilter, Context.RECEIVER_NOT_EXPORTED);
+       mContext.registerReceiver(this, mFilter);
        mRegisteredReceiver = true;
    }
 

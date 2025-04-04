@@ -654,6 +654,7 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
 
     @GuardedBy("mUidRulesFirstLock")
     final SparseIntArray mUidFirewallStandbyRules = new SparseIntArray();
+
     @GuardedBy("mDisallowedUidsDenylist")
     final Set<Integer> mDisallowedUidsDenylist = new ArraySet<Integer>();
 
@@ -1495,19 +1496,6 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
                     updateRestrictionRulesForUidUL(uid);
                 }
             }
-        }
-
-        private boolean isSystemApp(int uid) {
-            final String packageName = getPackageForUid(uid);
-            if (packageName == null) return false;
-            final ApplicationInfo appInfo;
-            try {
-                appInfo = mContext.getPackageManager().getApplicationInfo(packageName,
-                        PackageManager.MATCH_UNINSTALLED_PACKAGES);
-            } catch (PackageManager.NameNotFoundException ignored) {
-                return false;
-            }
-            return appInfo.isSystemApp();
         }
     };
 
@@ -2878,6 +2866,19 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         ConnectivitySettingsManager.setUidsAllowedOnRestrictedNetworks(mContext, Set.of());
     }
 
+    private boolean isSystemApp(int uid) {
+        final String packageName = getPackageForUid(uid);
+        if (packageName == null) return false;
+        final ApplicationInfo appInfo;
+        try {
+            appInfo = mContext.getPackageManager().getApplicationInfo(packageName,
+                    PackageManager.MATCH_UNINSTALLED_PACKAGES);
+        } catch (PackageManager.NameNotFoundException ignored) {
+            return false;
+        }
+        return appInfo.isSystemApp();
+    }
+
     private void setPolicyForUids(final Set<Integer> uids, int policy, boolean enabled) {
         synchronized (mUidRulesFirstLock) {
             for (final int uid : uids) {
@@ -3114,6 +3115,13 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
             } else {
                 Slog.w(TAG, "unable to update policy on UID " + uid);
             }
+        }
+
+        // There is nothing to migrate if coming from pre-12 or from nothing.
+        final boolean isMigratingFromAtLeastAndroid12 = version >= VERSION_SUPPORTED_CARRIER_USAGE;
+        if (lineageVersion < LINEAGE_VERSION_REINSTATED_POLICY_REJECT_ALL
+                && isMigratingFromAtLeastAndroid12) {
+            migrateToPolicyRejectAll();
         }
     }
 

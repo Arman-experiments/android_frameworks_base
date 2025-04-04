@@ -29,36 +29,48 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
-import android.text.TextUtils;
+import android.text.BidiFormatter;
 import android.text.format.Formatter;
+import android.text.format.Formatter.BytesResult;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
-import com.android.settingslib.development.DevelopmentSettingsEnabler;
 import com.android.settingslib.net.DataUsageController;
 import com.android.systemui.FontSizeUtils;
 import com.android.systemui.res.R;
 
-/**
- * Footer of expanded Quick Settings, tiles page indicator, (optionally) build number and
- * {@link FooterActionsView}
- */
-public class QSFooterView extends FrameLayout {
-    private static final String TAG = "QSFooterView";
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.List;
 
+public class QSFooterView extends FrameLayout {
     private PageIndicator mPageIndicator;
     private TextView mUsageText;
+    private TextView mFooterText;
     private View mEditButton;
+    private View mSpace;
+    
+    private static final String PREF_NAME = "DailyUsagePrefs";
+    private static final String KEY_MOBILE_UPLOAD = "mobile_upload";
+    private static final String KEY_MOBILE_DOWNLOAD = "mobile_download";
+    private static final String KEY_WIFI_UPLOAD = "wifi_upload";
+    private static final String KEY_WIFI_DOWNLOAD = "wifi_download";
+    private static final String KEY_LAST_RESET = "last_reset";
+
+    private LinearLayout mDataUsagePanel;
 
     @Nullable
     protected TouchAnimator mFooterAnimator;
@@ -67,148 +79,173 @@ public class QSFooterView extends FrameLayout {
     private boolean mExpanded;
     private float mExpansionAmount;
 
-    private boolean mShouldShowDataUsage;
- 
     @Nullable
     private OnClickListener mExpandClickListener;
 
     private DataUsageController mDataController;
+    private ConnectivityManager mConnectivityManager;
+    private WifiManager mWifiManager;
     private SubscriptionManager mSubManager;
-
-    private boolean mHasNoSims;
-    private boolean mIsWifiConnected;
-    private String mWifiSsid;
-    private int mSubId;
-    private int mCurrentDataSubId;
-    
-    private static final long DEBOUNCE_DELAY_MS = 200;
+    private boolean mShouldShowDataUsage;
     private Handler mHandler = new Handler();
-    private Runnable mSetUsageTextRunnable = this::setUsageText;
+    
+    private Runnable mUpdateDataUsageRunnable = new Runnable() {
+        @Override
+        public void run() {
+            setUsageText();
+            mHandler.postDelayed(this, 10000);
+        }
+    };
 
     public QSFooterView(Context context, AttributeSet attrs) {
         super(context, attrs);
         mDataController = new DataUsageController(context);
-        mSubManager = context.getSystemService(SubscriptionManager.class);
+        mConnectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        mWifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
+        mSubManager = (SubscriptionManager) context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
     }
 
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
         mPageIndicator = findViewById(R.id.footer_page_indicator);
-        mUsageText = findViewById(R.id.build);
+        mUsageText = findViewById(R.id.usage_text);
+        mFooterText = findViewById(R.id.footer_text);
         mEditButton = findViewById(android.R.id.edit);
+        mSpace = findViewById(R.id.spacer);
+        mDataUsagePanel = findViewById(R.id.qs_data_usage);
 
         updateResources();
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
-        setClickable(false);
+        updateFooterTextVisibility();
         setUsageText();
-
-        mUsageText.setOnClickListener(this::onUsageTextClick);
-    }
-    
-    private void onUsageTextClick(View v) {
-        if (mSubManager.getActiveSubscriptionInfoCount() > 1) {
-            // Get opposite slot 2 ^ 3 = 1, 1 ^ 3 = 2
-            mSubId = mSubId ^ 3;
-            setUsageText();
-            mUsageText.setSelected(false);
-            postOnAnimationDelayed(() -> mUsageText.setSelected(true), 1000);
-        }
-    }
-    
-    private void setUsageTextDebounced() {
-        if (mShouldShowDataUsage) {
-            removeCallbacks(mSetUsageTextRunnable);
-            postOnAnimationDelayed(mSetUsageTextRunnable, DEBOUNCE_DELAY_MS);
-        }
+        getInternetUsage();
     }
 
-    private void setUsageText() {
-        if (mUsageText == null || !mShouldShowDataUsage) return;
-        DataUsageController.DataUsageInfo info = null;
-        String suffix = null;
-        if (mIsWifiConnected || mHasNoSims) {
-            info = mDataController.getWifiDailyDataUsageInfo(true);
-            if (info == null) {
-                info = mDataController.getWifiDailyDataUsageInfo(false);
-                suffix = mContext.getResources().getString(R.string.usage_wifi_default_suffix);
-            } else {
-                suffix = getWifiSsid();
-            }
+    private void updateFooterTextVisibility() {
+        boolean isShow = Settings.System.getIntForUser(mContext.getContentResolver(),
+                Settings.System.OMNI_FOOTER_TEXT_SHOW, 0,
+                UserHandle.USER_CURRENT) == 1;
+        mShouldShowDataUsage = Settings.System.getIntForUser(mContext.getContentResolver(),
+                Settings.System.QS_FOOTER_DATA_USAGE, 0,
+                UserHandle.USER_CURRENT) == 1;
+
+        if (isShow) {
+            mUsageText.setVisibility(View.GONE);
+            mFooterText.setVisibility(View.VISIBLE);
+            mSpace.setVisibility(View.GONE);
+            setFooterText();
+        } else if (mShouldShowDataUsage) {
+	    mFooterText.setVisibility(View.GONE);
+	    mUsageText.setVisibility(View.VISIBLE);
+	    mSpace.setVisibility(View.GONE);
+	    setUsageText();
+	} else {
+	    mFooterText.setVisibility(View.GONE);
+	    mUsageText.setVisibility(View.GONE);
+	    mSpace.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void setFooterText() {
+        String text = Settings.System.getStringForUser(mContext.getContentResolver(),
+                Settings.System.X_FOOTER_TEXT_STRING,
+                UserHandle.USER_CURRENT);
+        if (text == null || text.isEmpty()) {
+            mFooterText.setText("Infinity X");
         } else {
-            mDataController.setSubscriptionId(mSubId);
-            info = mDataController.getDailyDataUsageInfo();
-            suffix = getSlotCarrierName();
-        }
-        if (info == null) {
-            Log.w(TAG, "setUsageText: DataUsageInfo is NULL.");
-            return;
-        }
-        // Setting text actually triggers a layout pass (because the text view is set to
-        // wrap_content width and TextView always relayouts for this). Avoid needless
-        // relayout if the text didn't actually change.
-        String text = formatDataUsage(info.usageLevel, suffix);
-        if (!TextUtils.equals(text, mUsageText.getText())) {
-            mUsageText.setText(text);
+            mFooterText.setText(text);
         }
     }
+    
+    private void setUsageText() {
+        if (mUsageText == null) return;
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Handler handler = new Handler(Looper.getMainLooper());
 
-    private String formatDataUsage(long byteValue, String suffix) {
-        // Example: 1.23 GB used today (airtel)
-        return new StringBuilder(Formatter.formatFileSize(getContext(), byteValue, Formatter.FLAG_IEC_UNITS))
-                .append(" ")
-                .append(mContext.getString(R.string.usage_data))
-                .append(" (" + suffix + ")")
-                .toString();
-    }
-
-    private String getSlotCarrierName() {
-        SubscriptionInfo subInfo = mSubManager.getActiveSubscriptionInfo(mSubId);
-        if (subInfo != null) {
-            return subInfo.getDisplayName().toString();
-        }
-        return mContext.getResources().getString(R.string.usage_data_default_suffix);
-    }
-
-    private String getWifiSsid() {
-        if (mWifiSsid != null) {
-            String ssid = mWifiSsid.replace("\"", "");
-            if (ssid.length() > 10) {
-                return ssid.substring(0, 7) + "...";
+        executor.execute(() -> {
+            DataUsageController.DataUsageInfo info;
+            if (isWifiConnected()) {
+                info = mDataController.getWifiDailyDataUsageInfo();
+            } else {
+                mDataController.setSubscriptionId(SubscriptionManager.getDefaultDataSubscriptionId());
+                info = mDataController.getDailyDataUsageInfo();
             }
-            return ssid;
-        }
-        return mContext.getResources().getString(R.string.usage_wifi_default_suffix);
+
+            DataUsageController.DataUsageInfo finalInfo = info;
+            handler.post(() -> {
+                if (info != null) {
+                    String suffix = isWifiConnected() ?
+                            mContext.getResources().getString(R.string.usage_wifi_default_suffix) :
+                            mContext.getResources().getString(R.string.usage_data_default_suffix);
+                    mUsageText.setText(formatDataUsage(info.usageLevel) + " " +
+                            mContext.getResources().getString(R.string.usage_data) +
+                            " (" + suffix + ")");
+                } else {
+                    mUsageText.setText(" ");
+                }
+            });
+        });
     }
 
-    protected void setWifiSsid(String ssid) {
-        if (mWifiSsid != ssid) {
-            mWifiSsid = ssid;
+    private CharSequence formatDataUsage(long byteValue) {
+        final BytesResult res = Formatter.formatBytes(mContext.getResources(), byteValue,
+                Formatter.FLAG_IEC_UNITS);
+        return BidiFormatter.getInstance().unicodeWrap(mContext.getString(
+                com.android.internal.R.string.fileSizeSuffix, res.value, res.units));
+    }
+
+    private boolean isWifiConnected() {
+        final Network network = mConnectivityManager.getActiveNetwork();
+        if (network != null) {
+            NetworkCapabilities capabilities = mConnectivityManager.getNetworkCapabilities(network);
+            return capabilities != null &&
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+        } else {
+            return false;
         }
     }
 
-    protected void setIsWifiConnected(boolean connected) {
-        if (mIsWifiConnected != connected) {
-            mIsWifiConnected = connected;
-        }
-    }
+    private void getInternetUsage() {
+        TextView internetUp = findViewById(R.id.internet_up);
+	TextView internetDown = findViewById(R.id.internet_down);
+	TextView mobileUp = findViewById(R.id.mobile_up);
+	TextView mobileDown = findViewById(R.id.mobile_down);
+	TextView wifiUp = findViewById(R.id.wifi_up);
+	TextView wifiDown = findViewById(R.id.wifi_down);
+	
+	DataUsageController.DataUsageInfo mobileUploadInfo = mDataController.getDailyDataUsageUploadInfo();
+        DataUsageController.DataUsageInfo mobileDownloadInfo = mDataController.getDailyDataUsageDownloadInfo();
+        DataUsageController.DataUsageInfo wifiUploadInfo = mDataController.getWifiDailyDataUsageUploadInfo();
+        DataUsageController.DataUsageInfo wifiDownloadInfo = mDataController.getWifiDailyDataUsageDownloadInfo();
 
-    protected void setNoSims(boolean hasNoSims) {
-        if (mHasNoSims != hasNoSims) {
-            mHasNoSims = hasNoSims;
-        }
-    }
+        long mobileUpload = mobileUploadInfo != null ? mobileUploadInfo.usageLevel : 0;
+        long mobileDownload = mobileDownloadInfo != null ? mobileDownloadInfo.usageLevel : 0;
+        long wifiUpload = wifiUploadInfo != null ? wifiUploadInfo.usageLevel : 0;
+        long wifiDownload = wifiDownloadInfo != null ? wifiDownloadInfo.usageLevel : 0;
 
-    protected void setCurrentDataSubId(int subId) {
-        if (mCurrentDataSubId != subId) {
-            mSubId = mCurrentDataSubId = subId;
-        }
-    }
+        long totalUpload = mobileUpload + wifiUpload;
+        long totalDownload = mobileDownload + wifiDownload;
 
-    protected void setShowDataUsage(boolean show) {
-        if (mShouldShowDataUsage != show) {
-            mShouldShowDataUsage = show;
-            updateVisibility();
+        internetDown.setText("Download: " + formatDataSize(totalDownload));
+        internetUp.setText("Upload: " + formatDataSize(totalUpload));
+
+        mobileDown.setText("Download: " + formatDataSize(mobileDownload));
+        mobileUp.setText("Upload: " + formatDataSize(mobileUpload));
+
+        wifiDown.setText("Download: " + formatDataSize(wifiDownload));
+        wifiUp.setText("Upload: " + formatDataSize(wifiUpload));
+    }
+    
+    private String formatDataSize(long bytes) {
+        if (bytes < 1024) {
+           return bytes + " B";
+        } else if (bytes < 1024 * 1024) {
+           return String.format("%.2f KB", bytes / 1024.0);
+        } else if (bytes < 1024 * 1024 * 1024) {
+           return String.format("%.2f MB", bytes / (1024.0 * 1024.0));
+        } else {
+           return String.format("%.2f GB", bytes / (1024.0 * 1024.0 * 1024.0));
         }
     }
 
@@ -222,8 +259,11 @@ public class QSFooterView extends FrameLayout {
         updateFooterAnimator();
         updateEditButtonResources();
         updateBuildTextResources();
+        updateUsageTextResources();
         MarginLayoutParams lp = (MarginLayoutParams) getLayoutParams();
-        lp.height = getResources().getDimensionPixelSize(R.dimen.qs_footer_height);
+        lp.height = !showUsagePanel() ?
+                getResources().getDimensionPixelSize(R.dimen.qs_footer_height) :
+                ViewGroup.LayoutParams.WRAP_CONTENT;
         int sideMargin = getResources().getDimensionPixelSize(R.dimen.qs_footer_margin);
         lp.leftMargin = sideMargin;
         lp.rightMargin = sideMargin;
@@ -242,7 +282,11 @@ public class QSFooterView extends FrameLayout {
     }
 
     private void updateBuildTextResources() {
-        FontSizeUtils.updateFontSizeFromStyle(mUsageText, R.style.TextAppearance_QS_Status_DataUsage);
+        FontSizeUtils.updateFontSizeFromStyle(mFooterText, R.style.TextAppearance_QS_Status_Build);
+    }
+    
+    private void updateUsageTextResources() {
+        FontSizeUtils.updateFontSizeFromStyle(mUsageText, R.style.TextAppearance_QS_Status_Build);
     }
 
     private void updateFooterAnimator() {
@@ -254,12 +298,13 @@ public class QSFooterView extends FrameLayout {
         TouchAnimator.Builder builder = new TouchAnimator.Builder()
                 .addFloat(mPageIndicator, "alpha", 0, 1)
                 .addFloat(mUsageText, "alpha", 0, 1)
+                .addFloat(mFooterText, "alpha", 0, 1)
                 .addFloat(mEditButton, "alpha", 0, 1)
-                .setStartDelay(0.9f);
+                .addFloat(mDataUsagePanel, "alpha", 0, 1)           
+                .setStartDelay(0.8f);                
         return builder.build();
     }
 
-    /** */
     public void setKeyguardShowing() {
         setExpansion(mExpansionAmount);
     }
@@ -271,25 +316,43 @@ public class QSFooterView extends FrameLayout {
     void setExpanded(boolean expanded) {
         if (mExpanded == expanded) return;
         mExpanded = expanded;
-        if (mExpanded) {
-            postOnAnimationDelayed(() -> updateEverything(), 250);
-        }
+        updateEverything();
     }
 
-    /** */
     public void setExpansion(float headerExpansionFraction) {
         mExpansionAmount = headerExpansionFraction;
         if (mFooterAnimator != null) {
             mFooterAnimator.setPosition(headerExpansionFraction);
         }
 
-        if (mUsageText == null || !mShouldShowDataUsage) return;
-        if (headerExpansionFraction == 1.0f) {
-            postOnAnimationDelayed(() -> mUsageText.setSelected(true), 1000);
-        } else if (headerExpansionFraction == 0.0f) {
+        if (mUsageText == null) return;
+        if (mShouldShowDataUsage && headerExpansionFraction == 1.0f) {
+            mUsageText.postDelayed(() -> mUsageText.setSelected(true), 1000);
+        } else {
             mUsageText.setSelected(false);
-            mSubId = mCurrentDataSubId;
         }
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        mContext.getContentResolver().registerContentObserver(
+                Settings.System.getUriFor(Settings.System.OMNI_FOOTER_TEXT_SHOW), false,
+                mSettingsObserver, UserHandle.USER_ALL);
+
+        mContext.getContentResolver().registerContentObserver(
+                Settings.System.getUriFor(Settings.System.X_FOOTER_TEXT_STRING), false,
+                mSettingsObserver, UserHandle.USER_ALL);
+                
+        mHandler.post(mUpdateDataUsageRunnable);
+    }
+
+    @Override
+    @VisibleForTesting
+    public void onDetachedFromWindow() {
+        mContext.getContentResolver().unregisterContentObserver(mSettingsObserver);
+        super.onDetachedFromWindow();
+        mHandler.removeCallbacks(mUpdateDataUsageRunnable);
     }
 
     void disable(int state2) {
@@ -300,15 +363,38 @@ public class QSFooterView extends FrameLayout {
     }
 
     void updateEverything() {
-        postOnAnimation(() -> {
-            setUsageTextDebounced();
+        post(() -> {
+            updateVisibilities();
+            setClickable(false);
         });
     }
     
-    void updateVisibility() {
-        int visibility = mShouldShowDataUsage ? View.VISIBLE : View.INVISIBLE;
-        if (mUsageText.getVisibility() != visibility) {
-            mUsageText.setVisibility(visibility);
+    private boolean showUsagePanel() {
+        return Settings.System.getIntForUser(mContext.getContentResolver(),
+                Settings.System.QS_DATA_USAGE_PANEL, 0,
+                UserHandle.USER_CURRENT) == 1;
+    }
+    
+    private void updateVisibilities() {
+        if (mExpanded) {
+            updateFooterTextVisibility();
+        } else {
+            mUsageText.setVisibility(View.INVISIBLE);
+            mFooterText.setVisibility(View.INVISIBLE);
+        }
+        
+        if (mExpanded && showUsagePanel()) {
+            mDataUsagePanel.setVisibility(View.VISIBLE);
+            getInternetUsage();
+        } else {
+            mDataUsagePanel.setVisibility(View.GONE);
         }
     }
+
+    private final ContentObserver mSettingsObserver = new ContentObserver(new Handler()) {
+        @Override
+        public void onChange(boolean selfChange, Uri uri) {
+            updateVisibilities();
+        }
+    };
 }

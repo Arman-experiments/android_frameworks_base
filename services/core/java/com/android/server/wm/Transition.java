@@ -85,13 +85,11 @@ import android.content.pm.ActivityInfo;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.hardware.HardwareBuffer;
-import android.hardware.power.Boost;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.IRemoteCallback;
 import android.os.Looper;
-import android.os.PowerManagerInternal;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.Trace;
@@ -113,7 +111,6 @@ import com.android.internal.policy.TransitionAnimation;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.protolog.WmProtoLogGroups;
 import com.android.internal.util.function.pooled.PooledLambda;
-import com.android.server.LocalServices;
 import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.window.flags.Flags;
@@ -188,8 +185,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     final TransitionController mController;
     private final BLASTSyncEngine mSyncEngine;
     private final Token mToken;
-
-    private final PowerManagerInternal mPowerManagerInternal;
 
     private @Nullable ActivityRecord mPipActivity;
 
@@ -357,8 +352,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
 
         mLogger.mCreateWallTimeMs = System.currentTimeMillis();
         mLogger.mCreateTimeNs = SystemClock.elapsedRealtimeNanos();
-
-        mPowerManagerInternal = LocalServices.getService(PowerManagerInternal.class);
     }
 
     @Nullable
@@ -744,9 +737,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             return;
         }
         mState = STATE_STARTED;
-        if (mPowerManagerInternal != null && mType == TRANSIT_CHANGE) {
-            mPowerManagerInternal.setPowerBoost(Boost.DISPLAY_UPDATE_IMMINENT, 80);
-        }
         ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS, "Starting Transition %d",
                 mSyncId);
         applyReady();
@@ -1425,7 +1415,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                         if (!tr.isAttached() || !tr.isVisibleRequested()
                                 || !tr.inPinnedWindowingMode()) return;
                         final ActivityRecord currTop = tr.getTopNonFinishingActivity();
-                        if (currTop == null) return;
                         if (currTop.inPinnedWindowingMode()) return;
                         Slog.e(TAG, "Enter-PIP was started but not completed, this is a Shell/SysUI"
                                 + " bug. This state breaks gesture-nav, so attempting clean-up.");

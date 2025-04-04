@@ -67,8 +67,8 @@ public class ThemeOverlayApplier implements Dumpable {
     @VisibleForTesting
     static final String SYSUI_PACKAGE = "com.android.systemui";
 
-    static final String OVERLAY_BLACK_THEME =
-            "org.lineageos.overlay.customization.blacktheme";
+    static final String OVERLAY_BERRY_BLACK_THEME =
+            "com.android.system.theme.black";
 
     static final String OVERLAY_CATEGORY_DYNAMIC_COLOR =
             "android.theme.customization.dynamic_color";
@@ -130,25 +130,47 @@ public class ThemeOverlayApplier implements Dumpable {
     static final String OVERLAY_CATEGORY_ICON_WIFI =
             "android.theme.customization.wifi_icon";
     @VisibleForTesting
-    static final String OVERLAY_CATEGORY_LOCK_CLOCK_FONT =
-            "android.theme.customization.lockscreen_clock_font";
     static final String OVERLAY_CATEGORY_NAVBAR =
             "android.theme.customization.navbar";
     @VisibleForTesting
-    static final String OVERLAY_CATEGORY_PROGRESS_BAR =
-            "android.theme.customization.progress_bar";
+    static final String OVERLAY_CATEGORY_DATA =
+            "android.customization.sb_data";
     @VisibleForTesting
-    static final String OVERLAY_CATEGORY_NOTIFICATION =
-            "android.theme.customization.notification";
-    @VisibleForTesting
-    static final String OVERLAY_CATEGORY_POWER_MENU =
-            "android.theme.customization.powermenu";
-    @VisibleForTesting
-    static final String OVERLAY_CATEGORY_BRIGHTNESS_SLIDER =
-            "android.theme.customization.brightness_slider";
-    @VisibleForTesting
-    static final String OVERLAY_CATEGORY_HIDE_IME_SPACE =
-            "android.theme.customization.hide_ime_space";
+    static final String OVERLAY_CATEGORY_LOCK_CLOCK_FONT =
+            "android.theme.customization.lockscreen_clock_font";
+
+    static final String OVERLAY_BRIGHTNESS_SLIDER_FILLED =
+            "com.android.systemui.brightness_slider.filled";
+    static final String OVERLAY_BRIGHTNESS_SLIDER_THIN =
+            "com.android.systemui.brightness_slider.thin";
+    static final String OVERLAY_BRIGHTNESS_SLIDER_CYBERPUNK =
+            "com.android.systemui.brightness_slider.cyberpunk";
+    static final String OVERLAY_BRIGHTNESS_SLIDER_GRADIANT =
+            "com.android.systemui.brightness_slider.gradiant";
+    static final String OVERLAY_BRIGHTNESS_SLIDER_NEUMORPH =
+            "com.android.systemui.brightness_slider.neumorph";
+    static final String OVERLAY_BRIGHTNESS_SLIDER_OUTLINE =
+            "com.android.systemui.brightness_slider.outline";
+    static final String OVERLAY_BRIGHTNESS_SLIDER_SHADED =
+            "com.android.systemui.brightness_slider.shaded";
+    static final String OVERLAY_BRIGHTNESS_SLIDER_THINOUTLINE =
+            "com.android.systemui.brightness_slider.thinoutline";
+    static final String OVERLAY_BRIGHTNESS_SLIDER_TRANSLUCENT =
+            "com.android.systemui.brightness_slider.translucent";
+    static final String OVERLAY_BRIGHTNESS_SLIDER_LEAFYOUTLINE =
+            "com.android.systemui.brightness_slider.leafyoutline";
+    static final String OVERLAY_BRIGHTNESS_SLIDER_MINIMALTHUMB =
+            "com.android.systemui.brightness_slider.minimalthumb";
+    static final String OVERLAY_BRIGHTNESS_SLIDER_OLDSCHOOLTHUMB =
+            "com.android.systemui.brightness_slider.oldschoolthumb";
+    static final String OVERLAY_BRIGHTNESS_SLIDER_ROUNDEDCLIP =
+            "com.android.systemui.brightness_slider.roundedclip";
+    static final String OVERLAY_BRIGHTNESS_SLIDER_THUMBSLIDER =
+            "com.android.systemui.brightness_slider.thumbslider";
+    static final String OVERLAY_BRIGHTNESS_SLIDER_LINE =
+            "com.android.systemui.brightness_slider.line";
+    static final String OVERLAY_BRIGHTNESS_SLIDER_LIGHTY =
+            "com.android.systemui.brightness_slider.lighty";
 
     /*
      * All theme customization categories used by the system, in order that they should be applied,
@@ -165,13 +187,9 @@ public class ThemeOverlayApplier implements Dumpable {
             OVERLAY_CATEGORY_ICON_SETTINGS,
             OVERLAY_CATEGORY_ICON_SIGNAL,
             OVERLAY_CATEGORY_ICON_WIFI,
-            OVERLAY_CATEGORY_LOCK_CLOCK_FONT,
             OVERLAY_CATEGORY_NAVBAR,
-            OVERLAY_CATEGORY_PROGRESS_BAR,
-            OVERLAY_CATEGORY_NOTIFICATION,
-            OVERLAY_CATEGORY_POWER_MENU,
-            OVERLAY_CATEGORY_BRIGHTNESS_SLIDER,
-            OVERLAY_CATEGORY_HIDE_IME_SPACE);
+            OVERLAY_CATEGORY_DATA,
+            OVERLAY_CATEGORY_LOCK_CLOCK_FONT);
 
     /* Categories that need to be applied to the current user as well as the system user. */
     @VisibleForTesting
@@ -183,13 +201,29 @@ public class ThemeOverlayApplier implements Dumpable {
             OVERLAY_CATEGORY_SHAPE,
             OVERLAY_CATEGORY_ICON_ANDROID,
             OVERLAY_CATEGORY_ICON_SYSUI,
-            OVERLAY_CATEGORY_LOCK_CLOCK_FONT,
             OVERLAY_CATEGORY_NAVBAR,
-            OVERLAY_CATEGORY_PROGRESS_BAR,
-            OVERLAY_CATEGORY_NOTIFICATION,
-            OVERLAY_CATEGORY_POWER_MENU,
-            OVERLAY_CATEGORY_BRIGHTNESS_SLIDER,
-            OVERLAY_CATEGORY_HIDE_IME_SPACE);
+            OVERLAY_CATEGORY_DATA,
+            OVERLAY_CATEGORY_LOCK_CLOCK_FONT);
+
+    /* Brightness slider overlays */
+    static final List<String> BRIGHTNESS_SLIDER_OVERLAYS = Lists.newArrayList(
+            "",
+            OVERLAY_BRIGHTNESS_SLIDER_FILLED,
+            OVERLAY_BRIGHTNESS_SLIDER_THIN,
+            OVERLAY_BRIGHTNESS_SLIDER_CYBERPUNK,
+            OVERLAY_BRIGHTNESS_SLIDER_GRADIANT,
+            OVERLAY_BRIGHTNESS_SLIDER_NEUMORPH,
+            OVERLAY_BRIGHTNESS_SLIDER_OUTLINE,
+            OVERLAY_BRIGHTNESS_SLIDER_SHADED,
+            OVERLAY_BRIGHTNESS_SLIDER_THINOUTLINE,
+            OVERLAY_BRIGHTNESS_SLIDER_TRANSLUCENT,
+            OVERLAY_BRIGHTNESS_SLIDER_LEAFYOUTLINE,
+            OVERLAY_BRIGHTNESS_SLIDER_MINIMALTHUMB,
+            OVERLAY_BRIGHTNESS_SLIDER_OLDSCHOOLTHUMB,
+            OVERLAY_BRIGHTNESS_SLIDER_ROUNDEDCLIP,
+            OVERLAY_BRIGHTNESS_SLIDER_THUMBSLIDER,
+            OVERLAY_BRIGHTNESS_SLIDER_LINE,
+            OVERLAY_BRIGHTNESS_SLIDER_LIGHTY);
 
     /* Allowed overlay categories for each target package. */
     private final Map<String, Set<String>> mTargetPackageToCategories = new ArrayMap<>();
@@ -226,18 +260,14 @@ public class ThemeOverlayApplier implements Dumpable {
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_DYNAMIC_COLOR, ANDROID_PACKAGE);
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_FONT, ANDROID_PACKAGE);
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_SHAPE, ANDROID_PACKAGE);
+        mCategoryToTargetPackage.put(OVERLAY_CATEGORY_LOCK_CLOCK_FONT, ANDROID_PACKAGE);
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_ICON_ANDROID, ANDROID_PACKAGE);
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_ICON_SYSUI, SYSUI_PACKAGE);
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_ICON_SETTINGS, SETTINGS_PACKAGE);
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_ICON_SIGNAL, SYSUI_PACKAGE);
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_ICON_WIFI, SYSUI_PACKAGE);
-        mCategoryToTargetPackage.put(OVERLAY_CATEGORY_LOCK_CLOCK_FONT, ANDROID_PACKAGE);
         mCategoryToTargetPackage.put(OVERLAY_CATEGORY_NAVBAR, SYSUI_PACKAGE);
-        mCategoryToTargetPackage.put(OVERLAY_CATEGORY_PROGRESS_BAR, ANDROID_PACKAGE);
-        mCategoryToTargetPackage.put(OVERLAY_CATEGORY_NOTIFICATION, SYSUI_PACKAGE);
-        mCategoryToTargetPackage.put(OVERLAY_CATEGORY_POWER_MENU, SYSUI_PACKAGE);
-        mCategoryToTargetPackage.put(OVERLAY_CATEGORY_BRIGHTNESS_SLIDER, SYSUI_PACKAGE);
-        mCategoryToTargetPackage.put(OVERLAY_CATEGORY_HIDE_IME_SPACE, ANDROID_PACKAGE);
+        mCategoryToTargetPackage.put(OVERLAY_CATEGORY_DATA, SYSUI_PACKAGE);
 
         dumpManager.registerDumpable(TAG, this);
     }
@@ -257,11 +287,11 @@ public class ThemeOverlayApplier implements Dumpable {
             FabricatedOverlay[] pendingCreation,
             int currentUser,
             Set<UserHandle> managedProfiles,
-            Runnable onComplete
+            Runnable onComplete,
+            boolean blackMode
     ) {
 
         mBgExecutor.execute(() -> {
-            boolean isBlackMode = false;
 
             // Disable all overlays that have not been specified in the user setting.
             final Set<String> overlayCategoriesToDisable = new HashSet<>(THEME_CATEGORIES);
@@ -285,11 +315,12 @@ public class ThemeOverlayApplier implements Dumpable {
             OverlayManagerTransaction.Builder transaction = getTransactionBuilder();
             HashSet<OverlayIdentifier> identifiersPending = new HashSet<>();
             if (pendingCreation != null) {
-                isBlackMode = pendingCreation.length == 2;
                 for (FabricatedOverlay overlay : pendingCreation) {
-                    if (overlay != null) {
+                    try {
                         identifiersPending.add(overlay.getIdentifier());
                         transaction.registerFabricatedOverlay(overlay);
+                    } catch (NullPointerException e) {
+                        Log.e(TAG, "NPE for overlay.getIdentifier()", e);
                     }
                 }
             }
@@ -318,19 +349,34 @@ public class ThemeOverlayApplier implements Dumpable {
                 Log.e(TAG, "setEnabled failed", e);
             }
 
-            checkDarkUserOverlays(currentUser, onComplete, isBlackMode);
+            checkDarkUserOverlays(currentUser, onComplete, blackMode);
         });
     }
 
-    private void checkDarkUserOverlays(
+    /* Set brightness slider styles */
+    public void setBrightnessSliderStyle(int brightnessSliderStyle) {
+        mBgExecutor.execute(() -> {
+            try {
+                for (int i = 1; i < BRIGHTNESS_SLIDER_OVERLAYS.size(); i++) {
+                    String overlay = BRIGHTNESS_SLIDER_OVERLAYS.get(i);
+                    boolean enable = (i == brightnessSliderStyle);
+                    mOverlayManager.setEnabled(overlay, enable, UserHandle.SYSTEM);
+                }
+            } catch (SecurityException | IllegalStateException e) {
+                Log.e(TAG, "Failed to set brightness slider style", e);
+            }
+        });
+    }
+    
+    public void checkDarkUserOverlays(
             int currentUser,
             Runnable onComplete,
-            boolean isBlackMode
+            boolean blackMode
     ) {
         OverlayManagerTransaction.Builder transaction = getTransactionBuilder();
         try {
-            transaction.setEnabled(getOverlayID(OVERLAY_BLACK_THEME), isBlackMode, currentUser);
-            transaction.setEnabled(getOverlayID("android:neutral"), !isBlackMode, currentUser);
+            transaction.setEnabled(getOverlayID(OVERLAY_BERRY_BLACK_THEME), blackMode, currentUser);
+            transaction.setEnabled(getOverlayID("android:neutral"), !blackMode, currentUser);
             mOverlayManager.commit(transaction.build());
             if (onComplete != null) {
                 Log.d(TAG, "Executing onComplete runnable");

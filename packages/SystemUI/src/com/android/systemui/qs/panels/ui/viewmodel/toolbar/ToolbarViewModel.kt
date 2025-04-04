@@ -57,7 +57,7 @@ constructor(
     val powerButtonViewModel = powerButtonViewModel(qsThemedContext, ::onPowerButtonClicked)
 
     val settingsButtonViewModel =
-        settingsButtonViewModel(qsThemedContext, ::onSettingsButtonClicked)
+        settingsButtonViewModel(qsThemedContext, ::onSettingsButtonClicked, onSettingsButtonLongClicked = { })
 
     val userSwitcherViewModel: FooterActionsButtonViewModel? by
         hydrator.hydratedStateOf(

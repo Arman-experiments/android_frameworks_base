@@ -22,9 +22,13 @@ import android.animation.Animator.AnimatorListener;
 import android.animation.AnimatorListenerAdapter;
 import android.content.Context;
 import android.content.res.Configuration;
+import android.graphics.Color;
+import android.text.SpannableString;
+import android.text.style.ForegroundColorSpan;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
+import android.view.ContextThemeWrapper;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -72,15 +76,21 @@ public class QSCustomizer extends LinearLayout {
     public QSCustomizer(Context context, AttributeSet attrs) {
         super(context, attrs);
 
-        LayoutInflater.from(getContext()).inflate(R.layout.qs_customize_panel_content, this);
+        Context themedContext =
+                new ContextThemeWrapper(context, R.style.Theme_SystemUI_QuickSettings);
+        LayoutInflater.from(themedContext).inflate(R.layout.qs_customize_panel_content, this);
         mClipper = new QSDetailClipper(findViewById(R.id.customize_container));
         mToolbar = findViewById(com.android.internal.R.id.action_bar);
         TypedValue value = new TypedValue();
-        mContext.getTheme().resolveAttribute(android.R.attr.homeAsUpIndicator, value, true);
+        themedContext.getTheme().resolveAttribute(android.R.attr.homeAsUpIndicator, value, true);
         mToolbar.setNavigationIcon(
-                getResources().getDrawable(value.resourceId, mContext.getTheme()));
+                getResources().getDrawable(value.resourceId, themedContext.getTheme()));
 
-        mToolbar.getMenu().add(Menu.NONE, MENU_RESET, 0, com.android.internal.R.string.reset)
+        SpannableString resetText = new SpannableString(
+                mContext.getString(com.android.internal.R.string.reset));
+        resetText.setSpan(new ForegroundColorSpan(isNightMode() ?
+                Color.WHITE : Color.BLACK), 0, resetText.length(), 0);
+        mToolbar.getMenu().add(Menu.NONE, MENU_RESET, 0, resetText)
                 .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
         mToolbar.setTitle(R.string.qs_edit);
         if (gsfQuickSettings()) {
@@ -109,13 +119,12 @@ public class QSCustomizer extends LinearLayout {
         if (enabled != mSceneContainerEnabled) {
             mSceneContainerEnabled = enabled;
             updateTransparentViewHeight();
-            if (mSceneContainerEnabled) {
-                findViewById(R.id.nav_bar_background).setVisibility(View.GONE);
-            } else {
-                findViewById(R.id.nav_bar_background)
-                        .setVisibility(mIsShowingNavBackdrop ? View.VISIBLE : View.GONE);
-            }
         }
+    }
+
+    private boolean isNightMode() {
+        return (mContext.getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
     }
 
     void updateResources() {
@@ -124,13 +133,8 @@ public class QSCustomizer extends LinearLayout {
     }
 
     void updateNavBackDrop(Configuration newConfig, LightBarController lightBarController) {
-        View navBackdrop = findViewById(R.id.nav_bar_background);
         mIsShowingNavBackdrop = newConfig.smallestScreenWidthDp >= 600
                 || newConfig.orientation != Configuration.ORIENTATION_LANDSCAPE;
-        if (navBackdrop != null) {
-            navBackdrop.setVisibility(
-                    mIsShowingNavBackdrop && !mSceneContainerEnabled ? View.VISIBLE : View.GONE);
-        }
         updateNavColors(lightBarController);
     }
 
@@ -311,9 +315,13 @@ public class QSCustomizer extends LinearLayout {
     }
 
     private void updateToolbarMenuFontSize() {
+        SpannableString resetText = new SpannableString(
+                mContext.getString(com.android.internal.R.string.reset));
+        resetText.setSpan(new ForegroundColorSpan(isNightMode() ?
+                Color.WHITE : Color.BLACK), 0, resetText.length(), 0);
         // Clearing and re-adding the toolbar action force updates the font size
         mToolbar.getMenu().clear();
-        mToolbar.getMenu().add(Menu.NONE, MENU_RESET, 0, com.android.internal.R.string.reset)
+        mToolbar.getMenu().add(Menu.NONE, MENU_RESET, 0, resetText)
                 .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
     }
 }

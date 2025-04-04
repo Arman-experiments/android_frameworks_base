@@ -44,7 +44,7 @@
         <com.android.systemui.tuner.TunerSwitch
           android:key="doze_always_on"
           android:title="@string/tuner_doze_always_on"
-          sysui:defValue="false" />
+          sysui:defValue="true" />
 
     </PreferenceScreen>
 
@@ -62,10 +62,5 @@
             android:key="plugins"
             android:title="@string/plugins"
             android:fragment="com.android.systemui.tuner.PluginFragment" />
-
-    <!-- Warning, this goes last. -->
-    <Preference
-        android:summary="@string/tuner_persistent_warning"
-        android:selectable="false" />
 
 </PreferenceScreen>

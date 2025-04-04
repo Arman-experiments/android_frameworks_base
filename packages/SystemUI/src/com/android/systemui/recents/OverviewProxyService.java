@@ -306,25 +306,6 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         }
 
         @Override
-        public void injectLongPress(int keyCode) throws RemoteException {
-            verifyCallerAndClearCallingIdentityPostMain("longPressInjected", () -> {
-                sendEvent(KeyEvent.ACTION_DOWN, keyCode, 0, KeyEvent.FLAG_LONG_PRESS);
-                sendEvent(KeyEvent.ACTION_DOWN, keyCode, 1, KeyEvent.FLAG_LONG_PRESS);
-                sendEvent(KeyEvent.ACTION_UP, keyCode, 1, KeyEvent.FLAG_LONG_PRESS);
-            });
-        }
-
-        @Override
-        public void injectDoublePress(int keyCode) throws RemoteException {
-            verifyCallerAndClearCallingIdentityPostMain("doublePressInjected", () -> {
-                sendEvent(KeyEvent.ACTION_DOWN, keyCode);
-                sendEvent(KeyEvent.ACTION_UP, keyCode);
-                sendEvent(KeyEvent.ACTION_DOWN, keyCode);
-                sendEvent(KeyEvent.ACTION_UP, keyCode);
-            });
-        }
-
-        @Override
         public void onImeSwitcherPressed() {
             // TODO(b/204901476) We're intentionally using the default display for now since
             // Launcher/Taskbar isn't display aware.
@@ -378,20 +359,16 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
                     onTaskbarAutohideSuspend(suspend));
         }
 
-        private boolean sendEvent(int action, int code, int repeat, int flags) {
+        private boolean sendEvent(int action, int code) {
             long when = SystemClock.uptimeMillis();
-            final KeyEvent ev = new KeyEvent(when, when, action, code, repeat,
+            final KeyEvent ev = new KeyEvent(when, when, action, code, 0 /* repeat */,
                     0 /* metaState */, KeyCharacterMap.VIRTUAL_KEYBOARD, 0 /* scancode */,
-                    flags | KeyEvent.FLAG_FROM_SYSTEM | KeyEvent.FLAG_VIRTUAL_HARD_KEY,
+                    KeyEvent.FLAG_FROM_SYSTEM | KeyEvent.FLAG_VIRTUAL_HARD_KEY,
                     InputDevice.SOURCE_KEYBOARD);
 
             ev.setDisplayId(mContext.getDisplay().getDisplayId());
             return InputManagerGlobal.getInstance()
                     .injectInputEvent(ev, InputManager.INJECT_INPUT_EVENT_MODE_ASYNC);
-        }
-
-        private boolean sendEvent(int action, int code) {
-            return sendEvent(action, code, 0, 0);
         }
 
         @Override
@@ -716,9 +693,8 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         mShadeInteractor = shadeInteractor;
         mUserTracker = userTracker;
         mConnectionBackoffAttempts = 0;
-        int defaultLauncher = android.os.SystemProperties.getInt("persist.sys.default_launcher", 0);
-        String[] launcherComponents = context.getResources().getStringArray(com.android.internal.R.array.config_launcherComponents);
-        mRecentsComponentName = ComponentName.unflattenFromString(launcherComponents[defaultLauncher]);
+        mRecentsComponentName = ComponentName.unflattenFromString(context.getString(
+                com.android.internal.R.string.config_recentsComponentName));
         mQuickStepIntent = new Intent(ACTION_QUICKSTEP)
                 .setPackage(mRecentsComponentName.getPackageName());
         mSysUiState = sysUiState;

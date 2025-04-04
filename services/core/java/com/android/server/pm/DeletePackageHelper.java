@@ -922,12 +922,6 @@ final class DeletePackageHelper {
             return true;
         }
         final int callingUserId = UserHandle.getUserId(callingUid);
-        // Allow package uninstaller to silently uninstall.
-        if (mPm.mRequiredUninstallerPackage != null && callingUid == snapshot
-                .getPackageUid(mPm.mRequiredUninstallerPackage, 0, callingUserId)) {
-            return true;
-        }
-
         // If the caller installed the pkgName, then allow it to silently uninstall.
         String installerPkgName;
         try {
@@ -950,9 +944,20 @@ final class DeletePackageHelper {
             }
         }
 
+        // Allow package uninstaller to silently uninstall.
+        if (mPm.mRequiredUninstallerPackage != null && callingUid == snapshot
+                .getPackageUid(mPm.mRequiredUninstallerPackage, 0, callingUserId)) {
+            return true;
+        }
+
         // Allow storage manager to silently uninstall.
         if (mPm.mStorageManagerPackage != null && callingUid == snapshot.getPackageUid(
                 mPm.mStorageManagerPackage, 0, callingUserId)) {
+            return true;
+        }
+
+        // Allow Panic app to silently uninstall.
+        if (callingUid == snapshot.getPackageUid("org.calyxos.panic", 0, callingUserId)) {
             return true;
         }
 

@@ -4246,30 +4246,24 @@ public class AppOpsService extends IAppOpsService.Stub {
             Op op = getOpLocked(code, uid, packageName, attributionTag, pvr.isAttributionTagValid,
                     pvr.bypass, /* edit */ true);
             if (op == null) {
-                if (DEBUG) {
-                    Slog.e(TAG, "Operation not found: uid=" + uid + " pkg=" + packageName + "("
-                            + attributionTag + ") op=" + AppOpsManager.opToName(code));
-                }
+                Slog.e(TAG, "Operation not found: uid=" + uid + " pkg=" + packageName + "("
+                        + attributionTag + ") op=" + AppOpsManager.opToName(code));
                 return;
             }
             final AttributedOp attributedOp =
                     op.mDeviceAttributedOps.getOrDefault(getPersistentId(virtualDeviceId),
                             new ArrayMap<>()).get(attributionTag);
             if (attributedOp == null) {
-                if (DEBUG) {
-                    Slog.e(TAG, "Attribution not found: uid=" + uid + " pkg=" + packageName + "("
-                            + attributionTag + ") op=" + AppOpsManager.opToName(code));
-                }
+                Slog.e(TAG, "Attribution not found: uid=" + uid + " pkg=" + packageName + "("
+                        + attributionTag + ") op=" + AppOpsManager.opToName(code));
                 return;
             }
 
             if (attributedOp.isRunning() || attributedOp.isPaused()) {
                 attributedOp.finished(clientId);
             } else {
-                if (DEBUG) {
-                    Slog.e(TAG, "Operation not started: uid=" + uid + " pkg=" + packageName + "("
-                            + attributionTag + ") op=" + AppOpsManager.opToName(code));
-                }
+                Slog.e(TAG, "Operation not started: uid=" + uid + " pkg=" + packageName + "("
+                        + attributionTag + ") op=" + AppOpsManager.opToName(code));
             }
         }
     }
@@ -4740,7 +4734,6 @@ public class AppOpsService extends IAppOpsService.Stub {
     private @NonNull PackageVerificationResult verifyAndGetBypass(int uid, String packageName,
             @Nullable String attributionTag, @Nullable String proxyPackageName,
             boolean suppressErrorLogs) {
-        final boolean suppressLogs = true;
         if (uid == Process.ROOT_UID) {
             // For backwards compatibility, don't check package name for root UID.
             return new PackageVerificationResult(null,
@@ -4794,7 +4787,7 @@ public class AppOpsService extends IAppOpsService.Stub {
         }
         if (pkgUid != Process.INVALID_UID) {
             if (pkgUid != UserHandle.getAppId(uid)) {
-                if (!suppressLogs) {
+                if (!suppressErrorLogs) {
                     Slog.e(TAG, "Bad call made by uid " + callingUid + ". "
                             + "Package \"" + packageName + "\" does not belong to uid " + uid
                             + ".");
@@ -4847,9 +4840,7 @@ public class AppOpsService extends IAppOpsService.Stub {
                         // Do not override tags if overriding is not enabled for this package
                         isAttributionTagValid = true;
                     }
-                    if (DEBUG) {
-                        Slog.e(TAG, msg);
-                    }
+                    Slog.e(TAG, msg);
                 } catch (RemoteException neverHappens) {
                 }
             }
@@ -4857,7 +4848,7 @@ public class AppOpsService extends IAppOpsService.Stub {
             Binder.restoreCallingIdentity(ident);
         }
 
-        if (pkgUid != Process.INVALID_UID && pkgUid != uid) {
+        if (pkgUid != uid) {
             if (!suppressErrorLogs) {
                 Slog.e(TAG, "Bad call made by uid " + callingUid + ". "
                         + "Package \"" + packageName + "\" does not belong to uid " + uid + ".");

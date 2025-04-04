@@ -26,7 +26,7 @@ import android.os.Build;
 public class AndroidBuildClassifier {
 
     public boolean isDebuggableBuild() {
-        return Build.IS_DEBUGGABLE;
+        return Build.IS_ENG;
     }
 
     public boolean isFinalBuild() {

@@ -171,6 +171,8 @@ public class MediaRouter {
                     .isVolumeFixed()) {
                 mDefaultAudioVideo.mVolumeHandling = RouteInfo.PLAYBACK_VOLUME_FIXED;
             }
+            mDefaultAudioVideo.mGlobalRouteId = sStatic.mResources.getString(
+                    R.string.default_audio_route_id);
             addRouteStatic(mDefaultAudioVideo);
 
             // This will select the active wifi display route if there is one.

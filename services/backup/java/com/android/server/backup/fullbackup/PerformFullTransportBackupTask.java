@@ -508,8 +508,6 @@ public class PerformFullTransportBackupTask extends FullBackupTask implements Ba
                                     BackupManagerMonitor.LOG_EVENT_CATEGORY_TRANSPORT,
                                     null);
                             mBackupRunner.sendQuotaExceeded(totalRead, quota);
-                        } else if (backupPackageStatus == BackupTransport.TRANSPORT_ERROR) {
-                            mBackupRunner.handleCancel(false);
                         }
                     }
 

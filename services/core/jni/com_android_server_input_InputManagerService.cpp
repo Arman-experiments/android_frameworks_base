@@ -354,7 +354,6 @@ public:
     void setTouchpadSystemGesturesEnabled(bool enabled);
     void setInputDeviceEnabled(uint32_t deviceId, bool enabled);
     void setShowTouches(bool enabled);
-    void setVolumeKeysRotation(int mode);
     void setNonInteractiveDisplays(const std::set<ui::LogicalDisplayId>& displayIds);
     void reloadCalibration();
     void reloadPointerIcons();
@@ -420,7 +419,7 @@ public:
     std::optional<KeyEvent> dispatchUnhandledKey(const sp<IBinder>& token, const KeyEvent& keyEvent,
                                                  uint32_t policyFlags) override;
     void pokeUserActivity(nsecs_t eventTime, int32_t eventType,
-                          ui::LogicalDisplayId displayId, int32_t keyCode) override;
+                          ui::LogicalDisplayId displayId) override;
     void onPointerDownOutsideFocus(const sp<IBinder>& touchedToken) override;
     void setPointerCapture(const PointerCaptureRequest& request) override;
     void notifyDropWindow(const sp<IBinder>& token, float x, float y) override;
@@ -477,9 +476,6 @@ private:
 
         // The latest request to enable or disable Pointer Capture.
         PointerCaptureRequest pointerCaptureRequest{};
-
-        // Volume keys rotation mode (0 - off, 1 - phone, 2 - tablet)
-        int32_t volumeKeysRotationMode{0};
 
         // Sprite controller singleton, created on first use.
         std::shared_ptr<SpriteController> spriteController{};
@@ -787,8 +783,6 @@ void NativeInputManager::getReaderConfiguration(InputReaderConfiguration* outCon
                 ? android::os::IInputConstants::DEFAULT_POINTER_ACCELERATION
                 : 1;
         outConfig->pointerGesturesEnabled = mLocked.pointerGesturesEnabled;
-
-        outConfig->volumeKeysRotationMode = mLocked.volumeKeysRotationMode;
 
         outConfig->pointerCaptureRequest = mLocked.pointerCaptureRequest;
 
@@ -1595,22 +1589,6 @@ void NativeInputManager::requestPointerCapture(const sp<IBinder>& windowToken, b
     mInputManager->getDispatcher().requestPointerCapture(windowToken, enabled);
 }
 
-void NativeInputManager::setVolumeKeysRotation(int mode) {
-    { // acquire lock
-        std::scoped_lock _l(mLock);
-
-        if (mLocked.volumeKeysRotationMode == mode) {
-            return;
-        }
-
-        ALOGI("Volume keys: rotation mode set to %d.", mode);
-        mLocked.volumeKeysRotationMode = mode;
-    } // release lock
-
-    mInputManager->getReader().requestRefreshConfiguration(
-            InputReaderConfiguration::Change::VOLUME_KEYS_ROTATION);
-}
-
 void NativeInputManager::setNonInteractiveDisplays(
         const std::set<ui::LogicalDisplayId>& displayIds) {
     std::scoped_lock _l(mLock);
@@ -1912,9 +1890,9 @@ std::optional<KeyEvent> NativeInputManager::dispatchUnhandledKey(const sp<IBinde
 }
 
 void NativeInputManager::pokeUserActivity(nsecs_t eventTime, int32_t eventType,
-                                          ui::LogicalDisplayId displayId, int32_t keyCode) {
+                                          ui::LogicalDisplayId displayId) {
     ATRACE_CALL();
-    android_server_PowerManagerService_userActivity(eventTime, eventType, displayId, keyCode);
+    android_server_PowerManagerService_userActivity(eventTime, eventType, displayId);
 }
 
 void NativeInputManager::onPointerDownOutsideFocus(const sp<IBinder>& touchedToken) {
@@ -2549,12 +2527,6 @@ static void nativeSetShowTouches(JNIEnv* env, jobject nativeImplObj, jboolean en
     NativeInputManager* im = getNativeInputManager(env, nativeImplObj);
 
     im->setShowTouches(enabled);
-}
-
-static void nativeSetVolumeKeysRotation(JNIEnv* env, jobject nativeImplObj, int mode) {
-    NativeInputManager* im = getNativeInputManager(env, nativeImplObj);
-
-    im->setVolumeKeysRotation(mode);
 }
 
 static void nativeSetNonInteractiveDisplays(JNIEnv* env, jobject nativeImplObj,
@@ -3243,7 +3215,6 @@ static const JNINativeMethod gInputManagerMethods[] = {
          (void*)nativeSetTouchpadThreeFingerTapShortcutEnabled},
         {"setTouchpadSystemGesturesEnabled", "(Z)V", (void*)nativeSetTouchpadSystemGesturesEnabled},
         {"setShowTouches", "(Z)V", (void*)nativeSetShowTouches},
-        {"setVolumeKeysRotation", "(I)V", (void*)nativeSetVolumeKeysRotation},
         {"setNonInteractiveDisplays", "([I)V", (void*)nativeSetNonInteractiveDisplays},
         {"reloadCalibration", "()V", (void*)nativeReloadCalibration},
         {"vibrate", "(I[J[III)V", (void*)nativeVibrate},

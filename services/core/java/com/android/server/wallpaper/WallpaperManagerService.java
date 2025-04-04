@@ -109,7 +109,6 @@ import android.os.SystemClock;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.storage.StorageManager;
-import android.provider.Settings;
 import android.service.wallpaper.IWallpaperConnection;
 import android.service.wallpaper.IWallpaperEngine;
 import android.service.wallpaper.IWallpaperService;
@@ -2922,29 +2921,13 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
                 WallpaperData wallpaper = mWallpaperMap.get(userId);
                 WallpaperData lockWallpaper = mLockWallpaperMap.get(userId);
 
-                final boolean isDimBlocked = checkIsDimBlockedByUser();
-
-                // remove gone UIDs from the map
-                boolean arrayChanged = false;
-                final int uidCount = wallpaper.mUidToDimAmount.size();
-                int[] uids = new int[uidCount];
-                for (int i = 0; i < uidCount; i++) {
-                    uids[i] = wallpaper.mUidToDimAmount.keyAt(i);
-                }
-                for (Integer u : uids) {
-                    final String cname = mPackageManagerInternal.getNameForUid(u);
-                    if (cname != null && !cname.isEmpty()) continue;
-                    wallpaper.mUidToDimAmount.remove(u);
-                    arrayChanged = true;
-                }
-
-                if (dimAmount == 0.0f || isDimBlocked) {
+                if (dimAmount == 0.0f) {
                     wallpaper.mUidToDimAmount.remove(uid);
                 } else {
                     wallpaper.mUidToDimAmount.put(uid, dimAmount);
                 }
 
-                float maxDimAmount = isDimBlocked ? 0 : getHighestDimAmountFromMap(wallpaper.mUidToDimAmount);
+                float maxDimAmount = getHighestDimAmountFromMap(wallpaper.mUidToDimAmount);
                 if (wallpaper.mWallpaperDimAmount == maxDimAmount) return;
                 wallpaper.mWallpaperDimAmount = maxDimAmount;
                 // Also set the dim amount to the lock screen wallpaper if the lock and home screen
@@ -2975,7 +2958,7 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
                         changed = true;
                     }
                 }
-                if (changed || arrayChanged) {
+                if (changed) {
                     saveSettingsLocked(wallpaper.userId);
                 }
             }
@@ -3015,11 +2998,6 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
             maxDimAmount = Math.max(maxDimAmount, uidToDimAmountMap.valueAt(i));
         }
         return maxDimAmount;
-    }
-
-    private boolean checkIsDimBlockedByUser() {
-        return Settings.System.getInt(mContext.getContentResolver(),
-                Settings.System.BLOCK_WALLPAPER_DIMMING, 0) == 1;
     }
 
     @Override
@@ -3302,7 +3280,7 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
     // ToDo: Remove this version of the function
     @Override
     public void setWallpaperComponent(ComponentName name) {
-        setWallpaperComponent(name, "", FLAG_SYSTEM, UserHandle.getCallingUserId());
+        setWallpaperComponent(name, "", UserHandle.getCallingUserId(), FLAG_SYSTEM);
     }
 
     @VisibleForTesting

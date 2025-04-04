@@ -35,15 +35,14 @@ import com.android.systemui.fragments.FragmentService;
 import com.android.systemui.model.SysUiState;
 import com.android.systemui.navigationbar.NavigationBarController;
 import com.android.systemui.navigationbar.NavigationModeController;
-import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.DarkIconDispatcher;
 import com.android.systemui.plugins.PluginManager;
 import com.android.systemui.plugins.VolumeDialogController;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
+import com.android.systemui.qs.QSImpl;
 import com.android.systemui.recents.OverviewProxyService;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.statusbar.CommandQueue;
-import com.android.systemui.statusbar.NotificationListener;
 import com.android.systemui.statusbar.NotificationMediaManager;
 import com.android.systemui.statusbar.notification.collection.render.GroupExpansionManager;
 import com.android.systemui.statusbar.notification.collection.render.GroupMembershipManager;
@@ -51,29 +50,27 @@ import com.android.systemui.statusbar.notification.stack.AmbientState;
 import com.android.systemui.statusbar.notification.stack.NotificationSectionsManager;
 import com.android.systemui.statusbar.phone.LightBarController;
 import com.android.systemui.statusbar.phone.ScreenOffAnimationController;
+import com.android.systemui.statusbar.phone.ScrimController;
 import com.android.systemui.statusbar.phone.SystemUIDialogManager;
 import com.android.systemui.statusbar.policy.BluetoothController;
+import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
-import com.android.systemui.statusbar.policy.HotspotController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.window.StatusBarWindowControllerStore;
+import com.android.systemui.statusbar.policy.HotspotController;
 import com.android.systemui.tuner.TunerService;
 
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.bluetooth.qsdialog.BluetoothTileDialogViewModel;
 import com.android.systemui.statusbar.connectivity.AccessPointController;
 import com.android.systemui.statusbar.connectivity.NetworkController;
-import com.android.systemui.qs.QSImpl;
 import com.android.systemui.qs.tiles.dialog.InternetDialogManager;
 import com.android.systemui.media.dialog.MediaOutputDialogManager;
-import com.android.systemui.statusbar.phone.ScrimController;
-import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.FlashlightController;
 
 import dagger.Lazy;
 
 import java.util.function.Consumer;
-import java.util.concurrent.Executor;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -129,24 +126,13 @@ public class Dependency {
     private final ArrayMap<Object, Object> mDependencies = new ArrayMap<>();
     private final ArrayMap<Object, LazyDependencyCreator> mProviders = new ArrayMap<>();
 
-    /**
-     * Generic executor on a background thread.
-     */
-    private static final String BACKGROUND_EXECUTOR_NAME = "background_executor";
-
-    /**
-     * Generic executor on a background thread.
-     */
-    public static final DependencyKey<Executor> BACKGROUND_EXECUTOR =
-            new DependencyKey<>(BACKGROUND_EXECUTOR_NAME);
-
     @Inject DumpManager mDumpManager;
 
-    @Inject Lazy<FalsingManager> mFalsingManager;
     @Inject Lazy<BroadcastDispatcher> mBroadcastDispatcher;
     @Inject Lazy<BluetoothController> mBluetoothController;
     @Inject Lazy<KeyguardStateController> mKeyguardStateController;
     @Inject Lazy<KeyguardUpdateMonitor> mKeyguardUpdateMonitor;
+    @Inject Lazy<ConfigurationController> mConfigurationController;
     @Inject Lazy<DeviceProvisionedController> mDeviceProvisionedController;
     @Inject Lazy<PluginManager> mPluginManager;
     @Inject Lazy<AssistManager> mAssistManager;
@@ -163,7 +149,6 @@ public class Dependency {
     @Inject Lazy<NavigationBarController> mNavigationBarController;
     @Inject Lazy<StatusBarStateController> mStatusBarStateController;
     @Inject Lazy<NotificationMediaManager> mNotificationMediaManager;
-    @Inject Lazy<NotificationListener> mNotificationListener;
     @Inject @Background Lazy<Looper> mBgLooper;
     @Inject @Named(TIME_TICK_HANDLER_NAME) Lazy<Handler> mTimeTickHandler;
     @Inject Lazy<SysUiState> mSysUiStateFlagsContainer;
@@ -171,7 +156,9 @@ public class Dependency {
     @Inject Lazy<UiEventLogger> mUiEventLogger;
     @Inject Lazy<FeatureFlags> mFeatureFlagsLazy;
     @Inject Lazy<NotificationSectionsManager> mNotificationSectionsManagerLazy;
+    @Inject Lazy<QSImpl> mQSImpl;
     @Inject Lazy<ScreenOffAnimationController> mScreenOffAnimationController;
+    @Inject Lazy<ScrimController> mScrimController;
     @Inject Lazy<AmbientState> mAmbientStateLazy;
     @Inject Lazy<GroupMembershipManager> mGroupMembershipManagerLazy;
     @Inject Lazy<GroupExpansionManager> mGroupExpansionManagerLazy;
@@ -179,18 +166,14 @@ public class Dependency {
     @Inject Lazy<DialogTransitionAnimator> mDialogTransitionAnimatorLazy;
     @Inject Lazy<UserTracker> mUserTrackerLazy;
     @Inject Lazy<StatusBarWindowControllerStore> mStatusBarWindowControllerStoreLazy;
-    @Inject Lazy<QSImpl> mQSImpl;
-    @Inject Lazy<ScrimController> mScrimController;
     @Inject Lazy<ActivityStarter> mActivityStarter;
     @Inject Lazy<AccessPointController> mAccessPointController;
     @Inject Lazy<NetworkController> mNetworkController;
     @Inject Lazy<InternetDialogManager> mInternetDialogManager;
     @Inject Lazy<MediaOutputDialogManager> mMediaOutputDialogManager;
-    @Inject Lazy<ConfigurationController> mConfigurationController;
     @Inject Lazy<FlashlightController> mFlashlightController;
     @Inject Lazy<BluetoothTileDialogViewModel> mBluetoothTileDialogViewModel;
     @Inject Lazy<HotspotController> mHotspotController;
-    @Inject @Background Lazy<Executor> mBackgroundExecutor;
 
     @Inject
     public Dependency() {
@@ -204,11 +187,11 @@ public class Dependency {
         // on imports.
         mProviders.put(TIME_TICK_HANDLER, mTimeTickHandler::get);
         mProviders.put(BG_LOOPER, mBgLooper::get);
-        mProviders.put(FalsingManager.class, mFalsingManager::get);
         mProviders.put(BroadcastDispatcher.class, mBroadcastDispatcher::get);
         mProviders.put(BluetoothController.class, mBluetoothController::get);
         mProviders.put(KeyguardStateController.class, mKeyguardStateController::get);
         mProviders.put(KeyguardUpdateMonitor.class, mKeyguardUpdateMonitor::get);
+        mProviders.put(ConfigurationController.class, mConfigurationController::get);
         mProviders.put(DeviceProvisionedController.class, mDeviceProvisionedController::get);
         mProviders.put(PluginManager.class, mPluginManager::get);
         mProviders.put(AssistManager.class, mAssistManager::get);
@@ -224,12 +207,13 @@ public class Dependency {
         mProviders.put(NavigationBarController.class, mNavigationBarController::get);
         mProviders.put(StatusBarStateController.class, mStatusBarStateController::get);
         mProviders.put(NotificationMediaManager.class, mNotificationMediaManager::get);
-        mProviders.put(NotificationListener.class, mNotificationListener::get);
         mProviders.put(SysUiState.class, mSysUiStateFlagsContainer::get);
         mProviders.put(CommandQueue.class, mCommandQueue::get);
         mProviders.put(UiEventLogger.class, mUiEventLogger::get);
         mProviders.put(FeatureFlags.class, mFeatureFlagsLazy::get);
         mProviders.put(NotificationSectionsManager.class, mNotificationSectionsManagerLazy::get);
+        mProviders.put(ScrimController.class, mScrimController::get);
+        mProviders.put(QSImpl.class, mQSImpl::get);
         mProviders.put(ScreenOffAnimationController.class, mScreenOffAnimationController::get);
         mProviders.put(AmbientState.class, mAmbientStateLazy::get);
         mProviders.put(GroupMembershipManager.class, mGroupMembershipManagerLazy::get);
@@ -239,18 +223,14 @@ public class Dependency {
         mProviders.put(UserTracker.class, mUserTrackerLazy::get);
         mProviders.put(
                 StatusBarWindowControllerStore.class, mStatusBarWindowControllerStoreLazy::get);
-        mProviders.put(QSImpl.class, mQSImpl::get);
-        mProviders.put(ScrimController.class, mScrimController::get);
         mProviders.put(MediaOutputDialogManager.class, mMediaOutputDialogManager::get);
         mProviders.put(AccessPointController.class, mAccessPointController::get);
         mProviders.put(NetworkController.class, mNetworkController::get);
         mProviders.put(InternetDialogManager.class, mInternetDialogManager::get);
-        mProviders.put(ConfigurationController.class, mConfigurationController::get);
         mProviders.put(FlashlightController.class, mFlashlightController::get);
         mProviders.put(BluetoothTileDialogViewModel.class, mBluetoothTileDialogViewModel::get);
         mProviders.put(ActivityStarter.class, mActivityStarter::get);
         mProviders.put(HotspotController.class, mHotspotController::get);
-        mProviders.put(BACKGROUND_EXECUTOR, mBackgroundExecutor::get);
 
         Dependency.setInstance(this);
     }

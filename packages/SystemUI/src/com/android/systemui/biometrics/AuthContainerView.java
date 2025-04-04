@@ -431,6 +431,7 @@ public class AuthContainerView extends LinearLayout
         // TODO(b/288175645): Once AuthContainerView is removed, set 0dp in credential view xml
         //  files with the corresponding left/right or top/bottom constraints being set to "parent".
         mCredentialView = factory.inflate(layoutResourceId, mLayout, false);
+
         if (credentialType instanceof PromptKind.Pattern) {
             LockPatternView lockPatternView = mCredentialView.findViewById(R.id.lockPattern);
             lockPatternView.setLockPatternSize(

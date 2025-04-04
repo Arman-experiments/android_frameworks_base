@@ -83,6 +83,7 @@ import com.android.settingslib.wifi.WifiUtils;
 import com.android.settingslib.wifi.dpp.WifiDppIntentHelper;
 import com.android.systemui.animation.ActivityTransitionAnimator;
 import com.android.systemui.animation.DialogTransitionAnimator;
+import com.android.systemui.Dependency;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
@@ -1060,17 +1061,6 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         mWorkerHandler.post(() -> setMergedCarrierWifiEnabledIfNeed(subId, enabled));
     }
 
-    void setAutoDataSwitchMobileDataPolicy(int subId, boolean enable) {
-        TelephonyManager tm = mSubIdTelephonyManagerMap.getOrDefault(subId, mTelephonyManager);
-        if (tm == null) {
-            if (DEBUG) {
-                Log.d(TAG, "TelephonyManager is null, can not set mobile data.");
-            }
-            return;
-        }
-        tm.setMobileDataPolicyEnabled(TelephonyManager.MOBILE_DATA_POLICY_AUTO_DATA_SWITCH, enable);
-    }
-
     boolean isFivegSupported() {
         if (!mContext.getResources().getBoolean(R.bool.config_supportsVONR))
             return false;
@@ -1109,6 +1099,17 @@ public class InternetDialogController implements AccessPointController.AccessPoi
                 newType);
     }
 
+    void setAutoDataSwitchMobileDataPolicy(int subId, boolean enable) {
+        TelephonyManager tm = mSubIdTelephonyManagerMap.getOrDefault(subId, mTelephonyManager);
+        if (tm == null) {
+            if (DEBUG) {
+                Log.d(TAG, "TelephonyManager is null, can not set mobile data.");
+            }
+            return;
+        }
+        tm.setMobileDataPolicyEnabled(TelephonyManager.MOBILE_DATA_POLICY_AUTO_DATA_SWITCH, enable);
+    }
+
     boolean isDataStateInService(int subId) {
         final ServiceState serviceState = mSubIdServiceState.getOrDefault(subId,
                 new ServiceState());
@@ -1134,7 +1135,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
     }
 
     public boolean isDeviceLocked() {
-        return false;
+        return !mKeyguardStateController.isUnlocked();
     }
 
     boolean activeNetworkIsCellular() {

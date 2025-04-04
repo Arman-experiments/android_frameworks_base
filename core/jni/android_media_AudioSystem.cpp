@@ -3704,15 +3704,12 @@ static const JNINativeMethod gMethods[] = {
                                android_media_AudioSystem_listenForSystemPropertyChange),
         MAKE_JNI_NATIVE_METHOD("triggerSystemPropertyUpdate", "(J)V",
                                android_media_AudioSystem_triggerSystemPropertyUpdate),
-
-       MAKE_JNI_NATIVE_METHOD("setAppVolume", "(Ljava/lang/String;F)I",
-                              android_media_AudioSystem_setAppVolume),
-       MAKE_JNI_NATIVE_METHOD("setAppMute", "(Ljava/lang/String;Z)I",
-                              android_media_AudioSystem_setAppMute),
-       MAKE_JNI_NATIVE_METHOD("listAppVolumes", "(Ljava/util/ArrayList;)I",
-                              android_media_AudioSystem_listAppVolumes),
-};
-
+        MAKE_JNI_NATIVE_METHOD("setAppVolume", "(Ljava/lang/String;F)I",
+                               android_media_AudioSystem_setAppVolume),
+        MAKE_JNI_NATIVE_METHOD("setAppMute", "(Ljava/lang/String;Z)I",
+                               android_media_AudioSystem_setAppMute),
+        MAKE_JNI_NATIVE_METHOD("listAppVolumes", "(Ljava/util/ArrayList;)I",
+                               android_media_AudioSystem_listAppVolumes)};
 
 static const JNINativeMethod gEventHandlerMethods[] =
         {MAKE_JNI_NATIVE_METHOD("native_setup", "(Ljava/lang/Object;)V",

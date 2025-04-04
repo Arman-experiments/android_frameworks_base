@@ -21,7 +21,7 @@
     </style>
 
     <style name="CollapsingToolbarTitle.Expanded" parent="CollapsingToolbarTitle.Collapsed">
-        <item name="android:textSize">36dp</item>
+        <item name="android:textSize">32dp</item>
     </style>
 
     <style name="Base.CollapsingToolbarLayoutStyle.SettingsLib" parent="@style/Widget.Material3.CollapsingToolbar">
@@ -30,7 +30,7 @@
         <item name="expandedTitleMarginStart">@dimen/expanded_title_margin_start</item>
         <item name="expandedTitleMarginEnd">@dimen/expanded_title_margin_end</item>
         <item name="expandedTitleMarginBottom">@dimen/expanded_title_margin_bottom</item>
-        <item name="maxLines">3</item>
+        <item name="maxLines">1</item>
         <item name="scrimVisibleHeightTrigger">@dimen/settingslib_scrim_visible_height_trigger</item>
         <item name="contentScrim">@color/settingslib_colorSurfaceHeader</item>
         <item name="statusBarScrim">@null</item>

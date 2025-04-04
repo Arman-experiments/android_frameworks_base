@@ -52,6 +52,7 @@ import com.android.systemui.statusbar.NotificationShadeWindowController
 import com.android.systemui.statusbar.commandline.Command
 import com.android.systemui.statusbar.commandline.CommandRegistry
 import com.android.systemui.statusbar.phone.BiometricUnlockController
+import com.android.systemui.statusbar.phone.BiometricUnlockController.MODE_WAKE_AND_UNLOCK
 import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.util.ViewController
@@ -229,6 +230,13 @@ constructor(
         }
 
         if (lightRevealMigration()) {
+            return
+        }
+
+        if (!isRippleEnabled) {
+            // reset and hide the scrim so it doesn't appear on the next notification shade usage
+            lightRevealScrim.revealAmount = 1f
+            startLightRevealScrimOnKeyguardFadingAway = false
             return
         }
 

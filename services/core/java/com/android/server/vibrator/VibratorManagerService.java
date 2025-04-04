@@ -1825,7 +1825,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
             try {
                 synchronized (mLock) {
                     if (mCurrentSession instanceof SingleVibrationSession session) {
-                        if (Build.IS_DEBUGGABLE && (session.getVibration().id != vibrationId)) {
+                        if (Build.IS_ENG && (session.getVibration().id != vibrationId)) {
                             Slog.wtf(TAG, TextUtils.formatSimple(
                                     "VibrationId mismatch on vibration thread release."
                                             + " expected=%d, released=%d",

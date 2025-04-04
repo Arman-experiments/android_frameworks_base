@@ -14,8 +14,6 @@
 
 package com.android.systemui.qs;
 
-import static com.android.wm.shell.shared.animation.Interpolators.SLOWDOWN_INTERPOLATOR;
-
 import android.animation.TimeInterpolator;
 import android.animation.ValueAnimator;
 import android.annotation.NonNull;
@@ -594,7 +592,7 @@ public class QSAnimator implements QSHost.Callback, PagedTileLayout.PageListener
         View qsBrightness = mQsPanelController.getBrightnessView();
         View qqsBrightness = mQuickQSPanelController.getBrightnessView();
 
-        if (mTunerService.getValue(QSPanel.QS_SHOW_BRIGHTNESS_SLIDER, 1) == 0) {
+        if (mTunerService.getValue(QSPanel.QS_SHOW_BRIGHTNESS_SLIDER, 2) == 0) {
             qsBrightness.setVisibility(View.GONE);
             qqsBrightness.setVisibility(View.GONE);
         }
@@ -612,7 +610,7 @@ public class QSAnimator implements QSHost.Callback, PagedTileLayout.PageListener
                     .addFloat(qqsBrightness, "translationY", 0, translationY)
                     .setInterpolator(mQSExpansionPathInterpolator.getYInterpolator())
                     .setInterpolator(mQuickQSPanelController.mMediaHost.getVisible() ?
-                            Interpolators.ALPHA_OUT : SLOWDOWN_INTERPOLATOR)
+                            Interpolators.ALPHA_OUT : com.android.wm.shell.shared.animation.Interpolators.SLOWDOWN_INTERPOLATOR)
                     .build();
         } else if (qsBrightness != null) {
             // The brightness slider's visible bottom edge must maintain a constant margin from the
@@ -666,6 +664,7 @@ public class QSAnimator implements QSHost.Callback, PagedTileLayout.PageListener
     }
 
     private void getRelativePosition(int[] loc1, View view, View parent) {
+        if (view == parent || view == null) return;
         loc1[0] = 0 + view.getWidth() / 2;
         loc1[1] = 0;
         getRelativePositionInt(loc1, view, parent);

@@ -6834,6 +6834,15 @@ public abstract class Context {
      * @hide
      */
     public static final String SUPERVISION_SERVICE = "supervision";
+    
+    /**
+      * {@link android.hardware.display.DcDimManager} for accessing and setting locked apps state.
+      *
+      * @see #getSystemService
+      * @see android.hardware.display.DcDimmingManager
+      * @hide
+      */
+     public static final String DC_DIM_SERVICE = "dc_dim_service";
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a

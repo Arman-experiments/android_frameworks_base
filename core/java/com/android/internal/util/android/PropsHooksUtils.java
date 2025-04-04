@@ -31,6 +31,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import com.android.internal.util.infinity.KeyProviderManager;
+
 public class PropsHooksUtils {
 
     private static final String TAG = PropsHooksUtils.class.getSimpleName();
@@ -301,6 +303,10 @@ public class PropsHooksUtils {
 
     public static void onEngineGetCertificateChain() {
         if (!SystemProperties.getBoolean(SPOOF_PIXEL_GMS, true)) return;
+        if (KeyProviderManager.isKeyboxAvailable()) {
+            dlog("Key attestation blocking is disabled because a keybox is defined to spoof");
+            return;
+        }
         // Check stack for SafetyNet or Play Integrity
         if (isCallerSafetyNet()) {
             Log.i(TAG, "Blocked key attestation");

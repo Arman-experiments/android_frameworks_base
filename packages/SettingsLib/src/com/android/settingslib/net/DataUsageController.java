@@ -23,7 +23,6 @@ import static android.text.format.DateUtils.FORMAT_SHOW_DATE;
 import android.app.usage.NetworkStats.Bucket;
 import android.app.usage.NetworkStatsManager;
 import android.content.Context;
-import android.net.ConnectivityManager;
 import android.net.NetworkPolicy;
 import android.net.NetworkPolicyManager;
 import android.net.NetworkTemplate;
@@ -110,29 +109,41 @@ public class DataUsageController {
 
         return getDailyDataUsageInfo(template);
     }
+    
+    public DataUsageInfo getDailyDataUsageUploadInfo() {
+	NetworkTemplate template = DataUsageUtils.getMobileTemplate(mContext, mSubscriptionId);
+	
+	return getDailyDataUsageInfo(template, true);
+    }
+
+    public DataUsageInfo getDailyDataUsageDownloadInfo() {
+	NetworkTemplate template = DataUsageUtils.getMobileTemplate(mContext, mSubscriptionId);
+	
+	return getDailyDataUsageInfo(template, false);
+    }
 
     public DataUsageInfo getWifiDataUsageInfo() {
-        return getWifiDataUsageInfo(false);
+        NetworkTemplate template = new NetworkTemplate.Builder(NetworkTemplate.MATCH_WIFI).build();
+
+        return getDataUsageInfo(template);
     }
 
-    public DataUsageInfo getWifiDataUsageInfo(boolean currentNetwork) {
-        return getDataUsageInfo(getWifiNetworkTemplate(currentNetwork));
+    public DataUsageInfo getWifiDailyDataUsageInfo() {
+        NetworkTemplate template = new NetworkTemplate.Builder(NetworkTemplate.MATCH_WIFI).build();
+
+        return getDailyDataUsageInfo(template);
+    }
+    
+    public DataUsageInfo getWifiDailyDataUsageUploadInfo() {
+        NetworkTemplate template = new NetworkTemplate.Builder(NetworkTemplate.MATCH_WIFI).build();
+        
+        return getDailyDataUsageInfo(template, true);
     }
 
-    public DataUsageInfo getWifiDailyDataUsageInfo(boolean currentNetwork) {
-        return getDailyDataUsageInfo(getWifiNetworkTemplate(currentNetwork));
-    }
-
-    public NetworkTemplate getWifiNetworkTemplate(boolean currentNetwork) {
-        final NetworkTemplate.Builder builder =
-                new NetworkTemplate.Builder(NetworkTemplate.MATCH_WIFI);
-        if (currentNetwork) {
-            final String networkKey = mWifiManager.getConnectionInfo().getNetworkKey();
-            if (networkKey != null) {
-                builder.setWifiNetworkKeys(Set.of(networkKey));
-            }
-        }
-        return builder.build();
+    public DataUsageInfo getWifiDailyDataUsageDownloadInfo() {
+        NetworkTemplate template = new NetworkTemplate.Builder(NetworkTemplate.MATCH_WIFI).build();
+        
+        return getDailyDataUsageInfo(template, false);
     }
 
     public DataUsageInfo getDataUsageInfo(NetworkTemplate template) {
@@ -166,7 +177,7 @@ public class DataUsageController {
         } else {
             usage.warningLevel = getDefaultWarningLevel();
         }
-        if (usage != null && mNetworkController != null) {
+        if (mNetworkController != null) {
             usage.carrier = mNetworkController.getMobileDataNetworkName();
         }
         return usage;
@@ -199,6 +210,50 @@ public class DataUsageController {
         }
         return usage;
     }
+    
+    private DataUsageInfo getDailyDataUsageInfo(NetworkTemplate template, boolean isUpload) {
+        final long end = System.currentTimeMillis();
+        final long start = end - DataUsageUtils.getTodayMillis();
+
+        long totalBytes = 0L;
+        try {
+            final Bucket bucket = mNetworkStatsManager.querySummaryForDevice(template, start, end);
+            if (bucket != null) {
+                totalBytes = isUpload ? bucket.getTxBytes() : bucket.getRxBytes();
+            } else {
+                Log.w(TAG, "Failed to get data usage, no entry data");
+                return null;
+            }
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Failed to get data usage, remote call failed", e);
+            return null;
+        }
+
+        if (totalBytes < 0L) {
+            return warn("no entry data");
+        }
+
+        final DataUsageInfo usage = new DataUsageInfo();
+        usage.startDate = start;
+        usage.usageLevel = totalBytes;
+        usage.period = formatDateRange(start, end);
+        usage.cycleStart = start;
+        usage.cycleEnd = end;
+
+        final NetworkPolicy policy = findNetworkPolicy(template);
+        if (policy != null) {
+            usage.limitLevel = policy.limitBytes > 0 ? policy.limitBytes : 0;
+            usage.warningLevel = policy.warningBytes > 0 ? policy.warningBytes : 0;
+        } else {
+            usage.warningLevel = getDefaultWarningLevel();
+        }
+
+        if (mNetworkController != null) {
+            usage.carrier = mNetworkController.getMobileDataNetworkName();
+        }
+
+        return usage;
+    }
 
     /**
      * Get the total usage level recorded in the network history
@@ -227,25 +282,12 @@ public class DataUsageController {
         if (mPolicyManager == null || template == null) return null;
         final NetworkPolicy[] policies = mPolicyManager.getNetworkPolicies();
         if (policies == null) return null;
-        final int N = policies.length;
-        for (int i = 0; i < N; i++) {
-            final NetworkPolicy policy = policies[i];
+        for (final NetworkPolicy policy : policies) {
             if (policy != null && template.equals(policy.template)) {
                 return policy;
             }
         }
         return null;
-    }
-
-    private static String statsBucketToString(Bucket bucket) {
-        return bucket == null ? null : new StringBuilder("Entry[")
-            .append("bucketDuration=").append(bucket.getEndTimeStamp() - bucket.getStartTimeStamp())
-            .append(",bucketStart=").append(bucket.getStartTimeStamp())
-            .append(",rxBytes=").append(bucket.getRxBytes())
-            .append(",rxPackets=").append(bucket.getRxPackets())
-            .append(",txBytes=").append(bucket.getTxBytes())
-            .append(",txPackets=").append(bucket.getTxPackets())
-            .append(']').toString();
     }
 
     @VisibleForTesting
@@ -265,8 +307,8 @@ public class DataUsageController {
             }
         }
 
-        return mContext.getSystemService(
-                TelephonyManager.class).createForSubscriptionId(subscriptionId);
+        return mContext.getSystemService(TelephonyManager.class)
+                .createForSubscriptionId(subscriptionId);
     }
 
     public void setMobileDataEnabled(boolean enabled) {
@@ -285,28 +327,6 @@ public class DataUsageController {
 
     public boolean isMobileDataEnabled() {
         return getTelephonyManager().isDataEnabled();
-    }
-
-    static int getNetworkType(NetworkTemplate networkTemplate) {
-        if (networkTemplate == null) {
-            return ConnectivityManager.TYPE_NONE;
-        }
-        final int matchRule = networkTemplate.getMatchRule();
-        switch (matchRule) {
-            case NetworkTemplate.MATCH_MOBILE:
-                return ConnectivityManager.TYPE_MOBILE;
-            case NetworkTemplate.MATCH_WIFI:
-                return  ConnectivityManager.TYPE_WIFI;
-            case NetworkTemplate.MATCH_ETHERNET:
-                return  ConnectivityManager.TYPE_ETHERNET;
-            default:
-                return ConnectivityManager.TYPE_MOBILE;
-        }
-    }
-
-    private String getActiveSubscriberId() {
-        final String actualSubscriberId = getTelephonyManager().getSubscriberId();
-        return actualSubscriberId;
     }
 
     private String formatDateRange(long start, long end) {

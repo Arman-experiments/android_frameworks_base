@@ -1229,10 +1229,8 @@ public class CameraExtensionsProxyService extends Service {
         public void onNextImageAvailable(OutputConfigId outputConfigId, ParcelImage img,
                 String physicalCameraId) {
             if (mImageProcessor != null) {
-                ImageReferenceImpl imgRef = new ImageReferenceImpl(img);
-                mImageProcessor.onNextImageAvailable(outputConfigId.id, img.timestamp, imgRef,
-                        physicalCameraId);
-                imgRef.decrement();
+                mImageProcessor.onNextImageAvailable(outputConfigId.id, img.timestamp,
+                        new ImageReferenceImpl(img), physicalCameraId);
             }
         }
     }

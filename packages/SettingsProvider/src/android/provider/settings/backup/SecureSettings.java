@@ -286,16 +286,15 @@ public class SecureSettings {
         Settings.Secure.ON_DEVICE_INTELLIGENCE_UNBIND_TIMEOUT_MS,
         Settings.Secure.ON_DEVICE_INFERENCE_UNBIND_TIMEOUT_MS,
         Settings.Secure.ON_DEVICE_INTELLIGENCE_IDLE_TIMEOUT_MS,
-        Settings.Secure.TETHERING_ALLOW_VPN_UPSTREAMS,
         Settings.Secure.MANDATORY_BIOMETRICS,
         Settings.Secure.MANDATORY_BIOMETRICS_REQUIREMENTS_SATISFIED,
         Settings.Secure.ADVANCED_PROTECTION_MODE,
         Settings.Secure.ACCESSIBILITY_KEY_GESTURE_TARGETS,
-        // Evolution X additions
-        Settings.Secure.VPN_ENFORCE_DNS,
-        Settings.Secure.DOZE_DOUBLE_TAP_GESTURE_AMBIENT,
-        Settings.Secure.DOZE_PICK_UP_GESTURE_AMBIENT,
-        Settings.Secure.EXTRA_DIM_AUTO_MODE,
-        Settings.Secure.EXTRA_DIM_AUTO_TIME,
+        Settings.Secure.TETHERING_ALLOW_VPN_UPSTREAMS,
+        Settings.Secure.MEDIA_CONTROLS_ALWAYS_SHOW_TIME,
+        Settings.Secure.MEDIA_CONTROLS_TIME_AS_NEXT,
+        Settings.Secure.MEDIA_CONTROLS_RIPPLE,
+        Settings.Secure.MEDIA_CONTROLS_TURBULENCE,
+        Settings.Secure.MEDIA_CONTROLS_ACTIONS,
     };
 }

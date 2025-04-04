@@ -49,7 +49,7 @@ constructor(
             override fun toLockScreenState(): KeyguardQuickAffordanceConfig.LockScreenState =
                 KeyguardQuickAffordanceConfig.LockScreenState.Visible(
                     Icon.Resource(
-                        R.drawable.qs_flashlight_icon_on,
+                        R.drawable.bottom_flashlight_on,
                         ContentDescription.Resource(R.string.quick_settings_flashlight_label)
                     ),
                     ActivationState.Active
@@ -60,7 +60,7 @@ constructor(
             override fun toLockScreenState(): KeyguardQuickAffordanceConfig.LockScreenState =
                 KeyguardQuickAffordanceConfig.LockScreenState.Visible(
                     Icon.Resource(
-                        R.drawable.qs_flashlight_icon_off,
+                        R.drawable.bottom_flashlight_off,
                         ContentDescription.Resource(R.string.quick_settings_flashlight_label)
                     ),
                     ActivationState.Inactive
@@ -79,7 +79,7 @@ constructor(
     override fun pickerName(): String = context.getString(R.string.quick_settings_flashlight_label)
 
     override val pickerIconResourceId: Int
-        get() = R.drawable.ic_flashlight_off
+        get() = R.drawable.stat_sys_flashlight
 
     override val lockScreenState: Flow<KeyguardQuickAffordanceConfig.LockScreenState> =
         conflatedCallbackFlow {

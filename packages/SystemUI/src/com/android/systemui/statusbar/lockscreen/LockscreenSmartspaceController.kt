@@ -319,7 +319,7 @@ constructor(
     val isWeatherEnabled: Boolean
         get() {
             val showWeather =
-                secureSettings.getIntForUser(LOCK_SCREEN_WEATHER_ENABLED, 1, userTracker.userId) ==
+                secureSettings.getIntForUser(LOCK_SCREEN_WEATHER_ENABLED, 0, userTracker.userId) ==
                     1
             return showWeather
         }
@@ -503,12 +503,6 @@ constructor(
             settingsObserver,
             UserHandle.USER_ALL,
         )
-        contentResolver.registerContentObserver(
-                secureSettings.getUriFor("peek_display_notifications"),
-                true,
-                settingsObserver,
-                UserHandle.USER_ALL
-        )
         configurationController.addCallback(configChangeListener)
         statusBarStateController.addCallback(statusBarStateListener)
         bypassController.registerOnBypassStateChangedListener(bypassStateChangedListener)
@@ -649,13 +643,8 @@ constructor(
     }
 
     private fun reloadSmartspace() {
-        val peekDisplayEnabled = secureSettings.getIntForUser(
-            "peek_display_notifications",
-            0,
-            userTracker.userId
-        ) == 1
         showNotifications =
-            secureSettings.getIntForUser(LOCK_SCREEN_SHOW_NOTIFICATIONS, 0, userTracker.userId) == 1 && !peekDisplayEnabled
+            secureSettings.getIntForUser(LOCK_SCREEN_SHOW_NOTIFICATIONS, 0, userTracker.userId) == 1
 
         showSensitiveContentForCurrentUser =
             secureSettings.getIntForUser(

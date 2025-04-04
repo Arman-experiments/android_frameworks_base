@@ -20,18 +20,18 @@ package com.android.systemui.keyguard.data.quickaffordance
 import android.app.StatusBarManager
 import android.content.Context
 import android.content.Intent
+import com.android.systemui.res.R
 import com.android.systemui.animation.Expandable
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
-import com.android.systemui.res.R
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 
-import com.android.internal.util.android.Utils
+import com.android.internal.util.infinity.InfinityUtils
 
 @SysUISingleton
 class AssistantKeyguardQuickAffordanceConfig
@@ -61,7 +61,7 @@ constructor(
             )
 
     override suspend fun getPickerScreenState(): KeyguardQuickAffordanceConfig.PickerScreenState {
-        return if (Utils.isPackageInstalled(context, "com.openai.chatgpt")) {
+        return if (InfinityUtils.isPackageInstalled(context, "com.openai.chatgpt")) {
             super.getPickerScreenState()
         } else {
             KeyguardQuickAffordanceConfig.PickerScreenState.UnavailableOnDevice

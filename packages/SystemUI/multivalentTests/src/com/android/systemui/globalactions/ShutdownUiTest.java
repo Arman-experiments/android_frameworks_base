@@ -62,38 +62,37 @@ public class ShutdownUiTest extends SysuiTestCase {
 
     @Test
     public void getRebootMessage_update() {
-        int messageId = mShutdownUi.getRebootMessage(true, PowerManager.REBOOT_RECOVERY_UPDATE,
-                false);
+        int messageId = mShutdownUi.getRebootMessage(true, PowerManager.REBOOT_RECOVERY_UPDATE);
         assertEquals(messageId, R.string.reboot_to_update_reboot);
     }
 
     @Test
     public void getRebootMessage_rebootDefault() {
-        int messageId = mShutdownUi.getRebootMessage(true, "anything-else", false);
+        int messageId = mShutdownUi.getRebootMessage(true, "anything-else");
         assertEquals(messageId, R.string.reboot_to_reset_message);
     }
 
     @Test
     public void getRebootMessage_shutdown() {
-        int messageId = mShutdownUi.getRebootMessage(false, "anything-else", false);
+        int messageId = mShutdownUi.getRebootMessage(false, "anything-else");
         assertEquals(messageId, R.string.shutdown_progress);
     }
 
     @Test
     public void getReasonMessage_update() {
-        String message = mShutdownUi.getReasonMessage(PowerManager.REBOOT_RECOVERY_UPDATE, false);
+        String message = mShutdownUi.getReasonMessage(PowerManager.REBOOT_RECOVERY_UPDATE);
         assertEquals(message, mContext.getString(R.string.reboot_to_update_title));
     }
 
     @Test
     public void getReasonMessage_rebootDefault() {
-        String message = mShutdownUi.getReasonMessage(PowerManager.REBOOT_RECOVERY, false);
+        String message = mShutdownUi.getReasonMessage(PowerManager.REBOOT_RECOVERY);
         assertEquals(message, mContext.getString(R.string.reboot_to_reset_title));
     }
 
     @Test
     public void getRebootMessage_defaultToNone() {
-        String message = mShutdownUi.getReasonMessage("anything-else", false);
+        String message = mShutdownUi.getReasonMessage("anything-else");
         assertNull(message);
     }
 
@@ -157,7 +156,7 @@ public class ShutdownUiTest extends SysuiTestCase {
         Resources mockResources = spy(mContext.getResources());
         when(mContext.getResources()).thenReturn(mockResources);
 
-        mShutdownUi.showShutdownUi(false, "test", false);
+        mShutdownUi.showShutdownUi(false, "test");
 
         verify(mockResources).getFloat(
                 eq(com.android.systemui.res.R.dimen.shutdown_scrim_behind_alpha));

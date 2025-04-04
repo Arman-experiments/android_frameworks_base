@@ -32,7 +32,7 @@ import android.provider.Settings;
 import android.util.Log;
 
 import com.android.internal.config.sysui.SystemUiDeviceConfigFlags;
-import com.android.internal.util.android.Utils;
+import com.android.internal.util.infinity.InfinityUtils;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.settings.UserTracker;
@@ -313,7 +313,7 @@ public class QRCodeScannerController implements
             mQRCodeScannerActivity = qrCodeScannerActivity;
             mComponentName = componentName;
             mIntent = intent;
-        } else if (Utils. isPackageInstalled(mContext, GSA_PACKAGE, false) &&
+        } else if (InfinityUtils. isPackageInstalled(mContext, GSA_PACKAGE, false) &&
                 lensIntent != null && isActivityCallable(lensIntent)) {
             mQRCodeScannerActivity = LENS_ACTIVITY;
             mComponentName = lensIntent.getComponent();

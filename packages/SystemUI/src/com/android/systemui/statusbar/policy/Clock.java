@@ -25,6 +25,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.TypedArray;
+import android.graphics.Paint;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.icu.lang.UCharacter;
@@ -43,13 +44,11 @@ import android.text.style.CharacterStyle;
 import android.text.style.RelativeSizeSpan;
 import android.util.AttributeSet;
 import android.util.TypedValue;
-import android.view.ContextThemeWrapper;
 import android.view.Display;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
-import com.android.settingslib.Utils;
 import com.android.systemui.Dependency;
 import com.android.systemui.FontSizeUtils;
 import com.android.systemui.broadcast.BroadcastDispatcher;
@@ -65,8 +64,6 @@ import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.policy.ConfigurationController.ConfigurationListener;
 import com.android.systemui.tuner.TunerService;
 import com.android.systemui.tuner.TunerService.Tunable;
-
-import lineageos.providers.LineageSettings;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -95,9 +92,9 @@ public class Clock extends TextView implements
     public static final String STATUS_BAR_CLOCK_SECONDS =
             "system:" + Settings.System.STATUS_BAR_CLOCK_SECONDS;
     private static final String STATUS_BAR_AM_PM =
-            "lineagesystem:" + LineageSettings.System.STATUS_BAR_AM_PM;
+            "system:" + Settings.System.STATUS_BAR_AM_PM;
     private static final String STATUS_BAR_CLOCK_AUTO_HIDE_LAUNCHER =
-            "lineagesystem:" + LineageSettings.System.STATUS_BAR_CLOCK_AUTO_HIDE;
+            "system:" + Settings.System.STATUS_BAR_CLOCK_AUTO_HIDE_LAUNCHER;
     public static final String STATUS_BAR_CLOCK_DATE_DISPLAY =
             "system:" + Settings.System.STATUS_BAR_CLOCK_DATE_DISPLAY;
     public static final String STATUS_BAR_CLOCK_DATE_STYLE =
@@ -114,23 +111,15 @@ public class Clock extends TextView implements
             "system:" + Settings.System.STATUS_BAR_CLOCK_AUTO_HIDE_SDURATION;
     private static final String STATUSBAR_CLOCK_CHIP =
             "system:" + Settings.System.STATUSBAR_CLOCK_CHIP;
-    public static final String STATUS_BAR_CLOCK_SIZE =
-            "system:" + Settings.System.STATUS_BAR_CLOCK_SIZE;
-    public static final String QS_HEADER_CLOCK_SIZE =
-            "system:" + Settings.System.QS_HEADER_CLOCK_SIZE;
-
-    private int mClockSize;
-    private int mClockSizeQsHeader;
 
     private final UserTracker mUserTracker;
     private final CommandQueue mCommandQueue;
     private int mCurrentUserId;
+    private int mClockBg;
 
     private boolean mClockAutoHideLauncher = false;
     private boolean mClockVisibleByPolicy = true;
     private boolean mClockVisibleByUser = getVisibility() == View.VISIBLE;
-    private boolean mClockBgOn;
-    private boolean mClockBgStyleIsTwo;
 
     private boolean mAttached;
     private boolean mScreenReceiverRegistered;
@@ -287,9 +276,7 @@ public class Clock extends TextView implements
                     STATUS_BAR_CLOCK_AUTO_HIDE,
                     STATUS_BAR_CLOCK_AUTO_HIDE_HDURATION,
                     STATUS_BAR_CLOCK_AUTO_HIDE_SDURATION,
-                    STATUSBAR_CLOCK_CHIP,
-                    STATUS_BAR_CLOCK_SIZE,
-                    QS_HEADER_CLOCK_SIZE);
+                    STATUSBAR_CLOCK_CHIP);
             mCommandQueue.addCallback(this);
             if (mShowDark) {
                 Dependency.get(DarkIconDispatcher.class).addDarkReceiver(this);
@@ -305,11 +292,8 @@ public class Clock extends TextView implements
 
         // Make sure we update to the current time
         updateShowSeconds();
-        mContext.getMainExecutor().execute(() -> {
-            updateClock();
-            updateClockSize();
-            updateClockVisibility();
-        });
+        updateClock();
+        updateClockVisibility();
     }
 
     @Override
@@ -526,19 +510,8 @@ public class Clock extends TextView implements
                         TunerService.parseInteger(newValue, SHOW_DURATION);
                 break;
             case STATUSBAR_CLOCK_CHIP:
-                int sbClockBgStyle = TunerService.parseInteger(newValue, 0);
-                mClockBgOn = sbClockBgStyle != 0;
-                mClockBgStyleIsTwo = sbClockBgStyle == 2;
-                break;
-            case STATUS_BAR_CLOCK_SIZE:
-                mClockSize =
-                        TunerService.parseInteger(newValue, 14);
-                updateClockSize();
-                break;
-            case QS_HEADER_CLOCK_SIZE:
-                mClockSizeQsHeader =
-                        TunerService.parseInteger(newValue, 14);
-                updateClockSize();
+                mClockBg = 
+                        TunerService.parseInteger(newValue, 0);
                 break;
             default:
                 break;
@@ -546,10 +519,8 @@ public class Clock extends TextView implements
         // Force refresh of dependent variables.
         mContentDescriptionFormatString = "";
         mDateTimePatternGenerator = null;
-        mContext.getMainExecutor().execute(() -> {
-            updateClock(true);
-            updateClockVisibility();
-        });
+        updateClock(true);
+        updateClockVisibility();
     }
 
     @Override
@@ -565,15 +536,13 @@ public class Clock extends TextView implements
 
     @Override
     public void onDarkChanged(ArrayList<Rect> areas, float darkIntensity, int tint) {
-        mNonAdaptedColor = DarkIconDispatcher.getTint(areas, this, tint);
-        setTextColor(mClockBgOn && !mClockBgStyleIsTwo ? Color.WHITE : mNonAdaptedColor);
-    }
-
-    // Update text color based when shade scrim changes color.
-    public void onColorsChanged(boolean lightTheme) {
-        final Context context = new ContextThemeWrapper(mContext,
-                lightTheme ? R.style.Theme_SystemUI_LightWallpaper : R.style.Theme_SystemUI);
-        setTextColor(Utils.getColorAttrDefaultColor(context, R.attr.wallpaperTextColor));
+            mNonAdaptedColor = DarkIconDispatcher.getTint(areas, this, tint);
+		setTextColor(mNonAdaptedColor);
+            if (mClockBg == 3 || mClockBg == 4 || mClockBg == 6 || mClockBg == 7) {
+		setTextColor(Color.WHITE);
+	    } else if (mClockBg == 5 || mClockBg == 11 || mClockBg == 12) {
+        	setTextColor(Color.BLACK);
+	    }	
     }
 
     @Override
@@ -587,7 +556,9 @@ public class Clock extends TextView implements
 
         FontSizeUtils.updateFontSize(this, R.dimen.status_bar_clock_size);
 
-        float fontHeight = getPaint().getFontMetricsInt(null);
+        Paint.FontMetrics metrics = getPaint().getFontMetrics();
+        float fontHeight = (metrics.descent + Math.abs(metrics.ascent) + 
+                    metrics.leading + metrics.bottom);
         setLineHeight(TypedValue.COMPLEX_UNIT_PX, fontHeight);
 
         ViewGroup.LayoutParams lp = getLayoutParams();
@@ -646,6 +617,8 @@ public class Clock extends TextView implements
 
         final char MAGIC1 = '\uEF00';
         final char MAGIC2 = '\uEF01';
+        
+        int amPmStyle = mQsHeader ? AM_PM_STYLE_GONE : mAmPmStyle;
 
         final String formatSkeleton = mShowSeconds
                 ? is24 ? "Hms" : "hms"
@@ -659,7 +632,7 @@ public class Clock extends TextView implements
              * add marker characters around it to let us find it again after
              * formatting and change its size.
              */
-            if (mAmPmStyle != AM_PM_STYLE_NORMAL) {
+            if (amPmStyle != AM_PM_STYLE_NORMAL) {
                 int a = -1;
                 boolean quoted = false;
                 for (int i = 0; i < format.length(); i++) {
@@ -737,7 +710,7 @@ public class Clock extends TextView implements
             }
         }
 
-        if (mAmPmStyle != AM_PM_STYLE_NORMAL) {
+        if (amPmStyle != AM_PM_STYLE_NORMAL) {
             int magic1 = result.indexOf(MAGIC1);
             int magic2 = result.indexOf(MAGIC2);
             if (magic1 >= 0 && magic2 > magic1) {
@@ -836,12 +809,5 @@ public class Clock extends TextView implements
             updateShowClock();
         }
     };
-
-    public void updateClockSize() {
-        if (mQsHeader) {
-            setTextSize(mClockSizeQsHeader);
-        } else {
-            setTextSize(mClockSize);
-        }
-    }
 }
+

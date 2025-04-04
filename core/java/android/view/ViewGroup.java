@@ -2919,7 +2919,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
      * Returns true if the flag was previously set.
      */
     private static boolean resetCancelNextUpFlag(@NonNull View view) {
-        if (view != null && (view.mPrivateFlags & PFLAG_CANCEL_NEXT_UP_EVENT) != 0) {
+        if ((view.mPrivateFlags & PFLAG_CANCEL_NEXT_UP_EVENT) != 0) {
             view.mPrivateFlags &= ~PFLAG_CANCEL_NEXT_UP_EVENT;
             return true;
         }
@@ -4514,9 +4514,6 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
     protected void dispatchGetDisplayList() {
         final int count = mChildrenCount;
         final View[] children = mChildren;
-        if (children == null) {
-            return;
-        }
         for (int i = 0; i < count; i++) {
             final View child = children[i];
             if (child == null) {
@@ -5287,7 +5284,8 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
         }
 
         if (child.getParent() != null) {
-           ((ViewGroup) child.getParent()).removeView(child);
+            throw new IllegalStateException("The specified child already has a parent. " +
+                    "You must call removeView() on the child's parent first.");
         }
 
         if (mTransition != null) {

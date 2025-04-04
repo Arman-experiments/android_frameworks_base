@@ -104,8 +104,8 @@ public interface CentralSurfacesDependenciesModule {
             MediaDataManager mediaDataManager,
             DumpManager dumpManager,
             @Background Executor backgroundExecutor,
-            SysuiColorExtractor colorExtractor,
             @Main Handler handler,
+            SysuiColorExtractor colorExtractor,
             StatusBarStateController statusBarStateController,
             TunerService tunerService) {
         return new NotificationMediaManager(
@@ -116,8 +116,8 @@ public interface CentralSurfacesDependenciesModule {
                 mediaDataManager,
                 dumpManager,
                 backgroundExecutor,
-                colorExtractor,
                 handler,
+                colorExtractor,
                 statusBarStateController,
                 tunerService);
     }

@@ -188,6 +188,7 @@ constructor(
 
         val indicationAreaTop = KeyguardIndicationAreaTop(context, null)
         keyguardIndicationController.setIndicationAreaTop(indicationAreaTop)
+
     }
 
     private fun bindKeyguardRootView() {

@@ -2448,7 +2448,7 @@
     <string name="right_icon">Right icon</string>
 
     <!-- Label for area where tiles can be dragged out of [CHAR LIMIT=60] -->
-    <string name="drag_to_add_tiles">Hold and drag to add tiles</string>
+    <string name="drag_to_add_tiles">Press on tiles to add or remove</string>
 
     <!-- Label for header of customize QS [CHAR LIMIT=60] -->
     <string name="drag_to_rearrange_tiles">Hold and drag to rearrange tiles</string>
@@ -3356,7 +3356,7 @@
     <string name="mobile_data_poor_connection">Poor connection</string>
     <!-- Provider Model:
      Summary indicating that a SIM has no mobile data connection [CHAR LIMIT=50] -->
-    <string name="mobile_data_off_summary">Mobile data won\u0027t auto\u2011connect</string>
+    <string name="mobile_data_off_summary">Disconnected</string>
     <!-- Provider Model:
      Summary indicating that a active SIM and no network available [CHAR LIMIT=50] -->
     <string name="mobile_data_no_connection">No connection</string>

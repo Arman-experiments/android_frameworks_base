@@ -17,11 +17,9 @@
 package com.android.server.am;
 
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
-import com.android.internal.util.PastyUtils;
-import com.android.internal.util.PastyUtils.UploadResultCallback;
 
-import android.content.ClipboardManager;
 import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.res.Resources;
 import android.os.Build;
@@ -37,6 +35,9 @@ import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.android.internal.util.PastyUtils;
+import com.android.internal.util.PastyUtils.UploadResultCallback;
 
 final class AppErrorDialog extends BaseErrorDialog implements View.OnClickListener {
 

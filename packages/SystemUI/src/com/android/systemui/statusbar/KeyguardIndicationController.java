@@ -1133,16 +1133,19 @@ public class KeyguardIndicationController {
 
             if (!TextUtils.isEmpty(mBiometricMessage)) {
                 newIndication = mBiometricMessage; // note: doesn't show mBiometricMessageFollowUp
+                setWakelock = true;
             } else if (!TextUtils.isEmpty(mTransientIndication)) {
                 newIndication = mTransientIndication;
                 setWakelock = true;
             } else if (!mBatteryPresent) {
                 // If there is no battery detected, hide the indication area and bail
                 mIndicationArea.setVisibility(GONE);
+                setWakelock = false;
                 return;
             } else if (!TextUtils.isEmpty(mAlignmentIndication)) {
                 useMisalignmentColor = true;
                 newIndication = mAlignmentIndication;
+                setWakelock = false;
             } else if (mBatteryLevel == -1) {
                 // If the battery level is not initialized, hide the indication area
                 mIndicationArea.setVisibility(GONE);
@@ -1153,6 +1156,7 @@ public class KeyguardIndicationController {
             } else {
                 newIndication = NumberFormat.getPercentInstance()
                         .format(mBatteryLevel / 100f);
+                setWakelock = false;
             }
 
             if (!TextUtils.equals(mTopIndicationView.getText(), newIndication)) {
@@ -1262,49 +1266,43 @@ public class KeyguardIndicationController {
                     : R.string.keyguard_plugged_in;
         }
 
-        boolean nowBarEnabled = Settings.System.getIntForUser(mContext.getContentResolver(),
-            "keyguard_now_bar_enabled", 0, UserHandle.USER_CURRENT) == 1;
-
         String batteryInfo = "";
-        boolean showBatteryInfo = Settings.System.getIntForUser(mContext.getContentResolver(),
+        boolean showbatteryInfo = Settings.System.getIntForUser(mContext.getContentResolver(),
             Settings.System.LOCKSCREEN_BATTERY_INFO, 1, UserHandle.USER_CURRENT) == 1;
-        if (showBatteryInfo) {
-            if (mCurrentDivider != 0 && mChargingCurrent >= mCurrentDivider * 1000) {
-                float chargingCurrentInAmps = (float) (mChargingCurrent / (mCurrentDivider * 1000));
-                batteryInfo = String.format("%.1fA", chargingCurrentInAmps);
-            } else if (mCurrentDivider != 0 && mChargingCurrent > 0) {
-                float chargingCurrentInMilliamps = (float) (mChargingCurrent / mCurrentDivider);
-                batteryInfo = String.format("%.0f mA", chargingCurrentInMilliamps);
+         if (showbatteryInfo) {
+            if (mChargingCurrent >= mCurrentDivider * 1000) {
+                batteryInfo = String.format("%.1f" , (mChargingCurrent / mCurrentDivider / 1000)) + "A";
+            } else if (mChargingCurrent > 0) {
+                batteryInfo = String.format("%.0f" , (mChargingCurrent / mCurrentDivider)) + "mA";
             }
-            if (mCurrentDivider != 0 && mChargingWattage > 0) {
-                float chargingWattageInWatts = (float) (mChargingWattage / (mCurrentDivider * 1000));
-                batteryInfo += " · " + String.format("%.1fW", chargingWattageInWatts);
+            if (mChargingWattage > 0) {
+                batteryInfo = (batteryInfo == "" ? "" : batteryInfo + " · ") +
+                        String.format("%.1f" , (mChargingWattage / mCurrentDivider / 1000)) + "W";
             }
             if (mChargingVoltage > 0) {
-                float chargingVoltageInVolts = (float) (mChargingVoltage / 1000000);
-                batteryInfo += " · " + String.format("%.1fV", chargingVoltageInVolts);
+                batteryInfo = (batteryInfo == "" ? "" : batteryInfo + " · ") +
+                        String.format("%.1f", (mChargingVoltage / 1000 / 1000)) + "V";
             }
             if (mTemperature > 0) {
-                float temperatureInCelsius = (float) (mTemperature / 10);
-                batteryInfo += " · " + String.format("%.1f°C", temperatureInCelsius);
+                batteryInfo = (batteryInfo == "" ? "" : batteryInfo + " · ") +
+                        String.format("%.1f", (mTemperature / 10)) + "°C";
+            }
+            if (batteryInfo != "") {
+                batteryInfo = "\n" + batteryInfo;
             }
         }
 
         String percentage = NumberFormat.getPercentInstance().format(mBatteryLevel / 100f);
-        String chargingText;
         if (hasChargingTime) {
             String chargingTimeFormatted = Formatter.formatShortElapsedTimeRoundingUpToMinutes(
-                mContext, mChargingTimeRemaining);
-            chargingText = mContext.getResources().getString(chargingId, chargingTimeFormatted, percentage);
+                    mContext, mChargingTimeRemaining);
+            String chargingText = mContext.getResources().getString(chargingId, chargingTimeFormatted,
+                    percentage);
+            return chargingText + batteryInfo;
         } else {
-            chargingText =  mContext.getResources().getString(chargingId, percentage);
+            String chargingText =  mContext.getResources().getString(chargingId, percentage);
+            return chargingText + batteryInfo;
         }
-
-        if (nowBarEnabled) {
-            return percentage;
-        }
-
-        return batteryInfo.isEmpty() ? chargingText : chargingText + "\n" + batteryInfo;
     }
 
     public void setStatusBarKeyguardViewManager(
@@ -1453,7 +1451,7 @@ public class KeyguardIndicationController {
             mBatteryLevel = status.level;
             mBatteryPresent = status.present;
             mTemperature = status.temperature;
-            mBatteryDefender = isBatteryDefender(status) && mBatteryLevel >= 80;
+            mBatteryDefender = isBatteryDefender(status);
             // when the battery is overheated, device doesn't charge so only guard on pluggedIn:
             mEnableBatteryDefender = mBatteryDefender && status.isPluggedIn();
             mIncompatibleCharger = status.incompatibleCharger.orElse(false);
@@ -1860,10 +1858,6 @@ public class KeyguardIndicationController {
                 return;
             }
             mDozing = dozing;
-
-            Intent intent = new Intent("org.rising.server.action.AOD_STATE_CHANGED");
-            intent.putExtra("is_doze", mDozing);
-            mContext.sendBroadcast(intent);
 
             if (mDozing) {
                 hideBiometricMessage();

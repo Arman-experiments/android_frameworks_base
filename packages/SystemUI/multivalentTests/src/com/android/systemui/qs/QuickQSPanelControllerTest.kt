@@ -61,10 +61,10 @@ class QuickQSPanelControllerTest : SysuiTestCase() {
     @Mock private lateinit var qsLogger: QSLogger
     @Mock private lateinit var tile: QSTile
     @Mock private lateinit var tileLayout: TileLayout
+    @Mock private lateinit var quickQsBrightnessController: QuickQSBrightnessController
     @Captor private lateinit var captor: ArgumentCaptor<QSPanel.OnConfigurationChangedListener>
     @Mock private lateinit var longPressEffectProvider: Provider<QSLongPressEffect>
     @Mock private lateinit var mediaCarouselInteractor: MediaCarouselInteractor
-    @Mock private lateinit var quickQsBrightnessController: QuickQSBrightnessController
 
     private val usingMediaPlayer: Boolean
         get() = false

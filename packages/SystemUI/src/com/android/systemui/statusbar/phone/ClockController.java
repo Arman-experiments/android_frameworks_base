@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018-2023 The LineageOS Project
+ * Copyright (C) 2018 The LineageOS Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ package com.android.systemui.statusbar.phone;
 
 import android.content.Context;
 import android.os.UserHandle;
+import android.provider.Settings;
+import android.util.Log;
 import android.view.View;
 
 import com.android.systemui.Dependency;
@@ -25,14 +27,12 @@ import com.android.systemui.res.R;
 import com.android.systemui.statusbar.policy.Clock;
 import com.android.systemui.tuner.TunerService;
 
-import lineageos.providers.LineageSettings;
-
 public class ClockController implements TunerService.Tunable {
 
     private static final String TAG = "ClockController";
 
     private static final String STATUS_BAR_CLOCK =
-            "lineagesystem:" + LineageSettings.System.STATUS_BAR_CLOCK;
+            "system:" + Settings.System.STATUS_BAR_CLOCK;
 
     private static final int CLOCK_POSITION_RIGHT = 0;
     private static final int CLOCK_POSITION_CENTER = 1;
@@ -41,8 +41,6 @@ public class ClockController implements TunerService.Tunable {
 
     private Context mContext;
     private Clock mActiveClock, mCenterClock, mLeftClock, mRightClock;
-    
-    private final TunerService mTunerService;
 
     private int mClockPosition = CLOCK_POSITION_LEFT;
 
@@ -53,15 +51,11 @@ public class ClockController implements TunerService.Tunable {
         mLeftClock = statusBar.findViewById(R.id.clock);
         mRightClock = statusBar.findViewById(R.id.clock_right);
 
-        mClockPosition = LineageSettings.System.getIntForUser(mContext.getContentResolver(),
+        mClockPosition = Settings.System.getIntForUser(mContext.getContentResolver(),
                     STATUS_BAR_CLOCK, CLOCK_POSITION_LEFT, UserHandle.USER_CURRENT);
-        mContext.getMainExecutor().execute(() -> {
-            updateActiveClock();
-        });
-        
-        mTunerService = Dependency.get(TunerService.class);
+        updateActiveClock();
 
-        mTunerService.addTunable(this,
+        Dependency.get(TunerService.class).addTunable(this,
                 STATUS_BAR_CLOCK);
     }
 
@@ -104,22 +98,15 @@ public class ClockController implements TunerService.Tunable {
         switch (key) {
             case STATUS_BAR_CLOCK:
                 mClockPosition = TunerService.parseInteger(newValue, CLOCK_POSITION_LEFT);
-                mContext.getMainExecutor().execute(() -> {
-                    updateActiveClock();
-                });
+                updateActiveClock();
                 break;
             default:
                 break;
         }
     }
     
-    public void removeTunable() {
-        mTunerService.removeTunable(this);
-    }
-
     public void onDensityOrFontScaleChanged() {
-        if (mActiveClock != null) {
-            mActiveClock.onDensityOrFontScaleChanged();
-        }
+        updateActiveClock();
+        mActiveClock.onDensityOrFontScaleChanged();
     }
 }

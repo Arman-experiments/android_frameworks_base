@@ -16,7 +16,9 @@
 
 package com.android.settingslib.widget;
 
+import android.animation.ValueAnimator;
 import android.content.Context;
+import android.content.res.Resources;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.TextUtils;
@@ -24,7 +26,6 @@ import android.text.method.LinkMovementMethod;
 import android.text.style.AbsoluteSizeSpan;
 import android.util.AttributeSet;
 import android.view.View;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -42,9 +43,10 @@ import java.util.regex.Pattern;
  *
  * <p>This preference shows number in usage summary with enlarged font size.
  */
-public class UsageProgressBarPreference extends Preference implements GroupSectionDividerMixin {
+public class UsageProgressBarPreference extends StorageUsageProgressBarPreference implements GroupSectionDividerMixin {
 
     private final Pattern mNumberPattern = Pattern.compile("[\\d]*[\\٫.,]?[\\d]+");
+    private static final int ANIM_DURATION = 1200;
 
     private CharSequence mUsageSummary;
     private CharSequence mTotalSummary;
@@ -56,27 +58,12 @@ public class UsageProgressBarPreference extends Preference implements GroupSecti
     /**
      * Perform inflation from XML and apply a class-specific base style.
      *
-     * @param context The {@link Context} this is associated with, through which it can access the
-     *     current theme, resources, {@link SharedPreferences}, etc.
-     * @param attrs The attributes of the XML tag that is inflating the preference
-     * @param defStyle An attribute in the current theme that contains a reference to a style
-     *     resource that supplies default values for the view. Can be 0 to not look for defaults.
-     */
-    public UsageProgressBarPreference(Context context, AttributeSet attrs, int defStyle) {
-        super(context, attrs, defStyle);
-        setLayoutResource(R.layout.preference_usage_progress_bar);
-    }
-
-    /**
-     * Perform inflation from XML and apply a class-specific base style.
-     *
-     * @param context The {@link Context} this is associated with, through which it can access the
-     *     current theme, resources, {@link SharedPreferences}, etc.
-     * @param attrs The attributes of the XML tag that is inflating the preference
+     * @param context The {@link Context} this is associated with, through which it can
+     *                access the current theme, resources, {@link SharedPreferences}, etc.
+     * @param attrs   The attributes of the XML tag that is inflating the preference
      */
     public UsageProgressBarPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
-        setLayoutResource(R.layout.preference_usage_progress_bar);
     }
 
     /**
@@ -85,7 +72,7 @@ public class UsageProgressBarPreference extends Preference implements GroupSecti
      * @param context The Context this is associated with.
      */
     public UsageProgressBarPreference(Context context) {
-        this(context, null);
+        super(context);
     }
 
     /** Set usage summary, number in the summary will show with enlarged font size. */
@@ -166,20 +153,24 @@ public class UsageProgressBarPreference extends Preference implements GroupSecti
     @Override
     public void onBindViewHolder(PreferenceViewHolder holder) {
         super.onBindViewHolder(holder);
+        final Context context = getContext();
 
         holder.setDividerAllowedAbove(false);
         holder.setDividerAllowedBelow(false);
 
         final TextView usageSummary = (TextView) holder.findViewById(R.id.usage_summary);
-        usageSummary.setText(enlargeFontOfNumber(mUsageSummary));
+        if (usageSummary != null && mUsageSummary != null) {
+            usageSummary.setText(mUsageSummary);
+        }
 
         final TextView totalSummary = (TextView) holder.findViewById(R.id.total_summary);
-        if (mTotalSummary != null) {
+        if (totalSummary != null && mTotalSummary != null) {
             totalSummary.setText(mTotalSummary);
         }
 
         final TextView bottomSummary = (TextView) holder.findViewById(R.id.bottom_summary);
-        if (TextUtils.isEmpty(mBottomSummary)) {
+        if (bottomSummary != null) {
+            if (TextUtils.isEmpty(mBottomSummary)) {
             bottomSummary.setVisibility(View.GONE);
         } else {
             bottomSummary.setVisibility(View.VISIBLE);
@@ -188,24 +179,31 @@ public class UsageProgressBarPreference extends Preference implements GroupSecti
             if (!TextUtils.isEmpty(mBottomSummaryContentDescription)) {
                 bottomSummary.setContentDescription(mBottomSummaryContentDescription);
             }
+          }
         }
 
         final ProgressBar progressBar = (ProgressBar) holder.findViewById(android.R.id.progress);
-        if (mPercent < 0) {
-            progressBar.setIndeterminate(true);
-        } else {
+        final ValueAnimator animator = ValueAnimator.ofInt(0, mPercent);
+        if (mPercent > 0) {
             progressBar.setIndeterminate(false);
-            progressBar.setProgress(mPercent);
+            // Animate our new progress layout
+            animator.setDuration(ANIM_DURATION);
+            animator.addUpdateListener(animation -> {
+                int animProgress = (Integer) animation.getAnimatedValue();
+                progressBar.setProgress(animProgress);
+            });
+            animator.start();
         }
 
-        final FrameLayout customLayout = (FrameLayout) holder.findViewById(R.id.custom_content);
-        if (mCustomImageView == null) {
-            customLayout.removeAllViews();
-            customLayout.setVisibility(View.GONE);
-        } else {
-            customLayout.removeAllViews();
-            customLayout.addView(mCustomImageView);
-            customLayout.setVisibility(View.VISIBLE);
+        if (mPercent >= 51) {
+            progressBar.setProgressTintList(context.getColorStateList(R.color.battery_high));
+            progressBar.setProgressBackgroundTintList(context.getColorStateList(R.color.battery_high));
+        } else if (mPercent >= 20) {
+            progressBar.setProgressTintList(context.getColorStateList(R.color.battery_medium));
+            progressBar.setProgressBackgroundTintList(context.getColorStateList(R.color.battery_medium));
+        } else if (mPercent <= 19) {
+            progressBar.setProgressTintList(context.getColorStateList(R.color.battery_low));
+            progressBar.setProgressBackgroundTintList(context.getColorStateList(R.color.battery_low));
         }
     }
 
@@ -225,5 +223,18 @@ public class UsageProgressBarPreference extends Preference implements GroupSecti
             return spannableSummary;
         }
         return summary;
+    }
+    
+    private void animateBatteryLevel(final ProgressBar progressbar, final int startValue, final int endValue) {
+        final ValueAnimator animator = ValueAnimator.ofInt(startValue, endValue);
+        animator.setDuration(1000);
+        animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                int animatedValue = (int) animation.getAnimatedValue();
+                progressbar.setProgress(animatedValue);
+            }
+        });
+        animator.start();
     }
 }

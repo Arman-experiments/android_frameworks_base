@@ -7807,11 +7807,6 @@ public final class ViewRootImpl implements ViewParent,
         private int processPointerEvent(QueuedInputEvent q) {
             final MotionEvent event = (MotionEvent)q.mEvent;
 
-            if (event.getPointerCount() == 3 && isThreeFingersSwipeActive()) {
-                event.setAction(MotionEvent.ACTION_CANCEL);
-                Log.d(mTag, "canceling motionEvent because of threeGesture detecting");
-            }
-
             // Translate the pointer event for compatibility, if needed.
             if (mTranslator != null) {
                 mTranslator.translateEventInScreenToAppWindow(event);
@@ -8140,6 +8135,7 @@ public final class ViewRootImpl implements ViewParent,
 
             if (event.getPointerCount() == 3 && isSwipeToScreenshotGestureActive()) {
                 event.setAction(MotionEvent.ACTION_CANCEL);
+                Log.d("SwipeToScreenShot", "canceling motionEvent because of threeGesture detecting");
             }
 
             mAttachInfo.mUnbufferedDispatchRequested = false;
@@ -13431,6 +13427,15 @@ public final class ViewRootImpl implements ViewParent,
     void setBackKeyCallbackForWindowlessWindow(@NonNull Predicate<KeyEvent> callback) {
         mWindowlessBackKeyCallback = callback;
     }
+    
+    private boolean isSwipeToScreenshotGestureActive() {
+        try {
+            return ActivityManager.getService().isSwipeToScreenshotGestureActive();
+        } catch (RemoteException e) {
+            Log.e("SwipeToScreenshot", "isSwipeToScreenshotGestureActive exception", e);
+            return false;
+        }
+    }
 
     void recordViewPercentage(float percentage) {
         if (!Trace.isEnabled()) return;
@@ -13532,23 +13537,6 @@ public final class ViewRootImpl implements ViewParent,
         if (!sProtoLogInitialized) {
             ProtoLog.init(ViewProtoLogGroups.ALL_GROUPS);
             sProtoLogInitialized = true;
-        }
-    }
-
-    private boolean isSwipeToScreenshotGestureActive() {
-        try {
-            return ActivityManager.getService().isSwipeToScreenshotGestureActive();
-        } catch (RemoteException e) {
-            return false;
-        }
-    }
-
-    private boolean isThreeFingersSwipeActive() {
-        try {
-            return ActivityManager.getService().isThreeFingersSwipeActive();
-        } catch (RemoteException e) {
-            Log.e(mTag, "isThreeFingersSwipeActive exception", e);
-            return false;
         }
     }
 }

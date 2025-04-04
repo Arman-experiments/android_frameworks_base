@@ -53,7 +53,7 @@ public class TileUtils {
         } else {
             value = Settings.System.getIntForUser(
                     context.getContentResolver(), Settings.System.QS_LAYOUT_COLUMNS_LANDSCAPE,
-                    resourceCount, UserHandle.USER_CURRENT);
+                    2, UserHandle.USER_CURRENT);
         }
         return Math.max(QS_COLUMNS_MIN, value);
     }
@@ -105,8 +105,16 @@ public class TileUtils {
         int labelSize = Settings.System.getIntForUser(context.getContentResolver(),
                 Settings.System.QS_TILE_LABEL_SIZE,
                 14, UserHandle.USER_CURRENT);
-        if (getQsUiStyle(context) != 0) labelSize = labelSize - 2;
+        if (getQsUiStyle(context) != 0) labelSize = labelSize;
         return (float) labelSize;
+    }
+    
+    public static float getQSTileSecLabelSize(Context context) {
+        int seclabelSize = Settings.System.getIntForUser(context.getContentResolver(),
+                Settings.System.QS_TILE_SEC_LABEL_SIZE,
+                12, UserHandle.USER_CURRENT);
+        if (getQsUiStyle(context) != 0) seclabelSize = seclabelSize;
+        return (float) seclabelSize;        
     }
 
     public static boolean getQSTileVerticalLayout(Context context) {
@@ -119,28 +127,5 @@ public class TileUtils {
        return Settings.System.getIntForUser(context.getContentResolver(),
                 Settings.System.QS_TILE_UI_STYLE,
                 0, UserHandle.USER_CURRENT);
-   }
-
-   public static boolean isCompactQSMediaPlayerEnforced(Context context) {
-        return Settings.System.getIntForUser(context.getContentResolver(),
-            "qs_compact_media_player_mode",0, UserHandle.USER_CURRENT) != 0;
-   }
-
-   public static boolean canShowSplitShade(Context context) {
-        return Settings.System.getIntForUser(context.getContentResolver(),
-            "qs_split_shade_enabled",0, UserHandle.USER_CURRENT) != 0
-            && context.getResources().getConfiguration().orientation
-            == Configuration.ORIENTATION_LANDSCAPE;
-   }
-
-   public static boolean isQsWidgetsEnabled(Context context) {
-        return Settings.System.getIntForUser(context.getContentResolver(), 
-            "qs_widgets_enabled",0, UserHandle.USER_CURRENT) != 0;
-   }
-
-   public static boolean canShowQsWidgets(Context context) {
-        return isQsWidgetsEnabled(context)
-            && context.getResources().getConfiguration().orientation 
-            != Configuration.ORIENTATION_LANDSCAPE;
    }
 }

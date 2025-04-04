@@ -750,7 +750,7 @@ class AppErrors {
 
         return mService.mAtmInternal.handleAppCrashInActivityController(
                 name, pid, shortMsg, longMsg, timeMillis, crashInfo.stackTrace, () -> {
-                if (Build.IS_DEBUGGABLE
+                if (Build.IS_ENG
                         && "Native crash".equals(crashInfo.exceptionClassName)) {
                     Slog.w(TAG, "Skip killing native crashed app " + name
                             + "(" + pid + ") during testing");
@@ -1118,10 +1118,7 @@ class AppErrors {
             int visibleUserId = getVisibleUserId(proc.userId);
             boolean showBackground = Settings.Secure.getIntForUser(mContext.getContentResolver(),
                     Settings.Secure.ANR_SHOW_BACKGROUND, 0, visibleUserId) != 0;
-            final boolean anrSilenced = mAppsNotReportingCrashes != null
-                    && mAppsNotReportingCrashes.contains(proc.info.packageName);
-            if (!anrSilenced &&
-                    (mService.mAtmInternal.canShowErrorDialogs(visibleUserId) || showBackground)) {
+            if (mService.mAtmInternal.canShowErrorDialogs(visibleUserId) || showBackground) {
                 AnrController anrController = errState.getDialogController().getAnrController();
                 if (anrController == null) {
                     errState.getDialogController().showAnrDialogs(data);
@@ -1146,7 +1143,7 @@ class AppErrors {
                 MetricsLogger.action(mContext, MetricsProto.MetricsEvent.ACTION_APP_ANR,
                         AppNotRespondingDialog.CANT_SHOW);
                 // Just kill the app if there is no dialog to be shown.
-                doKill = !anrSilenced;
+                doKill = true;
             }
         }
         if (doKill) {

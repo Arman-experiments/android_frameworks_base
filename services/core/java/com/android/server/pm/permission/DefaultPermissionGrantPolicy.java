@@ -251,11 +251,6 @@ final class DefaultPermissionGrantPolicy {
         NOTIFICATION_PERMISSIONS.add(Manifest.permission.POST_NOTIFICATIONS);
     }
 
-    private static final Set<String> SUSPEND_APP_PERMISSIONS = new ArraySet<>();
-    static {
-        SUSPEND_APP_PERMISSIONS.add(Manifest.permission.SUSPEND_APPS);
-    }
-
     private static final int MSG_READ_DEFAULT_PERMISSION_EXCEPTIONS = 1;
 
     private static final String ACTION_TRACK = "com.android.fitness.TRACK";
@@ -502,40 +497,6 @@ final class DefaultPermissionGrantPolicy {
 
             grantRuntimePermissions(pm, pkg,
                     Collections.singleton(Manifest.permission.READ_PHONE_STATE),
-                    true, // systemFixed
-                    userId);
-        }
-        
-        // Grant ACCESS_COARSE_LOCATION to all system apps that have ACCESS_FINE_LOCATION
-        for (PackageInfo locPkg : packages) {
-            if (locPkg == null
-                    || !doesPackageSupportRuntimePermissions(locPkg)
-                    || ArrayUtils.isEmpty(locPkg.requestedPermissions)
-                    || !pm.isGranted(Manifest.permission.ACCESS_FINE_LOCATION,
-                            locPkg, UserHandle.of(userId))
-                    || pm.isSysComponentOrPersistentPlatformSignedPrivApp(locPkg)) {
-                continue;
-            }
-                    
-            grantRuntimePermissions(pm, locPkg,
-                    Collections.singleton(Manifest.permission.ACCESS_COARSE_LOCATION),
-                    true, // systemFixed
-                    userId);
-        }
-        
-        // Grant ACCESS_COARSE_LOCATION to all system apps that have ACCESS_FINE_LOCATION
-        for (PackageInfo locPkg : packages) {
-            if (locPkg == null
-                    || !doesPackageSupportRuntimePermissions(locPkg)
-                    || ArrayUtils.isEmpty(locPkg.requestedPermissions)
-                    || !pm.isGranted(Manifest.permission.ACCESS_FINE_LOCATION,
-                            locPkg, UserHandle.of(userId))
-                    || pm.isSysComponentOrPersistentPlatformSignedPrivApp(locPkg)) {
-                continue;
-            }
-                    
-            grantRuntimePermissions(pm, locPkg,
-                    Collections.singleton(Manifest.permission.ACCESS_COARSE_LOCATION),
                     true, // systemFixed
                     userId);
         }
@@ -826,19 +787,6 @@ final class DefaultPermissionGrantPolicy {
                         Intent.CATEGORY_APP_EMAIL, userId),
                 userId, CONTACTS_PERMISSIONS, CALENDAR_PERMISSIONS);
 
-        // Browser
-        String browserPackage = ArrayUtils.firstOrNull(getKnownPackages(
-                KnownPackages.PACKAGE_BROWSER, userId));
-        if (browserPackage == null) {
-            browserPackage = getDefaultSystemHandlerActivityPackageForCategory(pm,
-                    Intent.CATEGORY_APP_BROWSER, userId);
-            if (!pm.isSystemPackage(browserPackage)) {
-                browserPackage = null;
-            }
-        }
-        grantPermissionsToPackage(pm, browserPackage, userId, false /* ignoreSystemPackage */,
-                true /*whitelistRestrictedPermissions*/, FOREGROUND_LOCATION_PERMISSIONS);
-
         // Voice interaction
         if (voiceInteractPackageNames != null) {
             for (String voiceInteractPackageName : voiceInteractPackageNames) {
@@ -991,21 +939,6 @@ final class DefaultPermissionGrantPolicy {
         String commonServiceAction = "android.adservices.AD_SERVICES_COMMON_SERVICE";
         grantPermissionsToSystemPackage(pm, getDefaultSystemHandlerServicePackage(pm,
                         commonServiceAction, userId), userId, NOTIFICATION_PERMISSIONS);
-
-        // Flipendo
-        grantSystemFixedPermissionsToSystemPackage(pm,
-                getDefaultProviderAuthorityPackage("com.google.android.flipendo", userId),
-                userId, SUSPEND_APP_PERMISSIONS);
-
-        // Mediascanner
-        grantSystemFixedPermissionsToSystemPackage(pm,
-                getDefaultProviderAuthorityPackage("com.android.providers.media.MediaProvider", userId), userId,
-                STORAGE_PERMISSIONS);
-
-        // Google App
-        grantPermissionsToPackage(pm, "com.google.android.googlequicksearchbox", userId,
-                false /* ignoreSystemPackage */, true /*whitelistRestrictedPermissions*/,
-                PHONE_PERMISSIONS);
     }
 
     private String getDefaultSystemHandlerActivityPackageForCategory(PackageManagerWrapper pm,

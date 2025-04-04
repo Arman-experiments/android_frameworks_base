@@ -273,7 +273,7 @@ public class Cat extends Drawable {
                 .setCategory(Notification.CATEGORY_STATUS)
                 .setContentText(getName())
                 .setContentIntent(
-                        PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_MUTABLE))
+                        PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_IMMUTABLE))
                 .setAutoCancel(true)
                 .setStyle(new Notification.MessagingStyle(createPerson())
                         .addMessage(mFirstMessage, System.currentTimeMillis(), createPerson())

@@ -1772,13 +1772,11 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
     }
 
     void getStageBounds(Rect outTopOrLeftBounds, Rect outBottomOrRightBounds) {
-        if (mSplitLayout == null) return;
         outTopOrLeftBounds.set(mSplitLayout.getTopLeftBounds());
         outBottomOrRightBounds.set(mSplitLayout.getBottomRightBounds());
     }
 
     void getRefStageBounds(Rect outTopOrLeftBounds, Rect outBottomOrRightBounds) {
-        if (mSplitLayout == null) return;
         outTopOrLeftBounds.set(mSplitLayout.getTopLeftRefBounds());
         outBottomOrRightBounds.set(mSplitLayout.getBottomRightRefBounds());
     }
@@ -2966,8 +2964,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     mSplitLayout.update(startTransaction, false /* resetImePosition */);
                 }
 
-                if (mMixedHandler.isEnteringPip(change, transitType)
-                        && getSplitItemStage(change.getLastParent()) != STAGE_TYPE_UNDEFINED) {
+                if (mMixedHandler.isEnteringPip(change, transitType)) {
                     pipChange = change;
                 }
 

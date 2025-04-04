@@ -114,7 +114,8 @@ public class QSCustomizerController extends ViewController<QSCustomizer>
             QSHost qsHost, TileAdapter tileAdapter, ScreenLifecycle screenLifecycle,
             KeyguardStateController keyguardStateController, LightBarController lightBarController,
             @ShadeDisplayAware ConfigurationController configurationController,
-            UiEventLogger uiEventLogger, TunerService tunerService) {
+            UiEventLogger uiEventLogger,
+            TunerService tunerService) {
         super(view);
         mTileQueryHelper = tileQueryHelper;
         mQsHost = qsHost;

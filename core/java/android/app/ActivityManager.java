@@ -193,7 +193,7 @@ public class ActivityManager {
     public static final int INSTR_FLAG_NO_RESTART = 1 << 3;
     /**
      * Force the check that instrumentation and the target package are signed with the same
-     * certificate even if {@link Build#IS_DEBUGGABLE} is {@code true}.
+     * certificate even if {@link Build.IS_ENG} is {@code true}.
      * @hide
      */
     public static final int INSTR_FLAG_ALWAYS_CHECK_SIGNATURE = 1 << 4;
@@ -1762,7 +1762,7 @@ public class ActivityManager {
     @UnsupportedAppUsage
     public static boolean isLowRamDeviceStatic() {
         return RoSystemProperties.CONFIG_LOW_RAM ||
-                (Build.IS_DEBUGGABLE && DEVELOPMENT_FORCE_LOW_RAM);
+                (Build.IS_ENG && DEVELOPMENT_FORCE_LOW_RAM);
     }
 
     /**
@@ -1785,11 +1785,8 @@ public class ActivityManager {
      */
     @TestApi
     static public boolean isHighEndGfx() {
-        return !isLowRamDeviceStatic()
-                && !RoSystemProperties.CONFIG_AVOID_GFX_ACCEL
-                && !Resources.getSystem()
-                        .getBoolean(com.android.internal.R.bool.config_avoidGfxAccel);
-    }
+    return true;
+   }
 
     /**
      * Return the total number of bytes of RAM this device has.
@@ -3102,8 +3099,7 @@ public class ActivityManager {
     /**
      * Flag for {@link #moveTaskToFront(int, int)}: also move the "home"
      * activity along with the task, so it is positioned immediately behind
-     * the task. This flag is ignored if the task's windowing mode is
-     * {@link WindowConfiguration#WINDOWING_MODE_MULTI_WINDOW}.
+     * the task.
      */
     public static final int MOVE_TASK_WITH_HOME = 0x00000001;
 

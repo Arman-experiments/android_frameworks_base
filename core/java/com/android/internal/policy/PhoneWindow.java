@@ -142,8 +142,6 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.android.internal.util.android.cutout.CutoutUtils;
-
 /**
  * Android-specific Window.
  * <p>
@@ -949,7 +947,6 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
 
             // This will populate st.shownPanelView
             if (!initializePanelContent(st) || !st.hasPanelItems()) {
-                closePanel(st, true);
                 return;
             }
 
@@ -998,7 +995,6 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
         if (!st.hasPanelItems()) {
             // Ensure that |st.decorView| has its actual content. Otherwise, an empty window can be
             // created and cause ANR.
-            closePanel(st, true);
             return;
         }
 
@@ -2701,7 +2697,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             params.layoutInDisplayCutoutMode = mode;
         }
 
-        if (CutoutUtils.hasCutout(context) && ActivityManager.isSystemReady()) {
+        if (ActivityManager.isSystemReady()) {
             try {
                 String packageName = context.getBasePackageName();
                 if (ActivityManager.getService().shouldForceCutoutFullscreen(packageName)){

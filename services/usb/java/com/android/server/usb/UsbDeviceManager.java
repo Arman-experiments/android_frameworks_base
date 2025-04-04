@@ -33,6 +33,7 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.ContentResolver;
@@ -102,8 +103,6 @@ import com.android.server.usb.hal.gadget.UsbGadgetHal;
 import com.android.server.usb.hal.gadget.UsbGadgetHalInstance;
 import com.android.server.utils.EventLogger;
 import com.android.server.wm.ActivityTaskManagerInternal;
-
-import lineageos.providers.LineageSettings;
 
 import java.io.File;
 import java.io.FileDescriptor;
@@ -472,7 +471,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         sEventLogger = new EventLogger(DUMPSYS_LOG_BUFFER, "UsbDeviceManager activity");
 
         mContentResolver.registerContentObserver(
-                LineageSettings.Global.getUriFor(LineageSettings.Global.TRUST_RESTRICT_USB),
+                Settings.Global.getUriFor(Settings.Global.TRUST_RESTRICT_USB),
                 false,
                 new ContentObserver(null) {
                     @Override
@@ -664,6 +663,8 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         protected int mCurrentGadgetHalVersion;
         protected boolean mPendingBootAccessoryHandshakeBroadcast;
         protected boolean mUserUnlockedAfterBoot;
+        protected boolean mShowedFunctionDialog;
+        protected boolean mIsFirstUnlock = true;
         /**
          * The persistent property which stores whether adb is enabled or not.
          * May also contain vendor-specific default functions for testing purposes.
@@ -1245,6 +1246,12 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                             }
                         }
                         updateUsbFunctions();
+                        if (mConnected && !mScreenLocked) {
+                            showFunctionDialog();
+                        } else if (!mConnected) {
+                            // reset for the next usb connection
+                            mShowedFunctionDialog = false;
+                        }
                     } else {
                         mPendingBootBroadcast = true;
                     }
@@ -1408,6 +1415,15 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                             // Set the screen unlocked functions if current function is charging.
                             setScreenUnlockedFunctions(operationId);
                         }
+                        if (mIsFirstUnlock) {
+                            // skip showing function dialog at the first unlock
+                            if (mConnected) {
+                                mShowedFunctionDialog = true;
+                            }
+                            mIsFirstUnlock = false;
+                        } else if (mConnected) {
+                            showFunctionDialog();
+                        }
                     }
                     break;
                 case MSG_UPDATE_USER_RESTRICTIONS:
@@ -1524,9 +1540,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         protected void finishBoot(int operationId) {
             if (mBootCompleted && mCurrentUsbFunctionsReceived && mSystemReady) {
                 if (DEBUG) Slog.d(TAG, "finishBoot all flags true");
-
                 setTrustRestrictUsb();
-
                 if (mPendingBootBroadcast) {
                     updateUsbStateBroadcastIfNeeded(getAppliedFunctions(mCurrentFunctions));
                     mPendingBootBroadcast = false;
@@ -1645,8 +1659,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                 titleRes = com.android.internal.R.string.usb_charging_notification_title;
                 id = SystemMessage.NOTE_USB_CHARGING;
             } else if (mSinkPower && mConnectedToDataDisabledPort
-                    && mPowerBrickConnectionStatus ==
-                            UsbPortStatus.POWER_BRICK_STATUS_DISCONNECTED) {
+                    && mPowerBrickConnectionStatus == UsbPortStatus.POWER_BRICK_STATUS_DISCONNECTED) {
                 // Show charging notification when USB Data is disabled on the port, and not
                 // connected to a wall charger.
                 titleRes = com.android.internal.R.string.usb_charging_notification_title;
@@ -1735,6 +1748,23 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                     mUsbNotificationId = id;
                 }
             }
+        }
+
+        private void showFunctionDialog() {
+            if (mShowedFunctionDialog) return;
+
+            Intent intent = new Intent();
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            intent.setComponent(ComponentName.unflattenFromString(mContext.getString(
+                    com.android.internal.R.string.config_usbFunctionActivity)));
+
+            try {
+                mContext.startActivityAsUser(intent, UserHandle.CURRENT);
+            } catch (ActivityNotFoundException e) {
+                Slog.e(TAG, "unable to start activity " + intent, e);
+            }
+
+            mShowedFunctionDialog = true;
         }
 
         protected boolean isAdbEnabled() {
@@ -1903,8 +1933,8 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         public abstract void resetCb(int status);
 
         public void setTrustRestrictUsb() {
-            final int restrictUsb = LineageSettings.Global.getInt(mContentResolver,
-                    LineageSettings.Global.TRUST_RESTRICT_USB, 0);
+            final int restrictUsb = Settings.Global.getInt(mContentResolver,
+                    Settings.Global.TRUST_RESTRICT_USB, 0);
             // Effective immediately, ejects any connected USB devices.
             // If the restriction is set to "only when locked", only execute once USB is
             // disconnected and keyguard is showing, to avoid ejecting connected devices

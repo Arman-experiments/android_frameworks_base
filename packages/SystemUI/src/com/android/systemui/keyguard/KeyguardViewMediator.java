@@ -79,7 +79,6 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.PowerManager;
 import android.os.RemoteException;
-import android.os.StrictMode;
 import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
@@ -488,7 +487,6 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     private boolean mHideAnimationRunning = false;
     private boolean mIsKeyguardExitAnimationCanceled = false;
 
-    private long mLastTimeSoundWasPlayed = 0;
     private SoundPool mLockSounds;
     private int mLockSoundId;
     private int mUnlockSoundId;
@@ -2851,8 +2849,6 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         int lockscreenSoundsEnabled = mSystemSettings.getIntForUser(LOCKSCREEN_SOUNDS_ENABLED, 1,
                 mSelectedUserInteractor.getSelectedUserId());
         if (lockscreenSoundsEnabled == 1) {
-            if (mSystemClock.elapsedRealtime() - mLastTimeSoundWasPlayed < 300) return;
-            mLastTimeSoundWasPlayed = mSystemClock.elapsedRealtime();
 
             mLockSounds.stop(mLockSoundStreamId);
             // Init mAudioManager
@@ -2968,16 +2964,6 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         mKeyguardDisplayManager.show();
 
         scheduleNonStrongBiometricIdleTimeout();
-
-        // Delay garbage collection until display is shown
-        mHandler.postDelayed(() -> {
-            final int oldMask = StrictMode.getThreadPolicyMask();
-            StrictMode.setThreadPolicyMask(0);
-            System.gc();
-            System.runFinalization();
-            System.gc();
-            StrictMode.setThreadPolicyMask(oldMask);
-        }, 2500);
     }
 
     /**
@@ -3367,9 +3353,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         // only play "unlock" noises if not on a call (since the incall UI
         // disables the keyguard)
         if (TelephonyManager.EXTRA_STATE_IDLE.equals(mPhoneState)) {
-            if (mShowing && mDeviceInteractive) {
-                playSounds(false);
-            }
+            playSounds(false);
         }
 
         setShowingLocked(false, "onKeyguardExitFinished: " + reason);

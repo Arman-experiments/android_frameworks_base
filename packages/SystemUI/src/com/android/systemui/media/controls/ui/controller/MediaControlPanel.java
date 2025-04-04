@@ -39,6 +39,7 @@ import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.database.ContentObserver;
 import android.graphics.Bitmap;
 import android.graphics.BlendMode;
 import android.graphics.Color;
@@ -59,6 +60,9 @@ import android.media.MediaMetadata;
 import android.media.session.MediaController;
 import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
+import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Process;
 import android.os.Trace;
 import android.os.UserHandle;
@@ -93,9 +97,9 @@ import com.android.systemui.animation.ActivityTransitionAnimator;
 import com.android.systemui.animation.GhostedViewTransitionAnimatorController;
 import com.android.systemui.bluetooth.BroadcastDialogController;
 import com.android.systemui.broadcast.BroadcastSender;
-import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.communal.domain.interactor.CommunalSceneInteractor;
 import com.android.systemui.communal.widgets.CommunalTransitionAnimatorController;
+import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.media.controls.domain.pipeline.MediaDataManager;
@@ -274,8 +278,16 @@ public class MediaControlPanel {
     private boolean mWasPlaying = false;
     private boolean mButtonClicked = false;
 
-    private final SysuiColorExtractor mSysuiColorExtractor;
+    private final boolean mShowRippleByDefault;
+    private final boolean mShowTurbulenceByDefault;
+    private boolean mAlwaysOnTime;
+    private boolean mTimeAsNext;
+    private boolean mShowRipple;
+    private boolean mShowTurbulence;
+    private int mActionsLimit = 5;
 
+    private final SysuiColorExtractor mSysuiColorExtractor;
+    
     private final PaintDrawCallback mNoiseDrawCallback =
             new PaintDrawCallback() {
                 @Override
@@ -297,6 +309,108 @@ public class MediaControlPanel {
                     }
                 }
             };
+
+    private final SettingsObserver mSettingsObserver = new SettingsObserver();
+    private class SettingsObserver extends ContentObserver {
+        SettingsObserver() {
+            super(new Handler(Looper.getMainLooper()));
+        }
+
+        void observe() {
+            mContext.getContentResolver().registerContentObserver(Settings.Secure.getUriFor(
+                    Settings.Secure.MEDIA_CONTROLS_ALWAYS_SHOW_TIME),
+                    false, this, UserHandle.USER_ALL);
+            mContext.getContentResolver().registerContentObserver(Settings.Secure.getUriFor(
+                    Settings.Secure.MEDIA_CONTROLS_TIME_AS_NEXT),
+                    false, this, UserHandle.USER_ALL);
+            mContext.getContentResolver().registerContentObserver(Settings.Secure.getUriFor(
+                    Settings.Secure.MEDIA_CONTROLS_RIPPLE),
+                    false, this, UserHandle.USER_ALL);
+            mContext.getContentResolver().registerContentObserver(Settings.Secure.getUriFor(
+                    Settings.Secure.MEDIA_CONTROLS_TURBULENCE),
+                    false, this, UserHandle.USER_ALL);
+            mContext.getContentResolver().registerContentObserver(Settings.Secure.getUriFor(
+                    Settings.Secure.MEDIA_CONTROLS_ACTIONS),
+                    false, this, UserHandle.USER_ALL);
+        }
+
+        void stop() {
+            mContext.getContentResolver().unregisterContentObserver(this);
+        }
+
+        @Override
+        public void onChange(boolean selfChange, Uri uri) {
+            switch (uri.getLastPathSegment()) {
+                case Settings.Secure.MEDIA_CONTROLS_ALWAYS_SHOW_TIME:
+                    updateAlwaysOnTime();
+                    if (mSeekBarObserver == null) break;
+                    mSeekBarObserver.setAlwaysOnTime(mAlwaysOnTime);
+                    updateDisplayForScrubbing();
+                    break;
+                case Settings.Secure.MEDIA_CONTROLS_TIME_AS_NEXT:
+                    updateTimeAsNext();
+                    updateDisplayForScrubbing();
+                    break;
+                case Settings.Secure.MEDIA_CONTROLS_RIPPLE:
+                    updateShowRipple();
+                    updatePlayers();
+                    break;
+                case Settings.Secure.MEDIA_CONTROLS_TURBULENCE:
+                    updateShowTurbulence();
+                    updatePlayers();
+                    break;
+                case Settings.Secure.MEDIA_CONTROLS_ACTIONS:
+                    updateShowActions();
+                    updatePlayers();
+                    break;
+            }
+        }
+
+        void update() {
+            updateAlwaysOnTime();
+            updateTimeAsNext();
+            updateShowRipple();
+            updateShowTurbulence();
+            updateShowActions();
+        }
+
+        private void updateAlwaysOnTime() {
+            mAlwaysOnTime = Settings.Secure.getInt(mContext.getContentResolver(),
+                    Settings.Secure.MEDIA_CONTROLS_ALWAYS_SHOW_TIME, 0) == 1;
+        }
+
+        private void updateTimeAsNext() {
+            mTimeAsNext = Settings.Secure.getInt(mContext.getContentResolver(),
+                    Settings.Secure.MEDIA_CONTROLS_TIME_AS_NEXT, 0) == 1;
+        }
+
+        private void updateShowRipple() {
+            mShowRipple = Settings.Secure.getInt(mContext.getContentResolver(),
+                    Settings.Secure.MEDIA_CONTROLS_RIPPLE, mShowRippleByDefault ? 1 : 0) == 1;
+        }
+
+        private void updateShowTurbulence() {
+            mShowTurbulence = Settings.Secure.getInt(mContext.getContentResolver(),
+                    Settings.Secure.MEDIA_CONTROLS_TURBULENCE, mShowTurbulenceByDefault ? 1 : 0) == 1;
+        }
+
+        private void updateShowActions() {
+            mActionsLimit = Settings.Secure.getInt(mContext.getContentResolver(),
+                    Settings.Secure.MEDIA_CONTROLS_ACTIONS, 5);
+        }
+
+        private void updatePlayers() {
+            if (mMediaCarouselController == null) return;
+            mMediaCarouselController.updatePlayers(true);
+        }
+
+        private void updateDisplayForScrubbing() {
+            if (mMainExecutor == null) return;
+            if (mMediaData == null) return;
+            mMainExecutor.execute(() ->
+                    updateDisplayForScrubbingChange(mMediaData.getSemanticActions()));
+        }
+    }
 
     /**
      * Initialize a new control panel
@@ -350,6 +464,11 @@ public class MediaControlPanel {
         mCommunalSceneInteractor = communalSceneInteractor;
         mSysuiColorExtractor = colorExtractor;
 
+        mShowRippleByDefault = context.getResources().getBoolean(
+                com.android.internal.R.bool.config_mediaControlsRippleByDefault);
+        mShowTurbulenceByDefault = context.getResources().getBoolean(
+                com.android.internal.R.bool.config_mediaControlsTurbulenceByDefault);
+
         mSeekBarViewModel.setLogSeek(() -> {
             if (mPackageName != null && mInstanceId != null) {
                 mLogger.logSeek(mUid, mPackageName, mInstanceId);
@@ -373,6 +492,7 @@ public class MediaControlPanel {
         mSeekBarViewModel.removeEnabledChangeListener(mEnabledChangeListener);
         mSeekBarViewModel.onDestroy();
         mMediaViewController.onDestroy();
+        mSettingsObserver.stop();
     }
 
     /**
@@ -464,10 +584,13 @@ public class MediaControlPanel {
 
     /** Attaches the player to the player view holder. */
     public void attachPlayer(MediaViewHolder vh) {
+        mSettingsObserver.update();
+        mSettingsObserver.observe();
+
         mMediaViewHolder = vh;
         TransitionLayout player = vh.getPlayer();
 
-        mSeekBarObserver = new SeekBarObserver(vh);
+        mSeekBarObserver = new SeekBarObserver(vh, mAlwaysOnTime);
         mSeekBarViewModel.getProgress().observeForever(mSeekBarObserver);
         mSeekBarViewModel.attachTouchHandlers(vh.getSeekBar());
         mSeekBarViewModel.setScrubbingChangeListener(mScrubbingChangeListener);
@@ -618,6 +741,8 @@ public class MediaControlPanel {
                 }
             });
         }
+
+        mSettingsObserver.update();
 
         // Seek Bar
         if (data.getResumption() && data.getResumeProgress() != null) {
@@ -1077,11 +1202,7 @@ public class MediaControlPanel {
                     Log.d(TAG, "Cannot load wallpaper color from a recycled bitmap");
                     return null;
                 }
-                try {
-                    return WallpaperColors.fromBitmap(artworkBitmap);
-                } catch (Exception e) {
-                    return null;
-                }
+                return WallpaperColors.fromBitmap(artworkBitmap);
             } else {
                 Drawable artworkDrawable = artworkIcon.loadDrawable(mContext);
                 if (artworkDrawable != null) {
@@ -1162,9 +1283,12 @@ public class MediaControlPanel {
                 setVisibleAndAlpha(expandedSet, b.getId(), false);
             }
 
+            int limit = mActionsLimit;
             for (int id : SEMANTIC_ACTIONS_ALL) {
                 ImageButton button = mMediaViewHolder.getAction(id);
                 MediaAction action = semanticActions.getActionById(id);
+                if (id == R.id.action0 || id == R.id.action1)
+                    if (limit-- <= 0) action = null;
                 setSemanticButton(button, action, semanticActions);
             }
         } else {
@@ -1176,7 +1300,9 @@ public class MediaControlPanel {
 
             // Set all the generic buttons
             List<Integer> actionsWhenCollapsed = data.getActionsToShowInCompact();
-            List<MediaAction> actions = getNotificationActions(data.getActions(), mActivityStarter);
+            List<MediaAction> actionsFull = getNotificationActions(data.getActions(), mActivityStarter);
+            List<MediaAction> actions = actionsFull.subList(
+                    0, Math.min(actionsFull.size(), mActionsLimit));
             int i = 0;
             for (; i < actions.size() && i < genericButtons.size(); i++) {
                 boolean showInCompact = actionsWhenCollapsed.contains(i);
@@ -1287,13 +1413,15 @@ public class MediaControlPanel {
 
                         action.run();
 
-                        mMultiRippleController.play(createTouchRippleAnimation(button));
+                        if (mShowRipple) {
+                            mMultiRippleController.play(createTouchRippleAnimation(button));
 
-                        if (icon instanceof Animatable) {
-                            ((Animatable) icon).start();
-                        }
-                        if (bgDrawable instanceof Animatable) {
-                            ((Animatable) bgDrawable).start();
+                            if (icon instanceof Animatable) {
+                                ((Animatable) icon).start();
+                            }
+                            if (bgDrawable instanceof Animatable) {
+                                ((Animatable) bgDrawable).start();
+                            }
                         }
                     }
                 });
@@ -1303,7 +1431,7 @@ public class MediaControlPanel {
         }
     }
 
-    private RippleAnimation createTouchRippleAnimation(ImageButton button) {
+    private RippleAnimation createTouchRippleAnimation(View button) {
         float maxSize = mMediaViewHolder.getMultiRippleView().getWidth() * 2;
         return new RippleAnimation(
                 new RippleAnimationConfig(
@@ -1326,9 +1454,7 @@ public class MediaControlPanel {
     }
 
     private boolean shouldPlayTurbulenceNoise() {
-        boolean isTurbulenceNoiseEnabled = mContext.getResources().getBoolean(
-                com.android.systemui.res.R.bool.config_turbulenceNoise);
-        return mButtonClicked && !mWasPlaying && isPlaying() && isTurbulenceNoiseEnabled;
+        return mButtonClicked && !mWasPlaying && isPlaying() && mShowTurbulence;
     }
 
     private TurbulenceNoiseAnimationConfig createTurbulenceNoiseConfig() {
@@ -1378,8 +1504,9 @@ public class MediaControlPanel {
         ConstraintSet expandedSet = mMediaViewController.getExpandedLayout();
         boolean showInCompact = SEMANTIC_ACTIONS_COMPACT.contains(buttonId);
         boolean hideWhenScrubbing = SEMANTIC_ACTIONS_HIDE_WHEN_SCRUBBING.contains(buttonId);
-        boolean shouldBeHiddenDueToScrubbing =
-                scrubbingTimeViewsEnabled(semanticActions) && hideWhenScrubbing && mIsScrubbing;
+        boolean shouldBeHiddenDueToScrubbing = hideWhenScrubbing &&
+                (mTimeAsNext && mAlwaysOnTime || scrubbingTimeViewsEnabled(semanticActions)
+                && mIsScrubbing && !mAlwaysOnTime);
         boolean visible = mediaAction != null && !shouldBeHiddenDueToScrubbing;
 
         int notVisibleValue;
@@ -1409,13 +1536,56 @@ public class MediaControlPanel {
 
     private void bindScrubbingTime(MediaData data) {
         ConstraintSet expandedSet = mMediaViewController.getExpandedLayout();
-        int elapsedTimeId = mMediaViewHolder.getScrubbingElapsedTimeView().getId();
-        int totalTimeId = mMediaViewHolder.getScrubbingTotalTimeView().getId();
+        TextView elapsedTime = mMediaViewHolder.getScrubbingElapsedTimeView();
+        TextView totalTime = mMediaViewHolder.getScrubbingTotalTimeView();
 
-        boolean visible = scrubbingTimeViewsEnabled(data.getSemanticActions()) && mIsScrubbing;
-        setVisibleAndAlpha(expandedSet, elapsedTimeId, visible);
-        setVisibleAndAlpha(expandedSet, totalTimeId, visible);
+        boolean visible = scrubbingTimeViewsEnabled(data.getSemanticActions())
+                && (mIsScrubbing || mAlwaysOnTime);
+        setVisibleAndAlpha(expandedSet, elapsedTime.getId(), visible);
+        setVisibleAndAlpha(expandedSet, totalTime.getId(), visible);
         // Collapsed view is always GONE as set in XML, so doesn't need to be updated dynamically
+
+        updateTimeAsNextListeners(data, elapsedTime, totalTime);
+    }
+
+    private void updateTimeAsNextListeners(MediaData data, TextView elapsedTime, TextView totalTime) {
+        if (data == null || data.getSemanticActions() == null) return;
+
+        MediaAction elapsedAction = null;
+        MediaAction totalAction = null;
+
+        if (mAlwaysOnTime && mTimeAsNext) {
+            elapsedAction = data.getSemanticActions().getActionById(R.id.actionPrev);
+            totalAction = data.getSemanticActions().getActionById(R.id.actionNext);
+        }
+
+        registerTimeAsNextClickListener(elapsedTime, elapsedAction);
+        registerTimeAsNextClickListener(totalTime, totalAction);
+    }
+
+    private void registerTimeAsNextClickListener(TextView view, MediaAction action) {
+        final boolean isEnabled = action != null;
+        view.setClickable(isEnabled);
+        view.setFocusable(isEnabled);
+        if (!isEnabled) {
+            view.setOnClickListener(null);
+            return;
+        }
+        view.setOnClickListener(v -> {
+            if (!mFalsingManager.isFalseTap(FalsingManager.MODERATE_PENALTY)) {
+                mLogger.logTapAction(view.getId(), mUid, mPackageName, mInstanceId);
+                logSmartspaceCardReported(SMARTSPACE_CARD_CLICK_EVENT);
+                // Used to determine whether to play turbulence noise.
+                mWasPlaying = isPlaying();
+                mButtonClicked = true;
+
+                action.getAction().run();
+
+                if (mShowRipple) {
+                    mMultiRippleController.play(createTouchRippleAnimation(view));
+                }
+            }
+        });
     }
 
     private boolean scrubbingTimeViewsEnabled(@Nullable MediaButton semanticActions) {
@@ -1438,22 +1608,21 @@ public class MediaControlPanel {
 
         // TODO(b/174236650): Make sure that the carousel indicator also fades out.
         // TODO(b/174236650): Instrument the animation to measure jank.
-	final ActivityTransitionAnimator.Controller controller =
-        	new GhostedViewTransitionAnimatorController(player,
-                	InteractionJankMonitor.CUJ_SHADE_APP_LAUNCH_FROM_MEDIA_PLAYER) {
-	            @Override
-        	    protected float getCurrentTopCornerRadius() {
-                	return Settings.System.getInt(mContext.getContentResolver(),
-                        	Settings.System.NOTIFICATION_CORNER_RADIUS,
-                        	mContext.getResources().getDimensionPixelSize(R.dimen.notification_corner_radius));
-            	    }
+        final ActivityTransitionAnimator.Controller controller =
+                new GhostedViewTransitionAnimatorController(player,
+                        InteractionJankMonitor.CUJ_SHADE_APP_LAUNCH_FROM_MEDIA_PLAYER) {
+                    @Override
+                    protected float getCurrentTopCornerRadius() {
+                        return mContext.getResources().getDimension(
+                                R.dimen.notification_corner_radius);
+                    }
 
-	            @Override
-        	    protected float getCurrentBottomCornerRadius() {
-                	// TODO(b/184121838): Make IlluminationDrawable support top and bottom
-                	//  radius.
-                	return getCurrentTopCornerRadius();
-            	    }
+                    @Override
+                    protected float getCurrentBottomCornerRadius() {
+                        // TODO(b/184121838): Make IlluminationDrawable support top and bottom
+                        //  radius.
+                        return getCurrentTopCornerRadius();
+                    }
                 };
 
         // When on the hub, wrap in the communal animation controller to ensure we exit the hub

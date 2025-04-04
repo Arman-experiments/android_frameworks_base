@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2009 The Android Open Source Project
- * Copyright (C) 2015 The CyanogenMod Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -132,8 +131,7 @@ static void setLight_native(
         jint flashMode,
         jint onMS,
         jint offMS,
-        jint brightnessMode,
-        jint brightnessLevel) {
+        jint brightnessMode) {
 
     if (!sLightSupported) {
         return;
@@ -141,15 +139,6 @@ static void setLight_native(
 
     if (!validate(light, flashMode, brightnessMode)) {
         return;
-    }
-
-    if (brightnessLevel > 0 && brightnessLevel <= 0xFF) {
-        int colorAlpha = (colorARGB & 0xFF000000) >> 24;
-        if (colorAlpha == 0x00) {
-            colorAlpha = 0xFF;
-        }
-        colorAlpha = (colorAlpha * brightnessLevel) / 0xFF;
-        colorARGB = (colorAlpha << 24) + (colorARGB & 0x00FFFFFF);
     }
 
     Type type = static_cast<Type>(light);
@@ -170,7 +159,7 @@ static void setLight_native(
 }
 
 static const JNINativeMethod method_table[] = {
-    { "setLight_native", "(IIIIIII)V", (void*)setLight_native },
+    { "setLight_native", "(IIIIII)V", (void*)setLight_native },
 };
 
 int register_android_server_LightsService(JNIEnv *env) {

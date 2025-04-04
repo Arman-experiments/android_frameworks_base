@@ -31,7 +31,8 @@
     <dimen name="qs_footer_padding">14dp</dimen>
 
     <dimen name="volume_tool_tip_top_margin">12dp</dimen>
-    <dimen name="volume_row_slider_height">128dp</dimen>
+    <dimen name="volume_row_slider_height">94dp</dimen>
+    <dimen name="volume_row_slider_progress_height">68dp</dimen>
 
     <!-- width of ImmersiveModeConfirmation (-1 for match_parent) -->
     <dimen name="immersive_mode_cling_width">500dp</dimen>
@@ -44,6 +45,9 @@
     <!-- Lock pattern view size, align sysui biometric_auth_pattern_view_size -->
     <dimen name="biometric_auth_pattern_view_size">248dp</dimen>
     <dimen name="biometric_auth_pattern_view_max_size">348dp</dimen>
+
+    <dimen name="global_actions_power_dialog_item_height">130dp</dimen>
+    <dimen name="global_actions_power_dialog_item_bottom_margin">35dp</dimen>
 
     <dimen name="controls_management_top_padding">12dp</dimen>
     <dimen name="controls_management_titles_margin">8dp</dimen>

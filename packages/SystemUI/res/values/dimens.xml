@@ -16,16 +16,6 @@
 */
 -->
 <resources>
-
-    <!-- Shit a* 12am -->
-    <dimen name="keyguard_lock_width">36dp</dimen>
-    <dimen name="keyguard_lock_height">36dp</dimen>
-    <dimen name="keyguard_udfps_width">48dp</dimen>
-    <dimen name="keyguard_udfps_height">48dp</dimen>
-    <dimen name="keyguard_affordance_bottom_margin">48dp</dimen>
-    <dimen name="keyguard_affordance_horizontal_margin">32dp</dimen>
-    <dimen name="keyguard_indication_margin_bottom">16dp</dimen>
-
     <!-- Recommended minimum clickable element dimension -->
     <dimen name="min_clickable_item_size">48dp</dimen>
 
@@ -72,22 +62,22 @@
     <dimen name="navigation_edge_action_deactivation_drag_threshold">32dp</dimen>
 
     <!-- The thickness of the arrow -->
-    <dimen name="navigation_edge_arrow_thickness">1.5dp</dimen>
+    <dimen name="navigation_edge_arrow_thickness">4dp</dimen>
 
     <!-- entry state -->
     <item name="navigation_edge_entry_scale" format="float" type="dimen">0.98</item>
-    <dimen name="navigation_edge_entry_margin">1.5dp</dimen>
+    <dimen name="navigation_edge_entry_margin">4dp</dimen>
     <item name="navigation_edge_entry_background_alpha" format="float" type="dimen">1.0</item>
     <dimen name="navigation_edge_entry_background_width">0dp</dimen>
     <dimen name="navigation_edge_entry_background_height">48dp</dimen>
     <dimen name="navigation_edge_entry_edge_corners">6dp</dimen>
     <dimen name="navigation_edge_entry_far_corners">6dp</dimen>
     <item name="navigation_edge_entry_arrow_alpha" format="float" type="dimen">0.0</item>
-    <dimen name="navigation_edge_entry_arrow_length">0dp</dimen>
-    <dimen name="navigation_edge_entry_arrow_height">13.5dp</dimen>
+    <dimen name="navigation_edge_entry_arrow_length">8.6dp</dimen>
+    <dimen name="navigation_edge_entry_arrow_height">5dp</dimen>
 
     <!-- pre-threshold -->
-    <dimen name="navigation_edge_pre_threshold_margin">1.5dp</dimen>
+    <dimen name="navigation_edge_pre_threshold_margin">4dp</dimen>
     <item name="navigation_edge_pre_threshold_background_alpha" format="float" type="dimen">1.0
     </item>
     <item name="navigation_edge_pre_threshold_scale" format="float" type="dimen">0.98</item>
@@ -96,8 +86,8 @@
     <dimen name="navigation_edge_pre_threshold_edge_corners">16dp</dimen>
     <dimen name="navigation_edge_pre_threshold_far_corners">20dp</dimen>
     <item name="navigation_edge_pre_threshold_arrow_alpha" format="float" type="dimen">1.0</item>
-    <dimen name="navigation_edge_pre_threshold_arrow_length">14dp</dimen>
-    <dimen name="navigation_edge_pre_threshold_arrow_height">11.5dp</dimen>
+    <dimen name="navigation_edge_pre_threshold_arrow_length">8dp</dimen>
+    <dimen name="navigation_edge_pre_threshold_arrow_height">5.6dp</dimen>
 
     <!-- active (post-threshold) -->
     <item name="navigation_edge_active_scale" format="float" type="dimen">1.0</item>
@@ -108,8 +98,8 @@
     <dimen name="navigation_edge_active_edge_corners">24dp</dimen>
     <dimen name="navigation_edge_active_far_corners">24dp</dimen>
     <item name="navigation_edge_active_arrow_alpha" format="float" type="dimen">1.0</item>
-    <dimen name="navigation_edge_active_arrow_length">12dp</dimen>
-    <dimen name="navigation_edge_active_arrow_height">13.5dp</dimen>
+    <dimen name="navigation_edge_active_arrow_length">6.4dp</dimen>
+    <dimen name="navigation_edge_active_arrow_height">7.2dp</dimen>
 
     <!-- committed -->
     <item name="navigation_edge_committed_scale" format="float" type="dimen">0.85</item>
@@ -128,8 +118,8 @@
     <dimen name="navigation_edge_stretch_edge_corners">24dp</dimen>
     <dimen name="navigation_edge_stretch_far_corners">24dp</dimen>
     <item name="navigation_edge_strech_arrow_alpha" format="float" type="dimen">1.0</item>
-    <dimen name="navigation_edge_stretched_arrow_length">11dp</dimen>
-    <dimen name="navigation_edge_stretched_arrow_height">13dp</dimen>
+    <dimen name="navigation_edge_stretched_arrow_length">5.6dp</dimen>
+    <dimen name="navigation_edge_stretched_arrow_height">8dp</dimen>
 
     <dimen name="navigation_edge_cancelled_arrow_length">12dp</dimen>
     <dimen name="navigation_edge_cancelled_arrow_height">0dp</dimen>
@@ -327,7 +317,7 @@
     <dimen name="notification_min_interaction_height">40dp</dimen>
 
     <!-- Radius for notifications corners without adjacent notifications -->
-    <dimen name="notification_corner_radius">28dp</dimen>
+    <dimen name="notification_corner_radius">@*android:dimen/config_dialogCornerRadius</dimen>
 
     <!-- Stroke width for notifications focus state overlay, see id/notification_focus_outline -->
     <dimen name="notification_focus_stroke_width">3dp</dimen>
@@ -611,7 +601,7 @@
 
     <dimen name="brightness_mirror_height">48dp</dimen>
 
-    <dimen name="volume_dialog_panel_transparent_padding_horizontal">8dp</dimen>
+    <dimen name="volume_dialog_panel_transparent_padding_right">8dp</dimen>
 
     <dimen name="volume_dialog_panel_transparent_padding">20dp</dimen>
 
@@ -650,7 +640,7 @@
 
     <dimen name="volume_dialog_background_blur_radius">0dp</dimen>
 
-    <dimen name="volume_tool_tip_horizontal_margin">76dp</dimen>
+    <dimen name="volume_tool_tip_right_margin">76dp</dimen>
 
     <dimen name="volume_tool_tip_arrow_corner_radius">2dp</dimen>
 
@@ -687,15 +677,15 @@
     <!-- The size of the gesture span needed to activate the "pull" notification expansion -->
     <dimen name="pull_span_min">25dp</dimen>
 
-    <dimen name="qs_corner_radius">32dp</dimen>
     <dimen name="qs_tile_height">80dp</dimen>
+    <dimen name="qs_corner_radius">32dp</dimen>
     <dimen name="qs_tile_margin_horizontal">8dp</dimen>
     <dimen name="qs_tile_margin_vertical">@dimen/qs_tile_margin_horizontal</dimen>
     <dimen name="qs_tile_margin_top_bottom">4dp</dimen>
     <dimen name="qs_brightness_margin_top">8dp</dimen>
     <dimen name="qs_brightness_margin_bottom">16dp</dimen>
     <dimen name="qqs_layout_margin_top">16dp</dimen>
-    <dimen name="qqs_layout_padding_bottom">12dp</dimen>
+    <dimen name="qqs_layout_padding_bottom">24dp</dimen>
     <item name="qqs_expand_clock_scale" format="float" type="dimen">2.57</item>
 
     <!-- Most of the time it should be the same as notification_side_paddings as it's vertically
@@ -852,7 +842,7 @@
     <!-- The amount to translate lockscreen elements on the GONE->AOD transition, on device fold -->
     <dimen name="keyguard_enter_from_side_translation_x">-100dp</dimen>
 
-    <dimen name="notification_scrim_corner_radius">32dp</dimen>
+    <dimen name="notification_scrim_corner_radius">@*android:dimen/config_dialogCornerRadius</dimen>
 
     <!-- The minimum amount the user needs to swipe to go to the camera / phone. -->
     <dimen name="keyguard_min_swipe_amount">110dp</dimen>
@@ -923,9 +913,9 @@
     <dimen name="go_to_full_shade_appearing_translation">200dp</dimen>
 
     <!-- The width/height of the keyguard bottom area icon view on keyguard. -->
-    <dimen name="keyguard_affordance_fixed_height">48dp</dimen>
-    <dimen name="keyguard_affordance_fixed_width">48dp</dimen>
-    <dimen name="keyguard_affordance_fixed_radius">24dp</dimen>
+    <dimen name="keyguard_affordance_fixed_height">56dp</dimen>
+    <dimen name="keyguard_affordance_fixed_width">56dp</dimen>
+    <dimen name="keyguard_affordance_fixed_radius">30dp</dimen>
     <dimen name="keyguard_affordance_fixed_padding">12dp</dimen>
 
     <!--  The width/height/padding of the keyguard settings popup menu  -->
@@ -982,7 +972,7 @@
     <!-- Starting margin before the signal cluster -->
 
     <!-- Padding between signal cluster and battery icon -->
-    <dimen name="signal_cluster_battery_padding">6dp</dimen>
+    <dimen name="signal_cluster_battery_padding">4dp</dimen>
 
     <!-- end padding for battery icon in status bar -->
     <dimen name="status_bar_battery_end_padding">0dp</dimen>
@@ -1020,7 +1010,8 @@
     <!-- Minimum margin of the notification panel on the side, when being positioned dynamically -->
     <dimen name="notification_panel_min_side_margin">48dp</dimen>
 
-    <dimen name="volume_row_slider_height">192dp</dimen>
+    <dimen name="volume_row_slider_height">184dp</dimen>
+    <dimen name="volume_row_slider_progress_height">158dp</dimen>
 
     <!-- Thickness of the assist disclosure beams -->
     <dimen name="assist_disclosure_thickness">2.5dp</dimen>
@@ -1049,7 +1040,7 @@
     <dimen name="default_gear_space">18dp</dimen>
 
     <!-- Global actions power menu -->
-    <dimen name="global_actions_translate">0dp</dimen>
+    <dimen name="global_actions_translate">9dp</dimen>
 
     <!-- Distance from the top of screen in pixels, to position the power menu near the button. -->
     <dimen name="global_actions_top_padding">330px</dimen>
@@ -1078,16 +1069,19 @@
     <dimen name="global_actions_controls_y_translation">20dp</dimen>
 
     <!-- Shutdown and restart actions are larger in power options dialog -->
-    <dimen name="global_actions_power_dialog_item_height">128dp</dimen>
-    <dimen name="global_actions_power_dialog_item_width">128dp</dimen>
-    <dimen name="global_actions_power_dialog_item_bottom_margin">22dp</dimen>
+    <dimen name="global_actions_power_dialog_item_height">108dp</dimen>
+    <dimen name="global_actions_power_dialog_item_width">165dp</dimen>
+    <dimen name="global_actions_power_dialog_item_bottom_margin">14dp</dimen>
 
-    <!-- Power Menu Lite -->
-    <dimen name="global_actions_button_size">96dp</dimen>
-    <dimen name="global_actions_button_padding">38dp</dimen>
+    <!-- Power Menu Lite -->   
+    <dimen name="global_actions_button_size">76dp</dimen>
+    <dimen name="global_actions_button_padding">24dp</dimen>
     <dimen name="global_actions_corner_radius">28dp</dimen>
     <dimen name="global_actions_lite_padding">24dp</dimen>
     <dimen name="global_actions_info_margin">32dp</dimen>
+
+    <dimen name="global_actions_power_dialog_message_top_margin">15dp</dimen>
+    <dimen name="global_actions_power_dialog_twoline_message_top_margin">0dp</dimen>
 
     <!-- The maximum offset in either direction that elements are moved horizontally to prevent
          burn-in on AOD. -->
@@ -1206,9 +1200,6 @@
     <item name="wireless_charging_anim_battery_level_text_size_start" format="float" type="dimen">
         0
     </item>
-    <!-- padding size in sp of batteryIcon for wireless charging animation -->
-    <item name="wireless_charging_padding" format="float" type="dimen">8
-    </item>
     <!-- Ending text size in sp of batteryLevel for wireless charging animation -->
     <item name="wireless_charging_anim_battery_level_text_size_end" format="float" type="dimen">48
     </item>
@@ -1235,7 +1226,7 @@
 
     <!--  Blur radius on status bar window and power menu  -->
     <dimen name="min_window_blur_radius">1px</dimen>
-    <dimen name="max_window_blur_radius">17.5dp</dimen>
+    <dimen name="max_window_blur_radius">23px</dimen>
 
     <!-- Blur radius behind Notification Shade -->
     <dimen name="max_shade_window_blur_radius">60dp</dimen>
@@ -1252,7 +1243,7 @@
     <!-- Icon size of Ongoing App Ops chip -->
     <dimen name="ongoing_appops_chip_icon_size">16sp</dimen>
     <!-- Radius of Ongoing App Ops chip corners -->
-    <dimen name="ongoing_appops_chip_bg_corner_radius">28dp</dimen>
+    <dimen name="ongoing_appops_chip_bg_corner_radius">@*android:dimen/config_dialogCornerRadius</dimen>
     <!--  One or two privacy items  -->
     <dimen name="ongoing_appops_chip_min_width">56dp</dimen>
     <!--  Three privacy items. This value must not be exceeded  -->
@@ -1262,7 +1253,12 @@
     <dimen name="ongoing_appops_chip_animation_in_status_bar_translation_x">15dp</dimen>
     <dimen name="ongoing_appops_chip_animation_out_status_bar_translation_x">7dp</dimen>
     <!--  Total minimum padding to enforce to ensure that the dot can always show  -->
-    <dimen name="ongoing_appops_dot_min_padding">20dp</dimen>
+    <!--  Currently used in StatusBarContentInsetsProvider.kt and KeyguardStatusBarView.java,
+          which choose the larger of this or rounded_corner_content_padding,
+          to calculate safe start/end layout insets.
+          For devices with centered notch/cutout, this should be small to make it
+          easier to maintain symmetrical spacing at start/end of layout. -->
+    <dimen name="ongoing_appops_dot_min_padding">10dp</dimen>
 
     <dimen name="ongoing_appops_dialog_side_margins">@dimen/notification_shade_content_margin_horizontal</dimen>
 
@@ -1786,7 +1782,7 @@
     <!-- The end padding for the timer text view. Only used if an embedded padding icon is used. -->
     <dimen name="ongoing_activity_chip_text_end_padding_for_embedded_padding_icon">6dp</dimen>
     <dimen name="ongoing_activity_chip_text_fading_edge_length">12dp</dimen>
-    <dimen name="ongoing_activity_chip_corner_radius">28dp</dimen>
+    <dimen name="ongoing_activity_chip_corner_radius">@*android:dimen/config_dialogCornerRadius</dimen>
 
     <!-- Status bar user chip -->
     <dimen name="status_bar_user_chip_avatar_size">16dp</dimen>
@@ -1810,7 +1806,7 @@
     <dimen name="signal_strength_icon_size">24dp</dimen>
 
     <!-- Internet dialog related dimensions -->
-    <dimen name="internet_dialog_corner_radius">24dp</dimen>
+    <dimen name="internet_dialog_corner_radius">@*android:dimen/config_dialogCornerRadius</dimen>
     <!-- Width of progress bar -->
     <dimen name="internet_dialog_progress_bar_width">152dp</dimen>
     <!-- End margin of network layout -->

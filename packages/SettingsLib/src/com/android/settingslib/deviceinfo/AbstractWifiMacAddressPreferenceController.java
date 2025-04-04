@@ -42,7 +42,6 @@ public abstract class AbstractWifiMacAddressPreferenceController
     static final int OFF = 0;
     @VisibleForTesting
     static final int ON = 1;
-    private boolean mTapped = false;
 
     private static final String[] CONNECTIVITY_INTENTS = {
             ConnectivityManager.CONNECTIVITY_ACTION,
@@ -80,14 +79,6 @@ public abstract class AbstractWifiMacAddressPreferenceController
         return CONNECTIVITY_INTENTS;
     }
 
-    @Override
-    public boolean handlePreferenceTreeClick(Preference preference) {
-        if (preference != mWifiMacAddress) return false;
-        mTapped = !mTapped;
-        updateConnectivity();
-        return true;
-    }
-
     @SuppressLint("HardwareIds")
     @Override
     protected void updateConnectivity() {
@@ -103,14 +94,8 @@ public abstract class AbstractWifiMacAddressPreferenceController
 
         if (TextUtils.isEmpty(macAddress) || macAddress.equals(WifiInfo.DEFAULT_MAC_ADDRESS)) {
             mWifiMacAddress.setSummary(R.string.status_unavailable);
-            mWifiMacAddress.setCopyingEnabled(false);
-        } else if (mTapped) {
-            mWifiMacAddress.setSummary(macAddress);
-            mWifiMacAddress.setCopyingEnabled(true);
         } else {
-            mWifiMacAddress.setSummary(R.string.device_info_protected_single_press);
-            mWifiMacAddress.setCopyingEnabled(false);
+            mWifiMacAddress.setSummary(macAddress);
         }
-        
     }
 }

@@ -32,9 +32,7 @@ import android.view.animation.Interpolator;
 
 import com.android.app.animation.Interpolators;
 import com.android.settingslib.Utils;
-import com.android.systemui.Dependency;
 import com.android.systemui.navigationbar.views.buttons.ButtonInterface;
-import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.res.R;
 
 public class NavigationHandle extends View implements ButtonInterface {
@@ -52,8 +50,6 @@ public class NavigationHandle extends View implements ButtonInterface {
 
     private ObjectAnimator mPulseAnimator = null;
     private float mPulseAnimationProgress;
-    
-    private final KeyguardStateController mKeyguardStateController;
 
     private static final FloatProperty<NavigationHandle> PULSE_ANIMATION_PROGRESS =
             new FloatProperty<>("pulseAnimationProgress") {
@@ -65,24 +61,6 @@ public class NavigationHandle extends View implements ButtonInterface {
                 @Override
                 public void setValue(NavigationHandle controller, float progress) {
                     controller.setPulseAnimationProgress(progress);
-                }
-            };
-
-    private final KeyguardStateController.Callback mKeyguardStateCallback =
-            new KeyguardStateController.Callback() {
-                @Override
-                public void onKeyguardShowingChanged() {
-                    if (mKeyguardStateController.isShowing()) {
-                        updateHandleVisibility(false);
-                    }
-                }
-                @Override
-                public void onKeyguardFadingAwayChanged() {
-                    updateHandleVisibility(true);
-                }
-                @Override
-                public void onKeyguardGoingAwayChanged() {
-                    updateHandleVisibility(true);
                 }
             };
 
@@ -110,19 +88,6 @@ public class NavigationHandle extends View implements ButtonInterface {
         mDarkColor = Utils.getColorAttrDefaultColor(darkContext, R.attr.homeHandleColor);
         mPaint.setAntiAlias(true);
         setFocusable(false);
-        mKeyguardStateController = Dependency.get(KeyguardStateController.class);
-    }
-    
-    @Override
-    public void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        mKeyguardStateController.addCallback(mKeyguardStateCallback);
-    }
-
-    @Override
-    public void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        mKeyguardStateController.removeCallback(mKeyguardStateCallback);
     }
 
     @Override
@@ -226,11 +191,5 @@ public class NavigationHandle extends View implements ButtonInterface {
 
     private float getPulseAnimationProgress() {
         return mPulseAnimationProgress;
-    }
-
-    private void updateHandleVisibility(boolean show) {
-        if (isShown() == show) return;
-        setVisibility(show ? View.VISIBLE : View.INVISIBLE);
-        if (show) invalidate();
     }
 }

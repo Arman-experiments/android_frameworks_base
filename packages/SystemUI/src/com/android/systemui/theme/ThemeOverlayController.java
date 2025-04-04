@@ -100,8 +100,6 @@ import com.google.ux.material.libmonet.dynamiccolor.MaterialDynamicColors;
 import kotlinx.coroutines.flow.Flow;
 import kotlinx.coroutines.flow.StateFlow;
 
-import lineageos.providers.LineageSettings;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -130,7 +128,9 @@ import javax.inject.Inject;
 @SysUISingleton
 public class ThemeOverlayController implements CoreStartable, Dumpable {
     protected static final String TAG = "ThemeOverlayController";
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
+    protected static final String OVERLAY_BERRY_BLACK_THEME =
+            "com.android.system.theme.black";
 
     private final ThemeOverlayApplier mThemeManager;
     private final UserManager mUserManager;
@@ -182,6 +182,7 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
     private final UiModeManager mUiModeManager;
     private ColorScheme mDarkColorScheme;
     private ColorScheme mLightColorScheme;
+    private final CustomThemeController mThemeController;
 
     // Defers changing themes until Setup Wizard is done.
     private boolean mDeferredThemeEvaluation;
@@ -192,8 +193,10 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
             new ConfigurationListener() {
                 @Override
                 public void onUiModeChanged() {
-                    Log.i(TAG, "Re-applying theme on UI change");
-                    reevaluateSystemTheme(true /* forceReload */);
+                    if (isBlackThemeEnabled()) {
+                        Log.i(TAG, "Re-applying theme on UI change");
+                        reevaluateSystemTheme(true /* forceReload */);
+                    }
                 }
             };
 
@@ -434,7 +437,6 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
             @Background Executor bgExecutor,
             ThemeOverlayApplier themeOverlayApplier,
             SecureSettings secureSettings,
-            SystemSettings systemSettings,
             WallpaperManager wallpaperManager,
             UserManager userManager,
             DeviceProvisionedController deviceProvisionedController,
@@ -447,7 +449,8 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
             KeyguardTransitionInteractor keyguardTransitionInteractor,
             UiModeManager uiModeManager,
             ActivityManager activityManager,
-            ConfigurationController configurationController) {
+            ConfigurationController configurationController,
+            SystemSettings systemSettings) {
         mContext = context;
         mIsMonetEnabled = featureFlags.isEnabled(Flags.MONET);
         mIsFidelityEnabled = featureFlags.isEnabled(Flags.COLOR_FIDELITY);
@@ -474,6 +477,8 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
         Flow<Boolean> isFinishedInAsleepStateFlow = mKeyguardTransitionInteractor
                 .isFinishedInStateWhere(KeyguardState.Companion::deviceIsAsleepInState);
         mIsKeyguardOnAsleepState = mJavaAdapter.stateInApp(isFinishedInAsleepStateFlow, false);
+
+        mThemeController = new CustomThemeController(mContext, mBgHandler);
     }
 
     @Override
@@ -482,6 +487,7 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
         final IntentFilter filter = new IntentFilter();
         filter.addAction(Intent.ACTION_PROFILE_ADDED);
         filter.addAction(Intent.ACTION_WALLPAPER_CHANGED);
+        mThemeController.observeSettings(() -> reevaluateSystemTheme(true));
         mBroadcastDispatcher.registerReceiver(mBroadcastReceiver, filter, mMainExecutor,
                 UserHandle.ALL);
         mSecureSettings.registerContentObserverForUserSync(
@@ -517,7 +523,7 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
         });
 
         mSecureSettings.registerContentObserverForUserSync(
-                LineageSettings.Secure.getUriFor(LineageSettings.Secure.BERRY_BLACK_THEME),
+                Settings.Secure.getUriFor(Settings.Secure.BERRY_BLACK_THEME),
                 false,
                 new ContentObserver(mBgHandler) {
                     @Override
@@ -536,15 +542,15 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
                     }
                 },
                 UserHandle.USER_ALL);
-
-        mSystemSettings.registerContentObserverForUserSync(
-                Settings.System.getUriFor(Settings.System.QS_TILE_UI_STYLE),
-                false,
-                new ContentObserver(mBgHandler) {
+                
+        mSecureSettings.registerContentObserverForUserSync(
+                Settings.Secure.getUriFor(Settings.Secure.BRIGHTNESS_SLIDER_STYLE),
+                false, new ContentObserver(mBgHandler) {
                     @Override
-                    public void onChange(boolean selfChange, Collection<Uri> collection, int flags,
-                            int userId) {
-                        if (DEBUG) Log.d(TAG, "Overlay changed for user: " + userId);
+                    public void onChange(
+                            boolean selfChange, Collection<Uri> collection, int flags, int userId) {
+                        if (DEBUG)
+                            Log.d(TAG, "Overlay changed for user: " + userId);
                         if (mUserTracker.getUserId() != userId) {
                             return;
                         }
@@ -553,7 +559,11 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
                             mDeferredThemeEvaluation = true;
                             return;
                         }
-                        reevaluateSystemTheme(true /* forceReload */);
+                        int brightnessSliderStyle =
+                                Settings.Secure.getIntForUser(mContext.getContentResolver(),
+                                        Settings.Secure.BRIGHTNESS_SLIDER_STYLE, 0,
+                                        UserHandle.USER_CURRENT);
+                        mThemeManager.setBrightnessSliderStyle(brightnessSliderStyle);
                     }
                 },
                 UserHandle.USER_ALL);
@@ -849,9 +859,7 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
             }
         }
 
-        boolean isBlackMode = (LineageSettings.Secure.getIntForUser(
-                mContext.getContentResolver(), LineageSettings.Secure.BERRY_BLACK_THEME,
-                0, currentUser) == 1) && isNightMode();
+        boolean isBlackMode = isBlackThemeEnabled() && isNightMode();
 
         // Compatibility with legacy themes, where full packages were defined, instead of just
         // colors.
@@ -892,18 +900,20 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
 
         if (mNeedsOverlayCreation) {
             mNeedsOverlayCreation = false;
-            fOverlays = new FabricatedOverlay[isBlackMode ? 2 : 3];
+            FabricatedOverlay[] fOverlay = new FabricatedOverlay[isBlackMode ? 2 : 3];
             int c = 0;
-            fOverlays[c++] = mSecondaryOverlay;
+            fOverlay[c++] = mSecondaryOverlay;
             if (!isBlackMode) {
-                fOverlays[c++] = mNeutralOverlay;
+                fOverlay[c++] = mNeutralOverlay;
             }
-            fOverlays[c++] = mDynamicOverlay;
+            fOverlay[c++] = mDynamicOverlay;
+            mThemeManager.applyCurrentUserOverlays(categoryToPackage, fOverlay,
+                    currentUser, managedProfiles, onCompleteCallback, isBlackMode);
+            return;
         }
 
         mThemeManager.applyCurrentUserOverlays(categoryToPackage, fOverlays, currentUser,
-                managedProfiles, onCompleteCallback);
-
+                managedProfiles, onCompleteCallback, isBlackMode);
     }
 
     @Style.Type
@@ -933,6 +943,11 @@ public class ThemeOverlayController implements CoreStartable, Dumpable {
             }
         }
         return style;
+    }
+    
+    private boolean isBlackThemeEnabled() {
+        return Settings.Secure.getIntForUser(
+            mContext.getContentResolver(), Settings.Secure.BERRY_BLACK_THEME, 0, mUserTracker.getUserId()) == 1;
     }
 
     private float fetchLuminanceFactorFromSetting() {

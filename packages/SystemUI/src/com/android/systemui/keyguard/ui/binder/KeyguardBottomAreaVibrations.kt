@@ -27,14 +27,12 @@ object KeyguardBottomAreaVibrations {
 
     private const val SmallVibrationScale = 0.3f
     private const val BigVibrationScale = 0.6f
-
     val vibratorHelper: VibratorHelper? = null
     val areAllPrimitivesSupported = vibratorHelper?.areAllPrimitivesSupported(
             VibrationEffect.Composition.PRIMITIVE_TICK,
             VibrationEffect.Composition.PRIMITIVE_QUICK_RISE,
             VibrationEffect.Composition.PRIMITIVE_QUICK_FALL
         ) ?: false
-
     val ShakeAlt = VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK)
     val Shake =
         VibrationEffect.startComposition()

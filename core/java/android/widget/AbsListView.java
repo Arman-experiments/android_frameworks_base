@@ -697,7 +697,6 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
     private int mMinimumVelocity;
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 124051740)
     private int mMaximumVelocity;
-    private int mDecacheThreshold;
     private float mVelocityScale = 1.0f;
 
     final boolean[] mIsScrap = new boolean[1];
@@ -1012,7 +1011,6 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
         mVerticalScrollFactor = configuration.getScaledVerticalScrollFactor();
         mMinimumVelocity = configuration.getScaledMinimumFlingVelocity();
         mMaximumVelocity = configuration.getScaledMaximumFlingVelocity();
-        mDecacheThreshold = mMaximumVelocity / 2;
         mOverscrollDistance = configuration.getScaledOverscrollDistance();
         mOverflingDistance = configuration.getScaledOverflingDistance();
 
@@ -3635,7 +3633,6 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
     }
 
     private boolean startScrollIfNeeded(int x, int y, MotionEvent vtev) {
-        notifyExpensiveFrame();
         // Check if we have moved far enough that it looks more like a
         // scroll than a tap
         final int deltaY = y - mMotionY;
@@ -4254,10 +4251,6 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                                     }
                                     mSelector.setHotspot(x, ev.getY());
                                 }
-                                if (!mDataChanged && !mIsDetaching
-                                        && isAttachedToWindow()) {
-                                    performClick.run();
-                                }
                                 if (mTouchModeReset != null) {
                                     removeCallbacks(mTouchModeReset);
                                 }
@@ -4268,6 +4261,10 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                                         mTouchMode = TOUCH_MODE_REST;
                                         child.setPressed(false);
                                         setPressed(false);
+                                        if (!mDataChanged && !mIsDetaching
+                                                && isAttachedToWindow()) {
+                                            performClick.run();
+                                        }
                                     }
                                 };
                                 postDelayed(mTouchModeReset,
@@ -4968,7 +4965,7 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                     // Keep the fling alive a little longer
                     postDelayed(this, FLYWHEEL_TIMEOUT);
                 } else {
-                    endFling(false); // Don't disable the scrolling cache right after it was enabled
+                    endFling();
                     mTouchMode = TOUCH_MODE_SCROLL;
                     reportScrollStateChange(OnScrollListener.SCROLL_STATE_TOUCH_SCROLL);
                 }
@@ -4989,12 +4986,6 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
         // Use AbsListView#fling(int) instead
         @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
         void start(int initialVelocity) {
-            if (Math.abs(initialVelocity) > mDecacheThreshold) {
-                // For long flings, scrolling cache causes stutter, so don't use it
-                clearScrollingCache();
-            }
-
-            notifyExpensiveFrame();
             int initialY = initialVelocity < 0 ? Integer.MAX_VALUE : 0;
             mLastFlingY = initialY;
             mScroller.setInterpolator(null);
@@ -5018,7 +5009,6 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
         }
 
         void startSpringback() {
-            notifyExpensiveFrame();
             mSuppressIdleStateChangeCall = false;
             if (mScroller.springBack(0, mScrollY, 0, 0, 0, 0)) {
                 mTouchMode = TOUCH_MODE_OVERFLING;
@@ -5031,7 +5021,6 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
         }
 
         void startOverfling(int initialVelocity) {
-            notifyExpensiveFrame();
             mScroller.setInterpolator(null);
             mScroller.fling(0, mScrollY, 0, initialVelocity, 0, 0,
                     Integer.MIN_VALUE, Integer.MAX_VALUE, 0, getHeight());
@@ -5065,7 +5054,6 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
 
         void startScroll(int distance, int duration, boolean linear,
                 boolean suppressEndFlingStateChangeCall) {
-            notifyExpensiveFrame();
             int initialY = distance < 0 ? Integer.MAX_VALUE : 0;
             mLastFlingY = initialY;
             mScroller.setInterpolator(linear ? sLinearInterpolator : null);
@@ -5078,10 +5066,6 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
         // To interrupt a fling early you should use smoothScrollBy(0,0) instead
         @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
         void endFling() {
-            endFling(true);
-        }
-
-        void endFling(boolean clearCache) {
             mTouchMode = TOUCH_MODE_REST;
 
             removeCallbacks(this);
@@ -5090,8 +5074,7 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
             if (!mSuppressIdleStateChangeCall) {
                 reportScrollStateChange(OnScrollListener.SCROLL_STATE_IDLE);
             }
-            if (clearCache)
-                clearScrollingCache();
+            clearScrollingCache();
             mScroller.abortAnimation();
 
             if (mFlingStrictSpan != null) {
@@ -5241,12 +5224,6 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                 break;
             }
             }
-        }
-    }
-    
-    void notifyExpensiveFrame() {
-        if (getViewRootImpl() != null) {
-            getViewRootImpl().notifyRendererOfExpensiveFrame();
         }
     }
 

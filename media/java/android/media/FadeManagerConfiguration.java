@@ -673,7 +673,6 @@ public final class FadeManagerConfiguration implements Parcelable {
         return config != null ? config.getDuration() : DURATION_NOT_SET;
     }
 
-    @Nullable
     private VolumeShaper.Configuration getVolumeShaperConfigFromWrapper(
             FadeVolumeShaperConfigsWrapper wrapper, boolean isFadeIn) {
         // if no volume shaper config is available, return null

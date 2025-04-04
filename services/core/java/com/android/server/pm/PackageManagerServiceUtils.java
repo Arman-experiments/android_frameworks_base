@@ -110,8 +110,6 @@ import dalvik.system.VMRuntime;
 import libcore.io.IoUtils;
 
 import java.io.BufferedReader;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
@@ -148,7 +146,7 @@ import java.util.zip.GZIPInputStream;
 public class PackageManagerServiceUtils {
     private static final long MAX_CRITICAL_INFO_DUMP_SIZE = 3 * 1000 * 1000; // 3MB
 
-    private static final boolean DEBUG = Build.IS_DEBUGGABLE;
+    private static final boolean DEBUG = Build.IS_ENG;
 
     // Skip APEX which doesn't have a valid UID
     public static final Predicate<PackageStateInternal> REMOVE_IF_APEX_PKG =
@@ -829,12 +827,12 @@ public class PackageManagerServiceUtils {
         final AtomicFile atomicFile = new AtomicFile(dstFile);
         FileOutputStream outputStream = null;
         try (
-            InputStream fileIn = new BufferedInputStream(new GZIPInputStream(new FileInputStream(srcFile)))
+                InputStream fileIn = new GZIPInputStream(new FileInputStream(srcFile))
         ) {
             outputStream = atomicFile.startWrite();
-            BufferedOutputStream bufferedOutStream = new BufferedOutputStream(outputStream);
-            FileUtils.copy(fileIn, bufferedOutStream);
-            bufferedOutStream.flush(); // Ensure to flush the buffered stream
+            FileUtils.copy(fileIn, outputStream);
+            // Flush anything in buffer before chmod, because any writes after chmod will fail.
+            outputStream.flush();
             Os.fchmod(outputStream.getFD(), DEFAULT_FILE_ACCESS_MODE);
             atomicFile.finishWrite(outputStream);
             return PackageManager.INSTALL_SUCCEEDED;
@@ -1009,7 +1007,7 @@ public class PackageManagerServiceUtils {
         if (!downgradeRequested) {
             return false;
         }
-        final boolean isDebuggable = Build.IS_DEBUGGABLE || isAppDebuggable;
+        final boolean isDebuggable = Build.IS_ENG || isAppDebuggable;
         if (isDebuggable) {
             return true;
         }

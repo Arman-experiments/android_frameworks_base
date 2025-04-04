@@ -144,7 +144,7 @@ final class VibrationStepConductor {
     @NonNull
     AbstractVibratorStep nextVibrateStep(long startTime, VibratorController controller,
             VibrationEffect.Composed effect, int segmentIndex, long pendingVibratorOffDeadline) {
-        if (Build.IS_DEBUGGABLE) {
+        if (Build.IS_ENG) {
             expectIsVibrationThread(true);
         }
         if (segmentIndex >= effect.getSegments().size()) {
@@ -183,7 +183,7 @@ final class VibrationStepConductor {
      * @return True if the vibration effect can be played, false otherwise.
      */
     public boolean prepareToStart() {
-        if (Build.IS_DEBUGGABLE) {
+        if (Build.IS_ENG) {
             expectIsVibrationThread(true);
         }
 
@@ -221,7 +221,7 @@ final class VibrationStepConductor {
     }
 
     public boolean isFinished() {
-        if (Build.IS_DEBUGGABLE) {
+        if (Build.IS_ENG) {
             expectIsVibrationThread(true);
         }
         if (mCancelledImmediately) {
@@ -239,7 +239,7 @@ final class VibrationStepConductor {
      */
     @Nullable
     public Vibration.EndInfo calculateVibrationEndInfo() {
-        if (Build.IS_DEBUGGABLE) {
+        if (Build.IS_ENG) {
             expectIsVibrationThread(true);
         }
 
@@ -271,7 +271,7 @@ final class VibrationStepConductor {
      *   method needs to be run again.
      */
     public boolean waitUntilNextStepIsDue() {
-        if (Build.IS_DEBUGGABLE) {
+        if (Build.IS_ENG) {
             expectIsVibrationThread(true);
         }
 
@@ -312,7 +312,7 @@ final class VibrationStepConductor {
 
     @Nullable
     private Step pollNext() {
-        if (Build.IS_DEBUGGABLE) {
+        if (Build.IS_ENG) {
             expectIsVibrationThread(true);
         }
 
@@ -329,7 +329,7 @@ final class VibrationStepConductor {
      * to be played next.
      */
     public void runNextStep() {
-        if (Build.IS_DEBUGGABLE) {
+        if (Build.IS_ENG) {
             expectIsVibrationThread(true);
         }
         // In theory a completion callback could have come in between the wait finishing and
@@ -373,7 +373,7 @@ final class VibrationStepConductor {
      * @param immediate indicates whether cancellation should abort urgently and skip cleanup steps.
      */
     public void notifyCancelled(@NonNull Vibration.EndInfo cancelInfo, boolean immediate) {
-        if (Build.IS_DEBUGGABLE) {
+        if (Build.IS_ENG) {
             expectIsVibrationThread(false);
         }
         if (DEBUG) {
@@ -520,7 +520,7 @@ final class VibrationStepConductor {
 
     @GuardedBy("mLock")
     private boolean hasPendingNotifySignalLocked() {
-        if (Build.IS_DEBUGGABLE) {
+        if (Build.IS_ENG) {
             expectIsVibrationThread(true);  // Reads VibrationThread variables as well as signals.
         }
         return (mSignalCancel != null && mCancelledVibrationEndInfo == null)
@@ -533,7 +533,7 @@ final class VibrationStepConductor {
      * changes.
      */
     private void processAllNotifySignals() {
-        if (Build.IS_DEBUGGABLE) {
+        if (Build.IS_ENG) {
             expectIsVibrationThread(true);
         }
 
@@ -583,7 +583,7 @@ final class VibrationStepConductor {
      * {@link Step#cancel()}.
      */
     public void processCancel(Vibration.EndInfo cancelInfo) {
-        if (Build.IS_DEBUGGABLE) {
+        if (Build.IS_ENG) {
             expectIsVibrationThread(true);
         }
 
@@ -606,7 +606,7 @@ final class VibrationStepConductor {
      * <p>This will remove and trigger {@link Step#cancelImmediately()} in all steps, in order.
      */
     public void processCancelImmediately(Vibration.EndInfo cancelInfo) {
-        if (Build.IS_DEBUGGABLE) {
+        if (Build.IS_ENG) {
             expectIsVibrationThread(true);
         }
 
@@ -628,7 +628,7 @@ final class VibrationStepConductor {
      * first step found will be resumed by this method, in no particular order.
      */
     private void processVibratorsComplete(@NonNull int[] vibratorsToProcess) {
-        if (Build.IS_DEBUGGABLE) {
+        if (Build.IS_ENG) {
             expectIsVibrationThread(true);
         }
 

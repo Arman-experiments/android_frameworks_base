@@ -53,7 +53,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import com.android.app.tracing.coroutines.launchTraced as launch
 import android.provider.Settings
 import android.os.UserHandle
-import com.android.internal.util.android.Utils
+import com.android.internal.util.infinity.InfinityUtils
 
 @ExperimentalCoroutinesApi
 object DeviceEntryIconViewBinder {
@@ -81,8 +81,8 @@ object DeviceEntryIconViewBinder {
         vibratorHelper: VibratorHelper,
         overrideColor: Color? = null,
     ): DisposableHandle {
-        val packageInstalled = Utils.isPackageInstalled(
-            view.context, "com.crdroid.udfps.icons"
+        val packageInstalled = InfinityUtils.isPackageInstalled(
+            view.context, "com.infinity.udfps.icons"
         )
 
         val shouldUseCustomUdfpsIcon: StateFlow<Boolean> = callbackFlow {
@@ -192,7 +192,20 @@ object DeviceEntryIconViewBinder {
                     }
                     launch("$TAG#viewModel.useBackgroundProtection") {
                         viewModel.useBackgroundProtection.collect { useBackgroundProtection ->
-                            bgView.visibility = View.GONE
+                            if (shouldUseCustomUdfpsIcon.value && packageInstalled) {
+                                bgView.visibility = View.GONE
+                            } else {
+                                bgView.visibility = if (useBackgroundProtection) View.VISIBLE else View.GONE
+                            }
+                        }
+                    }
+                    launch("$TAG#shouldUseCustomUdfpsIcon") {
+                        shouldUseCustomUdfpsIcon.collect { useCustomIcon ->
+                            if (useCustomIcon && packageInstalled) {
+                                bgView.visibility = View.GONE
+                            } else {
+                                bgView.visibility = if (viewModel.useBackgroundProtection.value) View.VISIBLE else View.GONE
+                            }
                         }
                     }
                     launch("$TAG#viewModel.burnInOffsets") {
@@ -218,6 +231,10 @@ object DeviceEntryIconViewBinder {
                     launch("$TAG#fpIconView.viewModel") {
                         fgViewModel.viewModel.collect { viewModel ->
                             Log.d(TAG, "Updating device entry icon image state $viewModel")
+                            fgIconView.setImageState(
+                                view.getIconState(viewModel.type, viewModel.useAodVariant),
+                                /* merge */ false,
+                            )
                             if (viewModel.type.contentDescriptionResId != -1) {
                                 fgIconView.contentDescription =
                                     fgIconView.resources.getString(
@@ -225,19 +242,17 @@ object DeviceEntryIconViewBinder {
                                     )
                             }
                             fgIconView.imageTintList =
-                                ColorStateList.valueOf(viewModel.tint)
-                            fgIconView.setPadding(
-                                viewModel.padding,
-                                viewModel.padding,
-                                viewModel.padding,
-                                viewModel.padding,
-                            )
-                            // Set image state at the end after updating other view state. This
-                            // method forces the ImageView to recompute the bounds of the drawable.
-                            fgIconView.setImageState(
-                                view.getIconState(viewModel.type, viewModel.useAodVariant),
-                                /* merge */ false,
-                            )
+                                ColorStateList.valueOf(overrideColor?.toArgb() ?: viewModel.tint)
+                            if (fgIconView.drawable.current !is UdfpsIconDrawable) {
+                                fgIconView.setPadding(
+                                    viewModel.padding,
+                                    viewModel.padding,
+                                    viewModel.padding,
+                                    viewModel.padding
+                                )
+                            } else {
+                                fgIconView.setPadding(0, 0, 0, 0)
+                            }
                             // Invalidate, just in case the padding changes just after icon changes
                             fgIconView.invalidate()
                         }
@@ -253,7 +268,11 @@ object DeviceEntryIconViewBinder {
                     }
                     launch("$TAG#bgViewModel.color") {
                         bgViewModel.color.collect { color ->
-                            bgView.imageTintList = null
+                            if (!shouldUseCustomUdfpsIcon.value || !packageInstalled) {
+                            bgView.imageTintList = ColorStateList.valueOf(color)
+                            } else {
+                                bgView.imageTintList = null
+                            }
                         }
                     }
                 }

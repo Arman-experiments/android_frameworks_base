@@ -50,7 +50,7 @@ import android.util.Slog
 
 import com.android.internal.R
 import com.android.internal.annotations.GuardedBy
-import com.android.internal.util.android.Utils
+import com.android.internal.util.infinity.InfinityUtils
 import com.android.server.LocalServices
 import com.android.server.SystemService
 import com.android.server.app.AppLockManagerServiceInternal
@@ -495,7 +495,7 @@ class AppLockManagerService(
                 userId
             )
             if (!aInfo.isSystemApp()) return
-            if (Utils.launchablePackages(context).contains(pkg)) return
+            if (InfinityUtils.launchablePackages(context).contains(pkg)) return
             if (!whiteListedSystemApps.contains(pkg))
                 throw IllegalArgumentException("System package $pkg is not whitelisted")
         } catch(e: PackageManager.NameNotFoundException) {
@@ -819,9 +819,6 @@ class AppLockManagerService(
     }
 
     private fun enforceCallingPermission(msg: String) {
-        if (com.android.internal.util.android.BypassUtils.isSystemLauncher(Binder.getCallingUid())) {
-            return
-        }
         context.enforceCallingPermission(Manifest.permission.MANAGE_APP_LOCK, msg)
     }
 

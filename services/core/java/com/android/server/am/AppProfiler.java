@@ -136,10 +136,10 @@ public class AppProfiler {
     // write battery stats every 30 minutes.
     static final long BATTERY_STATS_TIME = 30 * 60 * 1000;
 
-    static final boolean MONITOR_CPU_USAGE = true;
+    static final boolean MONITOR_CPU_USAGE = false;
 
-    // don't sample cpu less than every 5 seconds.
-    static final long MONITOR_CPU_MIN_TIME = 5 * 1000;
+    // don't sample cpu less than every 15 seconds.
+    static final long MONITOR_CPU_MIN_TIME = 15 * 1000;
 
     // wait possibly forever for next cpu sample.
     static final long MONITOR_CPU_MAX_TIME = 0x0fffffff;
@@ -951,7 +951,7 @@ public class AppProfiler {
         if (check != null) {
             if ((pss * 1024) >= check && profile.getThread() != null
                     && mMemWatchDumpProcName == null) {
-                if (Build.IS_DEBUGGABLE || proc.isDebuggable()) {
+                if (Build.IS_ENG || proc.isDebuggable()) {
                     Slog.w(TAG, "Process " + proc + " exceeded pss limit " + check + "; reporting");
                     startHeapDumpLPf(profile, false);
                 } else {
@@ -1353,11 +1353,6 @@ public class AppProfiler {
         mAllowLowerMemLevel = allowLowerMemLevel;
     }
 
-   @GuardedBy("mService")
-    boolean allowLowerMemLevelLocked() {
-        return mAllowLowerMemLevel;
-    }
-
     @GuardedBy("mService")
     void setMemFactorOverrideLocked(@MemFactor int factor) {
         mMemFactorOverride = factor;
@@ -1616,7 +1611,7 @@ public class AppProfiler {
         // and the app that died was not running instrumentation,
         // then tell everyone we are now low on memory.
         if (!mService.mProcessList.haveBackgroundProcessLOSP()) {
-            boolean doReport = Build.IS_DEBUGGABLE;
+            boolean doReport = Build.IS_ENG;
             final long now = SystemClock.uptimeMillis();
             if (doReport) {
                 if (now < (mLastMemUsageReportTime + 5 * 60 * 1000)) {

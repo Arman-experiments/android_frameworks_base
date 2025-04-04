@@ -626,7 +626,7 @@ class ContextImpl extends Context {
                                     + "if UserManager is not available. "
                                     + "(e.g. from inside an isolated process)");
                         }
-                        if (!um.isUserUnlockingOrUnlocked(UserHandle.myUserId())) {
+                        if (!um.isUserUnlockingOrUnlocked(getUserId())) {
                             throw new IllegalStateException("SharedPreferences in "
                                     + "credential encrypted storage are not available until after "
                                     + "user (id " + UserHandle.myUserId() + ") is unlocked");
@@ -1957,7 +1957,6 @@ class ContextImpl extends Context {
         if (mPackageInfo != null) {
             IIntentReceiver rd = mPackageInfo.forgetReceiverDispatcher(
                     getOuterContext(), receiver);
-            if (rd == null) return;
             try {
                 ActivityManager.getService().unregisterReceiver(rd);
             } catch (RemoteException e) {
@@ -2267,12 +2266,11 @@ class ContextImpl extends Context {
     @Override
     public void unbindService(ServiceConnection conn) {
         if (conn == null) {
-            return;
+            throw new IllegalArgumentException("connection is null");
         }
         if (mPackageInfo != null) {
             IServiceConnection sd = mPackageInfo.forgetServiceDispatcher(
                     getOuterContext(), conn);
-            if (sd == null) return;
             try {
                 ActivityManager.getService().unbindService(sd);
             } catch (RemoteException e) {
@@ -2734,10 +2732,8 @@ class ContextImpl extends Context {
      */
     private void warnIfCallingFromSystemProcess() {
         if (Process.myUid() == Process.SYSTEM_UID) {
-           if (DEBUG) {
-	      Slog.w(TAG, "Calling a method in the system process without a qualified user: "
+            Slog.w(TAG, "Calling a method in the system process without a qualified user: "
                     + Debug.getCallers(5));
-           }
         }
     }
 

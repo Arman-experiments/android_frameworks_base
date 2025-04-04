@@ -68,13 +68,16 @@ import com.android.systemui.statusbar.SysuiStatusBarStateController;
 import com.android.systemui.statusbar.disableflags.DisableFlagsLogger;
 import com.android.systemui.statusbar.notification.stack.StackStateAnimator;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
+import com.android.systemui.statusbar.policy.BrightnessMirrorController;
 import com.android.systemui.statusbar.policy.RemoteInputQuickSettingsDisabler;
-import com.android.systemui.statusbar.policy.SecureLockscreenQSDisabler;
 import com.android.systemui.tuner.TunerService;
+import com.android.systemui.statusbar.policy.SecureLockscreenQSDisabler;
 import com.android.systemui.util.Utils;
 import com.android.systemui.util.SystemUIBoostFramework;
 
 import dalvik.annotation.optimization.NeverCompile;
+
+import com.android.systemui.util.MediaArtUtils;
 
 import java.io.PrintWriter;
 import java.util.Arrays;
@@ -84,7 +87,7 @@ import javax.inject.Inject;
 import javax.inject.Named;
 
 public class QSImpl implements QS, CommandQueue.Callbacks, StatusBarStateController.StateListener,
-        Dumpable, TunerService.Tunable {
+        Dumpable, TunerService.Tunable  {
     private static final String TAG = "QS";
     private static final boolean DEBUG = false;
     private static final String EXTRA_EXPANDED = "expanded";
@@ -182,6 +185,7 @@ public class QSImpl implements QS, CommandQueue.Callbacks, StatusBarStateControl
     private ComposeView mFooterActionsView;
 
     private final TunerService mTunerService;
+
     private float mCustomAlpha = 1f;
 
     @Inject
@@ -195,8 +199,8 @@ public class QSImpl implements QS, CommandQueue.Callbacks, StatusBarStateControl
             FooterActionsController footerActionsController,
             FooterActionsViewModel.Factory footerActionsViewModelFactory,
             LargeScreenShadeInterpolator largeScreenShadeInterpolator,
-            SecureLockscreenQSDisabler secureLockscreenQSDisabler,
-            TunerService tunerService) {
+            TunerService tunerService,
+            SecureLockscreenQSDisabler secureLockscreenQSDisabler) {
         mRemoteInputQuickSettingsDisabler = remoteInputQsDisabler;
         mQsMediaHost = qsMediaHost;
         mQqsMediaHost = qqsMediaHost;
@@ -209,11 +213,11 @@ public class QSImpl implements QS, CommandQueue.Callbacks, StatusBarStateControl
         mDumpManager = dumpManager;
         mFooterActionsController = footerActionsController;
         mFooterActionsViewModelFactory = footerActionsViewModelFactory;
-        mTunerService = tunerService;
         mListeningAndVisibilityLifecycleOwner = new ListeningAndVisibilityLifecycleOwner();
         if (SceneContainerFlag.isEnabled()) {
             mStatusBarState = StatusBarState.SHADE;
         }
+        mTunerService = tunerService;
         mSecureLockscreenQSDisabler = secureLockscreenQSDisabler;
     }
 
@@ -223,6 +227,7 @@ public class QSImpl implements QS, CommandQueue.Callbacks, StatusBarStateControl
      */
     public void onComponentCreated(QSComponent qsComponent, @Nullable Bundle savedInstanceState) {
         mRootView = qsComponent.getRootView();
+        MediaArtUtils.getInstance(mRootView.getContext()).setQSImpl(this);
 
         mQSPanelController = qsComponent.getQSPanelController();
         mQuickQSPanelController = qsComponent.getQuickQSPanelController();
@@ -342,6 +347,7 @@ public class QSImpl implements QS, CommandQueue.Callbacks, StatusBarStateControl
         if (parent != null) {
             parent.removeView(getView());
         }
+        mTunerService.removeTunable(this);
     }
 
     public void onSaveInstanceState(Bundle outState) {
@@ -557,9 +563,14 @@ public class QSImpl implements QS, CommandQueue.Callbacks, StatusBarStateControl
     }
 
     public void setBrightnessMirrorController(
-            @Nullable MirrorController brightnessMirrorController) {
-        mQSPanelController.setBrightnessMirror(brightnessMirrorController);
-        mQuickQSPanelController.setBrightnessMirror(brightnessMirrorController);
+        @Nullable MirrorController brightnessMirrorController) {   
+            mQSPanelController.setBrightnessMirror(brightnessMirrorController);
+            if (brightnessMirrorController instanceof BrightnessMirrorController) {
+                mQuickQSPanelController.setBrightnessMirror(
+                        (BrightnessMirrorController) brightnessMirrorController);
+            } else {
+                mQuickQSPanelController.setBrightnessMirror(null);
+            }
     }
 
     @Override
@@ -722,8 +733,6 @@ public class QSImpl implements QS, CommandQueue.Callbacks, StatusBarStateControl
         boolean fullyCollapsed = expansion == 0.0f;
         int heightDiff = getHeightDiff();
         float panelTranslationY = translationScaleY * heightDiff;
-        
-        mHeader.setExpansion(onKeyguardAndExpanded, expansion, panelTranslationY);
 
         if (expansion < 1 && expansion > 0.99) {
             if (mQuickQSPanelController.switchTileLayout(false)) {
@@ -780,12 +789,21 @@ public class QSImpl implements QS, CommandQueue.Callbacks, StatusBarStateControl
         }
         updateMediaPositions();
         SystemUIBoostFramework sbf = SystemUIBoostFramework.getInstance();
-        if (expansion == 1.0f || expansion == 0.0f) {
-            sbf.animationBoostOff(SystemUIBoostFramework.REQUEST_ANIMATION_BOOST_TYPE_SPEED_UP_QS_EXPANSION_ANIMATION);
-        } else {
-            sbf.animationBoostOn(SystemUIBoostFramework.REQUEST_ANIMATION_BOOST_TYPE_SPEED_UP_QS_EXPANSION_ANIMATION);
+         if (expansion == 1.0f || expansion == 0.0f) {
+             sbf.animationBoostOff(SystemUIBoostFramework.REQUEST_ANIMATION_BOOST_TYPE_SPEED_UP_QS_EXPANSION_ANIMATION);
+         } else {
+             sbf.animationBoostOn(SystemUIBoostFramework.REQUEST_ANIMATION_BOOST_TYPE_SPEED_UP_QS_EXPANSION_ANIMATION);
+         }
+        
+        if (onKeyguard) {
+            com.android.systemui.util.WallpaperDepthUtils.getInstance(mRootView.getContext()).updateDepthWallpaper();
         }
-        com.android.systemui.util.ScrimUtils.getInstance(mRootView.getContext()).setQsExpansion(expansion);
+        
+        if (!fullyCollapsed) {
+            MediaArtUtils.getInstance(mRootView.getContext()).hideMediaArt();
+        } else {
+            MediaArtUtils.getInstance(mRootView.getContext()).updateMediaArtVisibility();   
+        }
     }
 
     private void setAlphaAnimationProgress(float progress) {

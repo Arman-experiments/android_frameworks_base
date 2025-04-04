@@ -23,7 +23,6 @@ import android.content.Intent;
 import android.media.AudioManager;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.UserHandle;
 import android.provider.Settings;
 import android.service.quicksettings.Tile;
 import android.util.Log;
@@ -56,16 +55,17 @@ public class VolumeControlTile extends QSTileImpl<BooleanState>
         implements SlideableQSTile, ConfigurationController.ConfigurationListener {
 
     public static final String TILE_SPEC = "volume_control";
-
     private static final String VOLUME_LEVEL_SETTING = "volume_level";
-
-    private static final Intent SOUND_SETTINGS = new Intent(Settings.Panel.ACTION_VOLUME);
 
     private final AudioManager mAudioManager;
     private float mCurrentVolumePercent;
     private int mCurrentVolumeLevel;
-    
     private boolean mListening = false;
+
+    @Override
+    public boolean isSlideable() {
+        return true;
+    }
 
     private final View.OnTouchListener mTouchListener =
             new View.OnTouchListener() {
@@ -160,18 +160,15 @@ public class VolumeControlTile extends QSTileImpl<BooleanState>
     }
 
     @Override
-    protected void handleUserSwitch(int newUserId) {
-    }
-
-    @Override
     public BooleanState newTileState() {
         BooleanState state = new BooleanState();
+        state.handlesLongClick = false;
         return state;
     }
 
     @Override
     public Intent getLongClickIntent() {
-        return SOUND_SETTINGS;
+        return null;
     }
 
     @Override
@@ -207,12 +204,11 @@ public class VolumeControlTile extends QSTileImpl<BooleanState>
     private void updateVolumeFromSystem() {
         mCurrentVolumeLevel = mAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
         mCurrentVolumePercent = (float) mCurrentVolumeLevel / mAudioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-        updateVolumeLevel();
-    }
-
-    @Override
-    public boolean isSlideable() {
-        return true;
+        Settings.System.putFloat(
+                mContext.getContentResolver(),
+                VOLUME_LEVEL_SETTING,
+                mCurrentVolumePercent);
+        refreshState(true);
     }
 
     @Override
@@ -222,15 +218,10 @@ public class VolumeControlTile extends QSTileImpl<BooleanState>
         int newLevel = (int) (mCurrentVolumePercent * mAudioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
         mAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newLevel, 0);
         mCurrentVolumeLevel = newLevel;
-        updateVolumeLevel();
-    }
-    
-    private void updateVolumeLevel() {
-        Settings.System.putFloatForUser(
+        Settings.System.putFloat(
                 mContext.getContentResolver(),
                 VOLUME_LEVEL_SETTING,
-                mCurrentVolumePercent,
-                UserHandle.USER_CURRENT);
+                mCurrentVolumePercent);
         refreshState(true);
     }
 

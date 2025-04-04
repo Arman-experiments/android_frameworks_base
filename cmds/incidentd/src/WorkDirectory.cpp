@@ -569,7 +569,7 @@ sp<ReportFile> WorkDirectory::createReportFile() {
 status_t WorkDirectory::getReports(vector<sp<ReportFile>>* result, int64_t after) {
     unique_lock<mutex> lock(mLock);
 
-    const bool DBG = false;
+    const bool DBG = true;
 
     if (DBG) {
         ALOGD("WorkDirectory::getReports");

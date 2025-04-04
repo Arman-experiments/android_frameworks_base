@@ -30,7 +30,6 @@ import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.ProgressBar
-import android.widget.Switch
 import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.recyclerview.widget.AsyncListDiffer
@@ -54,6 +53,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import com.google.android.material.materialswitch.MaterialSwitch
 
 /** Dialog for showing active, connected and saved bluetooth devices. */
 class BluetoothTileDialogDelegate
@@ -259,7 +259,7 @@ internal constructor(
         }
     }
 
-    private fun getToggleView(dialog: SystemUIDialog): Switch {
+    private fun getToggleView(dialog: SystemUIDialog): MaterialSwitch {
         return dialog.requireViewById(R.id.bluetooth_toggle)
     }
 
@@ -279,7 +279,7 @@ internal constructor(
         return dialog.requireViewById(R.id.device_list)
     }
 
-    private fun getAutoOnToggle(dialog: SystemUIDialog): Switch {
+    private fun getAutoOnToggle(dialog: SystemUIDialog): MaterialSwitch {
         return dialog.requireViewById(R.id.bluetooth_auto_on_toggle)
     }
 

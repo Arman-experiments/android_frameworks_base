@@ -50,18 +50,24 @@ constructor(
         with(input) {
             when (action) {
                 is QSTileUserAction.Click -> {
-                    val wasEnabled: Boolean = input.data.isEnabled
+                    val currentMode: Int = locationController.getCurrentMode()
+                    val newMode: Int = when (currentMode) {
+                        BATTERY_SAVING -> OFF
+                        SENSORS_ONLY -> HIGH_ACCURACY
+                        HIGH_ACCURACY -> BATTERY_SAVING
+                        else -> SENSORS_ONLY
+                    }
                     if (keyguardController.isMethodSecure() && keyguardController.isShowing()) {
                         activityStarter.postQSRunnableDismissingKeyguard {
                             CoroutineScope(
                                     applicationScope.coroutineContext +
                                         newTracingContext("LocationTileScope")
                                 )
-                                .launch { locationController.setLocationEnabled(!wasEnabled) }
+                                .launch { locationController.setLocationEnabled(newMode) }
                         }
                     } else {
                         withContext(coroutineContext) {
-                            locationController.setLocationEnabled(!wasEnabled)
+                            locationController.setLocationEnabled(newMode)
                         }
                     }
                 }
@@ -74,4 +80,11 @@ constructor(
                 is QSTileUserAction.ToggleClick -> {}
             }
         }
+
+    companion object {
+        private const val OFF = 0
+        private const val SENSORS_ONLY = 1
+        private const val BATTERY_SAVING = 2
+        private const val HIGH_ACCURACY = 3
+    }
 }

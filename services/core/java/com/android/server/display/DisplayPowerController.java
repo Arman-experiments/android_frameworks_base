@@ -102,11 +102,7 @@ import com.android.server.display.utils.SensorUtils;
 import com.android.server.display.whitebalance.DisplayWhiteBalanceController;
 import com.android.server.display.whitebalance.DisplayWhiteBalanceFactory;
 import com.android.server.display.whitebalance.DisplayWhiteBalanceSettings;
-import com.android.server.lights.LightsManager;
-import com.android.server.lights.LogicalLight;
 import com.android.server.policy.WindowManagerPolicy;
-
-import lineageos.providers.LineageSettings;
 
 import java.io.PrintWriter;
 import java.util.Objects;
@@ -255,9 +251,6 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     // Battery stats.
     @Nullable
     private final IBatteryStats mBatteryStats;
-
-    // The lights manager.
-    private final LightsManager mLights;
 
     // The sensor manager.
     private final SensorManager mSensorManager;
@@ -559,7 +552,6 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         mThermalBrightnessThrottlingDataId =
                 logicalDisplay.getDisplayInfoLocked().thermalBrightnessThrottlingDataId;
 
-        mLights = LocalServices.getService(LightsManager.class);
         mUniqueDisplayId = mDisplayDevice.getUniqueId();
         mDisplayStatsId = mUniqueDisplayId.hashCode();
         mPhysicalDisplayName = mDisplayDevice.getNameLocked();
@@ -744,7 +736,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     }
 
     private void handleOnSwitchUser(@UserIdInt int newUserId, int userSerial, float newBrightness) {
-        Slog.i(mTag, "Switching user newUserId=" + newUserId + " userSerial=" + userSerial
+        if (DEBUG) Slog.i(mTag, "Switching user newUserId=" + newUserId + " userSerial=" + userSerial
                 + " newBrightness=" + newBrightness);
 
         if (mAutomaticBrightnessController != null) {
@@ -1077,7 +1069,8 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                 Settings.System.SCREEN_OFF_ANIMATION,
                 SCREEN_OFF_FADE, UserHandle.USER_CURRENT);
 
-        mPowerState = mInjector.getDisplayPowerState(mBlanker, mScreenOffAnimation, mDisplayId, displayState);
+        mPowerState = mInjector.getDisplayPowerState(mBlanker,
+                mScreenOffAnimation, mDisplayId, displayState);
 
         if (mColorFadeEnabled) {
             mColorFadeOnAnimator = ObjectAnimator.ofFloat(
@@ -1127,7 +1120,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                     /* notifyForDescendants= */ false, mSettingsObserver, UserHandle.USER_ALL);
         }
         mContext.getContentResolver().registerContentObserver(
-                LineageSettings.System.getUriFor(LineageSettings.System.AUTO_BRIGHTNESS_ONE_SHOT),
+                Settings.System.getUriFor(Settings.System.AUTO_BRIGHTNESS_ONE_SHOT),
                 false /*notifyForDescendants*/, mSettingsObserver, UserHandle.USER_ALL);
         handleBrightnessModeChange();
     }
@@ -1458,19 +1451,6 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                 state, /* reason= */ stateAndReason.second,
                 mDisplayStateController.shouldPerformScreenOffTransition());
         state = mPowerState.getScreenState();
-
-        // Disable button and keyboard lights when screen off or dozing
-        if (state == Display.STATE_OFF || state == Display.STATE_DOZE ||
-                state == Display.STATE_DOZE_SUSPEND) {
-            LogicalLight buttonsLight = mLights.getLight(LightsManager.LIGHT_ID_BUTTONS);
-            if (buttonsLight != null) {
-                buttonsLight.setBrightness(PowerManager.BRIGHTNESS_OFF_FLOAT);
-            }
-            LogicalLight keyboardLight = mLights.getLight(LightsManager.LIGHT_ID_KEYBOARD);
-            if (keyboardLight != null) {
-                keyboardLight.setBrightness(PowerManager.BRIGHTNESS_OFF_FLOAT);
-            }
-        }
 
         // Use doze brightness if one of following is true:
         // 1. The target `state` isDozeState.
@@ -1855,13 +1835,13 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
 
         // Log any changes to what is currently driving the brightness setting.
         if (!mBrightnessReasonTemp.equals(mBrightnessReason) || brightnessAdjustmentFlags != 0) {
-            Slog.v(mTag, "Brightness [" + brightnessState + "] reason changing to: '"
+            if (DEBUG) Slog.v(mTag, "Brightness [" + brightnessState + "] reason changing to: '"
                     + mBrightnessReasonTemp.toString(brightnessAdjustmentFlags)
                     + "', previous reason: '" + mBrightnessReason + "'.");
             mBrightnessReason.set(mBrightnessReasonTemp);
         } else if (mBrightnessReasonTemp.getReason() == BrightnessReason.REASON_MANUAL
                 && userSetBrightnessChanged) {
-            Slog.v(mTag, "Brightness [" + brightnessState + "] manual adjustment.");
+            if (DEBUG) Slog.v(mTag, "Brightness [" + brightnessState + "] manual adjustment.");
         }
 
 
@@ -1923,7 +1903,6 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
             newEvent.setAdjustmentFlags(brightnessAdjustmentFlags);
             newEvent.setFlags(newEvent.getFlags() | (userSetBrightnessChanged
                     ? BrightnessEvent.FLAG_USER_SET : 0));
-            Slog.i(mTag, newEvent.toString(/* includeTime= */ false));
 
             if (userSetBrightnessChanged
                     || newEvent.getReason().getReason() != BrightnessReason.REASON_TEMPORARY) {
@@ -2189,7 +2168,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
             Trace.asyncTraceBegin(Trace.TRACE_TAG_POWER, SCREEN_ON_BLOCKED_TRACE_NAME, 0);
             mPendingScreenOnUnblocker = new ScreenOnUnblocker();
             mScreenOnBlockStartRealTime = SystemClock.elapsedRealtime();
-            Slog.i(mTag, "Blocking screen on until initial contents have been drawn.");
+            if (DEBUG) Slog.i(mTag, "Blocking screen on until initial contents have been drawn.");
         }
     }
 
@@ -2197,7 +2176,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         if (mPendingScreenOnUnblocker != null) {
             mPendingScreenOnUnblocker = null;
             long delay = SystemClock.elapsedRealtime() - mScreenOnBlockStartRealTime;
-            Slog.i(mTag, "Unblocked screen on after " + delay + " ms");
+            if (DEBUG) Slog.i(mTag, "Unblocked screen on after " + delay + " ms");
             Trace.asyncTraceEnd(Trace.TRACE_TAG_POWER, SCREEN_ON_BLOCKED_TRACE_NAME, 0);
         }
     }
@@ -2207,7 +2186,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
             Trace.asyncTraceBegin(Trace.TRACE_TAG_POWER, SCREEN_OFF_BLOCKED_TRACE_NAME, 0);
             mPendingScreenOffUnblocker = new ScreenOffUnblocker();
             mScreenOffBlockStartRealTime = SystemClock.elapsedRealtime();
-            Slog.i(mTag, "Blocking screen off");
+            if (DEBUG) Slog.i(mTag, "Blocking screen off");
         }
     }
 
@@ -2215,7 +2194,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         if (mPendingScreenOffUnblocker != null) {
             mPendingScreenOffUnblocker = null;
             long delay = SystemClock.elapsedRealtime() - mScreenOffBlockStartRealTime;
-            Slog.i(mTag, "Unblocked screen off after " + delay + " ms");
+            if (DEBUG) Slog.i(mTag, "Unblocked screen off after " + delay + " ms");
             Trace.asyncTraceEnd(Trace.TRACE_TAG_POWER, SCREEN_OFF_BLOCKED_TRACE_NAME, 0);
         }
     }
@@ -2242,7 +2221,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                     Trace.TRACE_TAG_POWER, SCREEN_ON_BLOCKED_BY_DISPLAYOFFLOAD_TRACE_NAME, 0);
             return;
         }
-        Slog.i(mTag, "Blocking screen on for offloading.");
+        if (DEBUG) Slog.i(mTag, "Blocking screen on for offloading.");
     }
 
     private void onDisplayOffloadUnblockScreenOn(DisplayOffloadSession displayOffloadSession) {
@@ -2257,7 +2236,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         }
         mPendingScreenOnUnblockerByDisplayOffload = null;
         long delay = SystemClock.elapsedRealtime() - mScreenOnBlockByDisplayOffloadStartRealTime;
-        Slog.i(mTag, "Unblocked screen on for offloading after " + delay + " ms");
+        if (DEBUG) Slog.i(mTag, "Unblocked screen on for offloading after " + delay + " ms");
         Trace.asyncTraceEnd(
                 Trace.TRACE_TAG_POWER, SCREEN_ON_BLOCKED_BY_DISPLAYOFFLOAD_TRACE_NAME, 0);
     }
@@ -2616,8 +2595,8 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     }
 
     private boolean getAutoBrightnessOneShotSetting() {
-        return LineageSettings.System.getIntForUser(
-                mContext.getContentResolver(), LineageSettings.System.AUTO_BRIGHTNESS_ONE_SHOT,
+        return Settings.System.getIntForUser(
+                mContext.getContentResolver(), Settings.System.AUTO_BRIGHTNESS_ONE_SHOT,
                 0, UserHandle.USER_CURRENT) == 1;
     }
 
@@ -3294,7 +3273,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                         Settings.System.SCREEN_BRIGHTNESS_FOR_ALS,
                         Settings.System.SCREEN_BRIGHTNESS_AUTOMATIC_NORMAL,
                         UserHandle.USER_CURRENT);
-                Slog.i(mTag, "Setting up auto-brightness for preset "
+                if (DEBUG) Slog.i(mTag, "Setting up auto-brightness for preset "
                         + autoBrightnessPresetToString(preset));
                 setUpAutoBrightness(mContext, mHandler);
                 sendUpdatePowerState();

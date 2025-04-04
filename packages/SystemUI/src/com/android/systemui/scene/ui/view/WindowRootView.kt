@@ -115,8 +115,8 @@ open class WindowRootView(
                             layoutParams.leftMargin != leftInset
                 ) {
                     layoutParams.updateMargins(
-                        left = if (layoutParams.ignoreLeftInset) 0 else leftInset,
-                        right = if (layoutParams.ignoreRightInset) 0 else rightInset
+                         left = if (layoutParams.ignoreLeftInset) 0 else leftInset,
+                         right = if (layoutParams.ignoreRightInset) 0 else rightInset
                     )
                     hasChildMarginUpdated = true
                     if (!hasFlagsEnabled) {

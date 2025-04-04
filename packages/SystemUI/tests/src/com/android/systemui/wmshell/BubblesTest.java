@@ -479,7 +479,6 @@ public class BubblesTest extends SysuiTestCase {
 
         final VisualInterruptionDecisionProvider interruptionDecisionProvider =
                 VisualInterruptionDecisionProviderTestUtil.INSTANCE.createProviderByFlag(
-                        mContext,
                         mock(AmbientDisplayConfiguration.class),
                         mock(BatteryController.class),
                         mock(DeviceProvisionedController.class),

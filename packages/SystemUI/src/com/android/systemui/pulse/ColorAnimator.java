@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016-2025 crDroid Android Project
+ * Copyright (C) 2016-2022 crDroid Android Project
  * 
  * @author: Randall Rushing <randall.rushing@gmail.com>
  *

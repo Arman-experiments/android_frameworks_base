@@ -554,8 +554,8 @@ class UserController implements Handler.Callback {
     void finishUserSwitch(UserState uss) {
         // This call holds the AM lock so we post to the handler.
         mHandler.post(() -> {
-            startProfiles();
             finishUserBoot(uss);
+            startProfiles();
             stopExcessRunningUsers();
         });
     }
@@ -1683,14 +1683,13 @@ class UserController implements Handler.Callback {
             }
         }
         final int profilesToStartSize = profilesToStart.size();
-        int i = 0;
-        for (; i < profilesToStartSize && i < (getMaxRunningUsers() - 1); ++i) {
+        if (profilesToStartSize > getMaxRunningUsers()) {
+            Slogf.w(TAG, "More profiles than MAX_RUNNING_USERS; starting all anyway");
+        }
+        for (int i = 0; i < profilesToStartSize; ++i) {
             // NOTE: this method is setting the profiles of the current user - which is always
             // assigned to the default display
             startUser(profilesToStart.get(i).id, USER_START_MODE_BACKGROUND_VISIBLE);
-        }
-        if (i < profilesToStartSize) {
-            Slogf.w(TAG, "More profiles than MAX_RUNNING_USERS");
         }
     }
 
@@ -3134,9 +3133,6 @@ class UserController implements Handler.Callback {
     }
 
     private void checkGetCurrentUserPermissions() {
-        if (com.android.internal.util.android.BypassUtils.isSystemLauncher(Binder.getCallingUid())) {
-            return;
-        }
         if ((mInjector.checkCallingPermission(INTERACT_ACROSS_USERS)
                 != PackageManager.PERMISSION_GRANTED) && (
                 mInjector.checkCallingPermission(INTERACT_ACROSS_USERS_FULL)

@@ -35,7 +35,6 @@ import static android.provider.settings.validators.SettingsValidators.NULLABLE_C
 import static android.provider.settings.validators.SettingsValidators.PACKAGE_NAME_VALIDATOR;
 import static android.provider.settings.validators.SettingsValidators.PERCENTAGE_INTEGER_VALIDATOR;
 import static android.provider.settings.validators.SettingsValidators.TILE_LIST_VALIDATOR;
-import static android.provider.settings.validators.SettingsValidators.TIME_RANGE_VALIDATOR;
 import static android.provider.settings.validators.SettingsValidators.TTS_LIST_VALIDATOR;
 
 import android.provider.Settings.Secure;
@@ -469,22 +468,22 @@ public class SecureSettingsValidators {
         VALIDATORS.put(Secure.ON_DEVICE_INFERENCE_UNBIND_TIMEOUT_MS, ANY_LONG_VALIDATOR);
         VALIDATORS.put(Secure.ON_DEVICE_INTELLIGENCE_UNBIND_TIMEOUT_MS, ANY_LONG_VALIDATOR);
         VALIDATORS.put(Secure.ON_DEVICE_INTELLIGENCE_IDLE_TIMEOUT_MS, NONE_NEGATIVE_LONG_VALIDATOR);
-        VALIDATORS.put(Secure.TETHERING_ALLOW_VPN_UPSTREAMS, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Secure.ACCESSIBILITY_MOUSE_KEYS_ENABLED, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Secure.MANDATORY_BIOMETRICS, new InclusiveIntegerRangeValidator(0, 1));
         VALIDATORS.put(Secure.MANDATORY_BIOMETRICS_REQUIREMENTS_SATISFIED,
                 new InclusiveIntegerRangeValidator(0, 1));
         VALIDATORS.put(Secure.ADVANCED_PROTECTION_MODE, BOOLEAN_VALIDATOR);
-        // Evolution X additions
+        VALIDATORS.put(Secure.TETHERING_ALLOW_VPN_UPSTREAMS, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(Secure.FEATURE_TOUCH_HOVERING, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(Secure.MEDIA_CONTROLS_ALWAYS_SHOW_TIME, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(Secure.MEDIA_CONTROLS_TIME_AS_NEXT, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(Secure.MEDIA_CONTROLS_RIPPLE, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(Secure.MEDIA_CONTROLS_TURBULENCE, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(Secure.MEDIA_CONTROLS_ACTIONS,
+                new DiscreteValueValidator(new String[] {"0", "1", "2", "3", "4", "5"}));
         VALIDATORS.put(Secure.CLIPBOARD_AUTO_CLEAR_ENABLED, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Secure.CLIPBOARD_AUTO_CLEAR_TIMEOUT, NONE_NEGATIVE_LONG_VALIDATOR);
         VALIDATORS.put(Secure.HIDE_DEVELOPER_STATUS, ANY_STRING_VALIDATOR);
-        VALIDATORS.put(Secure.VPN_ENFORCE_DNS, BOOLEAN_VALIDATOR);
-        VALIDATORS.put(Secure.VPN_ENFORCE_DNS_STORE, new DiscreteValueValidator(new String[] {"-1", "0", "1", "2"}));
-        VALIDATORS.put(Secure.DOZE_DOUBLE_TAP_GESTURE_AMBIENT, BOOLEAN_VALIDATOR);
-        VALIDATORS.put(Secure.DOZE_PICK_UP_GESTURE_AMBIENT, BOOLEAN_VALIDATOR);
-        VALIDATORS.put(Secure.EXTRA_DIM_AUTO_MODE, new DiscreteValueValidator(new String[] {"0", "1", "2", "3", "4"}));
-        VALIDATORS.put(Secure.EXTRA_DIM_AUTO_TIME, TIME_RANGE_VALIDATOR);
         VALIDATORS.put(Secure.HIDE_APPLIST, ANY_STRING_VALIDATOR);
     }
 }

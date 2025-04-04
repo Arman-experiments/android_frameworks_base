@@ -20,7 +20,6 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Point
-import android.graphics.Rect
 import android.os.Handler
 import android.util.Log
 import android.util.MathUtils
@@ -28,7 +27,6 @@ import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.VelocityTracker
-import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
 import androidx.annotation.VisibleForTesting
@@ -39,9 +37,7 @@ import com.android.app.viewcapture.ViewCaptureAwareWindowManager
 import com.android.internal.jank.Cuj
 import com.android.internal.jank.InteractionJankMonitor
 import com.android.internal.util.LatencyTracker
-import com.android.systemui.Dependency
 import com.android.systemui.plugins.NavigationEdgeBackPlugin
-import com.android.systemui.shared.navigationbar.RegionSamplingHelper
 import com.android.systemui.statusbar.VibratorHelper
 import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.util.ViewController
@@ -50,13 +46,10 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import java.io.PrintWriter
-import java.util.concurrent.Executor
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sign
-
-import com.android.internal.util.android.VibrationUtils
 
 private const val TAG = "BackPanelController"
 private const val ENABLE_FAILSAFE = true
@@ -110,11 +103,6 @@ constructor(
     @VisibleForTesting internal var params: EdgePanelParams = EdgePanelParams(resources)
     @VisibleForTesting internal var currentState: GestureState = GestureState.GONE
     private var previousState: GestureState = GestureState.GONE
-    
-    private var regionSamplingHelper: RegionSamplingHelper? = null
-    private val samplingRect = Rect()
-    private var leftInset = 0
-    private var rightInset = 0
 
     // Screen attributes
     private lateinit var layoutParams: WindowManager.LayoutParams
@@ -167,14 +155,8 @@ constructor(
     private var minFlingDistance = 0
 
     internal val failsafeRunnable = Runnable { onFailsafe() }
-
-    private var longSwipeThreshold = 0f
-    private var triggerLongSwipe = false
-    private var isLongSwipeEnabled = false
-
+    
     private var backArrowVisibility = false
-
-    private var edgeHapticIntensity = 0
 
     internal enum class GestureState {
         /* Arrow is off the screen and invisible */
@@ -273,22 +255,6 @@ constructor(
         updateArrowState(GestureState.GONE, force = true)
         updateRestingArrowDimens()
         configurationController.addCallback(configurationListener)
-        regionSamplingHelper = RegionSamplingHelper(
-            mView,
-            object : RegionSamplingHelper.SamplingCallback {
-                override fun onRegionDarknessChanged(isRegionDark: Boolean) {
-                    mView.setIsDark(!isRegionDark)
-                }
-                override fun getSampledRegion(sampledView: View): Rect {
-                    return samplingRect
-                }
-                override fun isSamplingEnabled(): Boolean {
-                    return context.displayId == 0
-                }
-            },
-            Dependency.get(Dependency.BACKGROUND_EXECUTOR) as Executor
-        )
-        regionSamplingHelper?.setWindowVisible(true)
     }
 
     /** Update the arrow direction. The arrow should point the same way for both panels. */
@@ -315,17 +281,13 @@ constructor(
                 startIsLeft = mView.isLeftPanel
                 hasPassedDragSlop = false
                 mView.resetStretch()
-                regionSamplingStart()
-                mView.triggerLongSwipe = false
             }
             MotionEvent.ACTION_MOVE -> {
                 if (dragSlopExceeded(event.x, startX)) {
-                    mView.triggerLongSwipe = triggerLongSwipe
                     handleMoveEvent(event)
                 }
             }
             MotionEvent.ACTION_UP -> {
-                mView.triggerLongSwipe = triggerLongSwipe
                 when (currentState) {
                     GestureState.ENTRY -> {
                         if (
@@ -381,49 +343,16 @@ constructor(
                     }
                 }
                 velocityTracker = null
-                regionSamplingStop()
             }
             MotionEvent.ACTION_CANCEL -> {
-                mView.triggerLongSwipe = triggerLongSwipe
                 // Receiving a CANCEL implies that something else intercepted
                 // the gesture, i.e., the user did not cancel their gesture.
                 // Therefore, disappear immediately, with minimum fanfare.
                 interactionJankMonitor.cancel(Cuj.CUJ_BACK_PANEL_ARROW)
                 updateArrowState(GestureState.GONE)
                 velocityTracker = null
-                regionSamplingStop()
             }
         }
-    }
-    
-    fun regionSamplingStart() {
-        regionSamplingHelper?.start(samplingRect)
-    }
-
-    fun regionSamplingStop() {
-        regionSamplingHelper?.stop()
-    }
-
-    fun updateSamplingRect() {
-        val inset: Int = if (mView.getIsLeftPanel()) {
-            leftInset.toInt()
-        } else {
-            displaySize.x.toInt() - rightInset.toInt() - layoutParams.width.toInt()
-        }
-        updateSamplingRect(inset, layoutParams.y.toInt(), displaySize.x.toInt())
-    }
-
-    fun updateSamplingRect(left: Int, top: Int, width: Int) {
-        val rect = Rect()
-        mView.getArrowBoundingBox().round(rect)
-        samplingRect.set(rect)
-        samplingRect.offset(left, top)
-        if (samplingRect.right > width) {
-            samplingRect.offset(width - samplingRect.right, 0)
-        } else if (samplingRect.left < 0) {
-            samplingRect.offset(-samplingRect.left, 0)
-        }
-        regionSamplingHelper?.updateSamplingRect()
     }
 
     private fun cancelAllPendingAnimations() {
@@ -559,13 +488,8 @@ constructor(
             }
         }
 
-        if (isLongSwipeEnabled) {
-            setTriggerLongSwipe(abs(xTranslation) > longSwipeThreshold)
-        }
-
         setArrowStrokeAlpha(gestureProgress)
         setVerticalTranslation(yOffset)
-        updateSamplingRect()
     }
 
     private fun setArrowStrokeAlpha(gestureProgress: Float?) {
@@ -698,8 +622,6 @@ constructor(
     override fun onDestroy() {
         cancelFailsafe()
         windowManager.removeView(mView)
-        regionSamplingHelper?.stop()
-        regionSamplingHelper = null
     }
 
     override fun setIsLeftPanel(isLeftPanel: Boolean) {
@@ -712,10 +634,7 @@ constructor(
             }
     }
 
-    override fun setInsets(insetLeft: Int, insetRight: Int) {
-        leftInset = insetLeft
-        rightInset = insetRight
-    }
+    override fun setInsets(insetLeft: Int, insetRight: Int) = Unit
 
     override fun setBackCallback(callback: NavigationEdgeBackPlugin.BackCallback) {
         backCallback = callback
@@ -725,35 +644,9 @@ constructor(
         this.layoutParams = layoutParams
         windowManager.addView(mView, layoutParams)
     }
-
-    override fun setLongSwipeEnabled(enabled: Boolean) {
-        longSwipeThreshold = if (enabled) MathUtils.min(
-            displaySize.x * 0.5f, layoutParams.width * 2.5f) else 0.0f
-        isLongSwipeEnabled = longSwipeThreshold > 0
-        setTriggerLongSwipe(isLongSwipeEnabled && triggerLongSwipe)
-    }
-
+    
     override fun setBackArrowVisibility(enabled: Boolean) {
         backArrowVisibility = enabled
-    }
-
-    override fun setEdgeHapticIntensity(intensity: Int) {
-        edgeHapticIntensity = intensity
-    }
-
-    private fun setTriggerLongSwipe(enabled: Boolean) {
-        if (triggerLongSwipe != enabled) {
-            triggerLongSwipe = enabled
-            if (edgeHapticIntensity > 0) VibrationUtils.triggerVibration(context, edgeHapticIntensity)
-            updateRestingArrowDimens()
-            // Whenever the trigger back state changes
-            // the existing translation animation should be cancelled
-            cancelFailsafe()
-            mView.cancelAnimations()
-            mView.triggerLongSwipe = triggerLongSwipe
-            updateConfiguration()
-            backCallback.setTriggerLongSwipe(triggerLongSwipe)
-        }
     }
 
     private fun isFlungAwayFromEdge(endX: Float, startX: Float = touchDeltaStartX): Boolean {
@@ -809,7 +702,6 @@ constructor(
         yPosition = max(yPosition, params.minArrowYPosition.toFloat())
         yPosition -= layoutParams.height / 2.0f
         layoutParams.y = MathUtils.constrain(yPosition.toInt(), 0, displaySize.y)
-        updateSamplingRect()
     }
 
     override fun setDisplaySize(displaySize: Point) {
@@ -990,17 +882,13 @@ constructor(
             GestureState.COMMITTED -> {
                 // When flung, trigger back immediately but don't fire again
                 // once state resolves to committed.
-                if (previousState != GestureState.FLUNG) backCallback.triggerBack(false)
+                if (previousState != GestureState.FLUNG) backCallback.triggerBack()
             }
             GestureState.ENTRY,
             GestureState.INACTIVE -> {
-                setTriggerLongSwipe(false)
                 backCallback.setTriggerBack(false)
             }
             GestureState.ACTIVE -> {
-                if (triggerLongSwipe) {
-                    backCallback.triggerBack(false)
-                }
                 backCallback.setTriggerBack(true)
             }
             GestureState.GONE -> {}
@@ -1022,7 +910,7 @@ constructor(
             GestureState.ACTIVE -> {
                 previousXTranslationOnActiveOffset = previousXTranslation
                 updateRestingArrowDimens()
-                if (edgeHapticIntensity > 0) VibrationUtils.triggerVibration(context, edgeHapticIntensity)
+//                performActivatedHapticFeedback()
                 val popVelocity =
                     if (previousState == GestureState.INACTIVE) {
                         POP_ON_INACTIVE_TO_ACTIVE_VELOCITY
@@ -1043,15 +931,15 @@ constructor(
 
                 mView.popOffEdge(POP_ON_INACTIVE_VELOCITY)
 
-                if (edgeHapticIntensity > 0) VibrationUtils.triggerVibration(context, edgeHapticIntensity)
+//                performDeactivatedHapticFeedback()
                 updateRestingArrowDimens()
             }
             GestureState.FLUNG -> {
                 // Typically a vibration is only played while transitioning to ACTIVE. However there
                 // are instances where a fling to trigger back occurs while not in that state.
                 // (e.g. A fling is detected before crossing the trigger threshold.)
-                if (edgeHapticIntensity > 0 && (previousState != GestureState.ACTIVE)) {
-                    VibrationUtils.triggerVibration(context, edgeHapticIntensity)
+                if (previousState != GestureState.ACTIVE) {
+//                    performActivatedHapticFeedback()
                 }
                 mainHandler.postDelayed(POP_ON_FLING_DELAY) {
                     mView.popScale(POP_ON_FLING_VELOCITY)
@@ -1081,6 +969,11 @@ constructor(
                         MIN_DURATION_COMMITTED_ANIMATION,
                     )
                 }
+
+//                vibratorHelper.cancel()
+//                    mainHandler.postDelayed(10L) {
+//                        vibratorHelper.vibrate(VIBRATE_ACTIVATED_EFFECT)
+//                    }
             }
             GestureState.CANCELLED -> {
                 val delay = max(0, MIN_DURATION_CANCELLED_ANIMATION - elapsedTimeSinceEntry)

@@ -261,7 +261,7 @@ class AppCompatAspectRatioPolicy {
         int activityHeight = containingAppHeight;
 
         if (containingRatio - aspectRatioToApply > ASPECT_RATIO_ROUNDING_TOLERANCE) {
-            if (mActivityRecord.shouldForceLongScreen()) {
+            if (mActivityRecord.shouldForceCutoutFullscreen()) {
                 // Use containingAppWidth/Height for maxActivityWidth/Height when force long screen
             } else if (containingAppWidth < containingAppHeight) {
                 // Width is the shorter side, so we use that to figure-out what the max. height

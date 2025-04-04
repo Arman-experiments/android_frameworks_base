@@ -17,8 +17,8 @@ package com.android.systemui.qs.tiles
 
 import android.os.Handler
 import android.os.Looper
+import com.android.systemui.animation.Expandable
 import android.provider.Settings
-import com.android.systemui.animation.Expandable;
 import com.android.systemui.plugins.qs.QSTile
 import com.android.systemui.qs.QSHost
 import com.android.systemui.plugins.FalsingManager
@@ -27,7 +27,7 @@ import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.qs.logging.QSLogger
 import com.android.systemui.qs.tileimpl.QSTileImpl
-import com.android.systemui.qs.QsEventLogger;
+import com.android.systemui.qs.QsEventLogger
 import com.android.systemui.statusbar.policy.KeyguardStateController
 
 abstract class SecureQSTile<TState : QSTile.State> protected constructor(
@@ -44,9 +44,9 @@ abstract class SecureQSTile<TState : QSTile.State> protected constructor(
     protected abstract fun handleClick(expandable: Expandable?, keyguardShowing: Boolean)
 
     override fun handleClick(expandable: Expandable?) {
-        val enabled: Boolean = Settings.Secure.getInt(mContext.getContentResolver(),
-            Settings.Secure.QSTILE_REQUIRES_UNLOCKING, 1) == 1
-        handleClick(expandable, keyguardController.isMethodSecure && keyguardController.isShowing && enabled)
+       val enabled: Boolean = Settings.Secure.getInt(mContext.getContentResolver(),
+               Settings.Secure.QSTILE_REQUIRES_UNLOCKING, 1) == 1
+       handleClick(expandable, keyguardController.isMethodSecure && keyguardController.isShowing && enabled)
     }
 
     protected fun checkKeyguard(expandable: Expandable?, keyguardShowing: Boolean): Boolean {

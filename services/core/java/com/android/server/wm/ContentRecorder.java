@@ -368,15 +368,6 @@ final class ContentRecorder implements WindowContainerListener {
             return;
         }
 
-        final SurfaceControl sourceSurface = mRecordedWindowContainer.getSurfaceControl();
-        if (sourceSurface == null || !sourceSurface.isValid()) {
-            ProtoLog.v(WM_DEBUG_CONTENT_RECORDING,
-                    "Content Recording: Unable to start recording for display %d since the "
-                            + "surface is null or have been released.",
-                    mDisplayContent.getDisplayId());
-            return;
-        }
-
         final int contentToRecord = mContentRecordingSession.getContentToRecord();
 
         // TODO(b/297514518) Do not start capture if the app is in PIP, the bounds are inaccurate.
@@ -404,7 +395,8 @@ final class ContentRecorder implements WindowContainerListener {
                 mDisplayContent.getDisplayId(), mDisplayContent.getDisplayInfo().state);
 
         // Create a mirrored hierarchy for the SurfaceControl of the DisplayArea to capture.
-        mRecordedSurface = SurfaceControl.mirrorSurface(sourceSurface);
+        mRecordedSurface = SurfaceControl.mirrorSurface(
+                mRecordedWindowContainer.getSurfaceControl());
         SurfaceControl.Transaction transaction =
                 mDisplayContent.mWmService.mTransactionFactory.get()
                         // Set the mMirroredSurface's parent to the root SurfaceControl for this
@@ -481,18 +473,16 @@ final class ContentRecorder implements WindowContainerListener {
             case RECORD_CONTENT_TASK:
                 // Given the WindowToken of the region to record, retrieve the associated
                 // SurfaceControl.
-                final WindowContainer wc = tokenToRecord != null
-                        ? WindowContainer.fromBinder(tokenToRecord) : null;
-                if (wc == null) {
+                if (tokenToRecord == null) {
                     handleStartRecordingFailed();
                     ProtoLog.v(WM_DEBUG_CONTENT_RECORDING,
-                            "Content Recording: Unable to start recording due to null token or " +
-                                    "null window container for " + "display %d",
+                            "Content Recording: Unable to start recording due to null token for "
+                                    + "display %d",
                             mDisplayContent.getDisplayId());
                     return null;
                 }
-                final Task taskToRecord = wc.asTask();
-                if (taskToRecord == null || !taskToRecord.isAttached()) {
+                Task taskToRecord = WindowContainer.fromBinder(tokenToRecord).asTask();
+                if (taskToRecord == null) {
                     handleStartRecordingFailed();
                     ProtoLog.v(WM_DEBUG_CONTENT_RECORDING,
                             "Content Recording: Unable to retrieve task to start recording for "

@@ -416,7 +416,6 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
 
         mVisualInterruptionDecisionProvider =
                 VisualInterruptionDecisionProviderTestUtil.INSTANCE.createProviderByFlag(
-                        mContext,
                         mAmbientDisplayConfiguration,
                         mBatteryController,
                         mDeviceProvisionedController,
@@ -626,7 +625,6 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                 mLockscreenTransitionController,
                 mFeatureFlags,
                 mKeyguardUnlockAnimationController,
-                new Handler(TestableLooper.get(this).getLooper()),
                 mMainExecutor,
                 mMessageRouter,
                 mWallpaperManager,

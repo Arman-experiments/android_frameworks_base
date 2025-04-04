@@ -111,7 +111,7 @@ public final class UserTypeFactory {
         builders.put(USER_TYPE_PROFILE_CLONE, getDefaultTypeProfileClone());
         builders.put(USER_TYPE_PROFILE_COMMUNAL, getDefaultTypeProfileCommunal());
         builders.put(USER_TYPE_PROFILE_PRIVATE, getDefaultTypeProfilePrivate());
-        if (Build.IS_DEBUGGABLE) {
+        if (Build.IS_ENG) {
             builders.put(USER_TYPE_PROFILE_TEST, getDefaultTypeProfileTest());
         }
 
@@ -447,9 +447,9 @@ public final class UserTypeFactory {
         // Only add String values to the bundle, settings are written as Strings eventually
         final Bundle settings = new Bundle();
         settings.putString(
-                android.provider.Settings.Secure.MANAGED_PROFILE_CONTACT_REMOTE_SEARCH, "1");
+                android.provider.Settings.Secure.MANAGED_PROFILE_CONTACT_REMOTE_SEARCH, "0");
         settings.putString(
-                android.provider.Settings.Secure.CROSS_PROFILE_CALENDAR_ENABLED, "1");
+                android.provider.Settings.Secure.CROSS_PROFILE_CALENDAR_ENABLED, "0");
         return settings;
     }
 

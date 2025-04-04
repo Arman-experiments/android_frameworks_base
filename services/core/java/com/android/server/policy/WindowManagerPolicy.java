@@ -254,8 +254,13 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
 
         public void shutdown(boolean confirm);
         public void reboot(boolean confirm);
-        public void reboot(boolean confirm, String reason);
         public void rebootSafeMode(boolean confirm);
+
+        /** @hide */
+        void reboot(String reason, boolean confirm);
+
+        /** @hide */
+        void advancedReboot(String reason, boolean confirm);
 
         /**
          * Return the window manager lock needed to correctly call "Lw" methods.

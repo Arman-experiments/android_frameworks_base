@@ -849,14 +849,8 @@ public class WindowManagerService extends IWindowManager.Stub
         public SettingsObserver() {
             super(new Handler());
             ContentResolver resolver = mContext.getContentResolver();
-
-            final boolean displayInversionAvailable = mContext.getResources().getBoolean(
-                    com.android.internal.R.bool.config_displayInversionAvailable);
-            if (displayInversionAvailable) {
-                resolver.registerContentObserver(mDisplayInversionEnabledUri, false, this,
-                        UserHandle.USER_ALL);
-            }
-
+            resolver.registerContentObserver(mDisplayInversionEnabledUri, false, this,
+                    UserHandle.USER_ALL);
             resolver.registerContentObserver(mWindowAnimationScaleUri, false, this,
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(mTransitionAnimationScaleUri, false, this,
@@ -1782,7 +1776,6 @@ public class WindowManagerService extends IWindowManager.Stub
             // UID, otherwise we allow unlimited duration. When a UID looses focus we
             // schedule hiding all of its toast windows.
             if (type == TYPE_TOAST) {
-                mAtmService.setToastWindow();
                 if (!displayContent.canAddToastWindowForUid(callingUid)) {
                     ProtoLog.w(WM_ERROR, "Adding more than one toast window for UID at a time.");
                     return WindowManagerGlobal.ADD_DUPLICATE_ADD;
@@ -3785,18 +3778,22 @@ public class WindowManagerService extends IWindowManager.Stub
 
     // Called by window manager policy.  Not exposed externally.
     @Override
-    public void reboot(boolean confirm, String reason) {
-        // Pass in the UI context, since ShutdownThread requires it (to show UI).
-        ShutdownThread.rebootCustom(ActivityThread.currentActivityThread().getSystemUiContext(),
-                reason, confirm);
-    }
-
-    // Called by window manager policy.  Not exposed externally.
-    @Override
     public void rebootSafeMode(boolean confirm) {
         // Pass in the UI context, since ShutdownThread requires it (to show UI).
         ShutdownThread.rebootSafeMode(ActivityThread.currentActivityThread().getSystemUiContext(),
                 confirm);
+    }
+
+    // Called by window manager policy.  Not exposed externally.
+    @Override
+    public void reboot(String reason, boolean confirm) {
+        ShutdownThread.reboot(ActivityThread.currentActivityThread().getSystemUiContext(), reason, confirm);
+    }
+
+    // Called by window manager policy.  Not exposed externally.
+    @Override
+    public void advancedReboot(String reason, boolean confirm) {
+        ShutdownThread.advancedReboot(ActivityThread.currentActivityThread().getSystemUiContext(), reason, confirm);
     }
 
     public void setCurrentUser(@UserIdInt int newUserId) {
@@ -7452,7 +7449,6 @@ public class WindowManagerService extends IWindowManager.Stub
         return mRoot.getDisplayContent(DEFAULT_DISPLAY);
     }
 
-    @Override
     public void onOverlayChanged() {
         // Post to display thread so it can get the latest display info.
         mH.post(() -> {
@@ -10534,7 +10530,7 @@ public class WindowManagerService extends IWindowManager.Stub
             }
         });
     }
-
+    
     private boolean shouldHideScreenCapture() {
         return Settings.Global.getInt(mContext.getContentResolver(),
                 Settings.Global.HIDE_SCREEN_CAPTURE_STATUS, 0) != 0;

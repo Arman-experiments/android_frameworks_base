@@ -39,6 +39,10 @@ import android.metrics.LogMaker;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.UserHandle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.provider.Settings;
 import android.text.format.DateUtils;
 import android.util.ArraySet;
 import android.util.Log;
@@ -157,6 +161,8 @@ public abstract class QSTileImpl<TState extends State> implements QSTile, Lifecy
      */
     abstract protected void handleUpdateState(TState state, Object arg);
 
+    protected Vibrator mVibrator;
+
     /**
      * Declare the category of this tile.
      *
@@ -203,6 +209,8 @@ public abstract class QSTileImpl<TState extends State> implements QSTile, Lifecy
         mMetricsLogger = metricsLogger;
         mStatusBarStateController = statusBarStateController;
         mActivityStarter = activityStarter;
+
+        mVibrator = (Vibrator) mContext.getSystemService(Context.VIBRATOR_SERVICE);
 
         resetStates();
         mUiHandler.post(() -> mLifecycle.setCurrentState(CREATED));
@@ -274,6 +282,25 @@ public abstract class QSTileImpl<TState extends State> implements QSTile, Lifecy
 
     // safe to call from any thread
 
+    public boolean isVibrationEnabled() {
+        return (Settings.System.getIntForUser(mContext.getContentResolver(),
+                Settings.System.QS_TILES_HAPTIC_FEEDBACK, 0,
+                UserHandle.USER_CURRENT) == 1);
+    }
+    
+    public void vibrateTile() {
+        if (!isVibrationEnabled()) {
+            return;
+        }
+        if (mVibrator != null && mVibrator.hasVibrator()) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                mVibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TEXTURE_TICK));
+            } else {
+                mVibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE));
+            }
+        }
+    }
+
     public void addCallback(Callback callback) {
         mHandler.obtainMessage(H.ADD_CALLBACK, callback).sendToTarget();
     }
@@ -299,6 +326,7 @@ public abstract class QSTileImpl<TState extends State> implements QSTile, Lifecy
         if (!mFalsingManager.isFalseTap(FalsingManager.LOW_PENALTY)) {
             mHandler.obtainMessage(H.CLICK, eventId, 0, expandable).sendToTarget();
         }
+        vibrateTile();
     }
 
     @Override
@@ -327,6 +355,7 @@ public abstract class QSTileImpl<TState extends State> implements QSTile, Lifecy
         if (!mFalsingManager.isFalseLongTap(FalsingManager.LOW_PENALTY)) {
             mHandler.obtainMessage(H.LONG_CLICK, eventId, 0, expandable).sendToTarget();
         }
+        vibrateTile();
     }
 
     public LogMaker populate(LogMaker logMaker) {
@@ -419,7 +448,6 @@ public abstract class QSTileImpl<TState extends State> implements QSTile, Lifecy
      * @param expandable {@link Expandable} from which the opening window will be animated.
      */
     protected void handleLongClick(@Nullable Expandable expandable) {
-        if (getLongClickIntent() == null) return;
         ActivityTransitionAnimator.Controller animationController =
                 expandable != null ? expandable.activityTransitionController(
                         InteractionJankMonitor.CUJ_SHADE_APP_LAUNCH_FROM_QS_TILE) : null;

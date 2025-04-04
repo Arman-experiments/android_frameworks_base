@@ -344,6 +344,7 @@ public class NotificationShadeWindowViewController implements Dumpable {
                 mPulsingGestureListener);
         mQQSGestureHandler = new GestureDetector(mView.getContext(),
                 mQQSGestureListener);
+
         mView.setLayoutInsetsController(mNotificationInsetsController);
         mView.setInteractionEventHandler(new NotificationShadeWindowView.InteractionEventHandler() {
             boolean mUseDragDownHelperForTouch = false;
@@ -406,11 +407,13 @@ public class NotificationShadeWindowViewController implements Dumpable {
                 }
 
                 mFalsingCollector.onTouchEvent(ev);
-                mQQSGestureHandler.onTouchEvent(ev);
-                // Pass touch events to the pulsing gesture listener only if it's dozing,
-                // otherwise lockscreen DT2S and AOD DT2W will conflict.
-                if (!SceneContainerFlag.isEnabled() && mStatusBarStateController.isDozing()) {
-                    mPulsingWakeupGestureHandler.onTouchEvent(ev);
+                if (!SceneContainerFlag.isEnabled()) {
+                    mQQSGestureHandler.onTouchEvent(ev);
+                    // Pass touch events to the pulsing gesture listener only if it's dozing,
+                    // otherwise lockscreen DT2S and AOD DT2W will conflict.
+                    if (mStatusBarStateController.isDozing()) {
+                        mPulsingWakeupGestureHandler.onTouchEvent(ev);
+                    }
                 }
 
                 if (!SceneContainerFlag.isEnabled()

@@ -32,7 +32,6 @@ import android.os.Handler;
 import android.provider.Settings;
 import android.service.notification.NotificationStats;
 import android.service.notification.StatusBarNotification;
-import android.text.TextUtils;
 import android.util.Log;
 
 import androidx.annotation.VisibleForTesting;
@@ -54,7 +53,7 @@ import com.android.systemui.statusbar.notification.collection.notifcollection.Di
 import com.android.systemui.statusbar.notification.collection.notifcollection.NotifCollectionListener;
 import com.android.systemui.statusbar.notification.collection.render.NotificationVisibilityProvider;
 import com.android.systemui.tuner.TunerService;
-import com.android.systemui.util.NotificationUtil;
+import com.android.systemui.util.NotificationUtils;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -73,7 +72,6 @@ public class NotificationMediaManager implements Dumpable, TunerService.Tunable 
     private static final String TAG = "NotificationMediaManager";
     public static final boolean DEBUG_MEDIA = false;
 
-    private static final String NOWPLAYING_SERVICE = "com.google.android.as";
     private static final String ISLAND_NOTIFICATION =
             "system:" + Settings.System.ISLAND_NOTIFICATION;
     private static final String ISLAND_NOTIFICATION_NOW_PLAYING =
@@ -107,21 +105,16 @@ public class NotificationMediaManager implements Dumpable, TunerService.Tunable 
     private String mMediaNotificationKey;
     private MediaMetadata mMediaMetadata;
 
-    private String mNowPlayingNotificationKey;
-    private String mNowPlayingTrack;
-
     private final SysuiColorExtractor mColorExtractor;
-
+    
     private final TunerService mTunerService;
-    private final NotificationUtil notifUtils;
+    private final NotificationUtils notifUtils;
     private final StatusBarStateController mStatusBarStateController;
-
     private boolean mIslandEnabled;
     private boolean mIslandNowPlayingEnabled;
-
+    
     @VisibleForTesting
     final MediaController.Callback mMediaListener = new MediaController.Callback() {
-
         @Override
         public void onPlaybackStateChanged(PlaybackState state) {
             super.onPlaybackStateChanged(state);
@@ -130,7 +123,7 @@ public class NotificationMediaManager implements Dumpable, TunerService.Tunable 
             }
             if (state != null) {
                 if (mIslandEnabled && mIslandNowPlayingEnabled) {
-                    if (mStatusBarStateController.getState() != KEYGUARD 
+                    if (mStatusBarStateController.getState() != KEYGUARD
                         && !mStatusBarStateController.isDozing()
                         && PlaybackState.STATE_PLAYING == getMediaControllerPlaybackState(mMediaController)
                         && mMediaMetadata != null) {
@@ -152,19 +145,21 @@ public class NotificationMediaManager implements Dumpable, TunerService.Tunable 
             if (DEBUG_MEDIA) {
                 Log.v(TAG, "DEBUG_MEDIA: onMetadataChanged: " + metadata);
             }
+            if (notificationMediaManagerBackgroundExecution()) {
+                mBackgroundExecutor.execute(() -> setMediaMetadata(metadata));
+            } else {
+                setMediaMetadata(metadata);                
+            }
             if (mIslandEnabled && mIslandNowPlayingEnabled) {
                 notifUtils.cancelNowPlayingNotification();
                 if (mStatusBarStateController.getState() != KEYGUARD 
                         && !mStatusBarStateController.isDozing()
-                        && PlaybackState.STATE_PLAYING == getMediaControllerPlaybackState(mMediaController) 
-                        && mMediaMetadata != null) {
+                        && isPlayingState(getMediaControllerPlaybackState(mMediaController))) {
+                    String mediaTitle = metadata.getString(MediaMetadata.METADATA_KEY_TITLE);
                     notifUtils.showNowPlayingNotification(metadata);
+                } else {
+                    notifUtils.cancelNowPlayingNotification();
                 }
-            }
-            if (notificationMediaManagerBackgroundExecution()) {
-                mBackgroundExecutor.execute(() -> setMediaMetadata(metadata));
-            } else {
-                setMediaMetadata(metadata);
             }
             dispatchUpdateMediaMetaData();
         }
@@ -185,8 +180,8 @@ public class NotificationMediaManager implements Dumpable, TunerService.Tunable 
             MediaDataManager mediaDataManager,
             DumpManager dumpManager,
             @Background Executor backgroundExecutor,
-            SysuiColorExtractor colorExtractor,
             @Main Handler handler,
+            SysuiColorExtractor colorExtractor,
             StatusBarStateController statusBarStateController,
             TunerService tunerService) {
         mContext = context;
@@ -204,7 +199,7 @@ public class NotificationMediaManager implements Dumpable, TunerService.Tunable 
 
         dumpManager.registerDumpable(this);
 
-        notifUtils = new NotificationUtil(mContext);
+        notifUtils = new NotificationUtils(mContext);
         mTunerService = tunerService;
         mTunerService.addTunable(this, ISLAND_NOTIFICATION);
         mTunerService.addTunable(this, ISLAND_NOTIFICATION_NOW_PLAYING);
@@ -217,7 +212,7 @@ public class NotificationMediaManager implements Dumpable, TunerService.Tunable 
                 mIslandEnabled = TunerService.parseIntegerSwitch(newValue, false);
                 break;
             case ISLAND_NOTIFICATION_NOW_PLAYING:
-                mIslandNowPlayingEnabled = TunerService.parseIntegerSwitch(newValue, false);
+                mIslandNowPlayingEnabled = TunerService.parseIntegerSwitch(newValue, true);
                 break;
             default:
                 break;
@@ -327,10 +322,6 @@ public class NotificationMediaManager implements Dumpable, TunerService.Tunable 
             clearCurrentMediaNotification();
             dispatchUpdateMediaMetaData();
         }
-        if (key.equals(mNowPlayingNotificationKey)) {
-            mNowPlayingNotificationKey = null;
-            dispatchUpdateMediaMetaData();
-        }
     }
 
     @Nullable
@@ -352,10 +343,6 @@ public class NotificationMediaManager implements Dumpable, TunerService.Tunable 
             .orElse(null);
     }
 
-    public int getMediaBgColor() {
-        return mColorExtractor.getMediaBackgroundColor();
-    }
-
     public void addCallback(MediaListener callback) {
         mMediaListeners.add(callback);
         if (notificationMediaManagerBackgroundExecution()) {
@@ -364,13 +351,13 @@ public class NotificationMediaManager implements Dumpable, TunerService.Tunable 
             updateMediaMetaData(callback);
         }
     }
-
+    
     private void updateMediaMetaData(MediaListener callback) {
         int playbackState = getMediaControllerPlaybackState(mMediaController);
         mHandler.post(() -> {
             callback.onPrimaryMetadataOrStateChanged(mMediaMetadata, playbackState);
+            callback.setMediaNotificationColor(mColorExtractor.getMediaBackgroundColor());
         });
-        callback.setMediaNotificationColor(mColorExtractor.getMediaBackgroundColor());
     }
 
     public void removeCallback(MediaListener callback) {
@@ -404,18 +391,6 @@ public class NotificationMediaManager implements Dumpable, TunerService.Tunable 
         // Promote the media notification with a controller in 'playing' state, if any.
         NotificationEntry mediaNotification = null;
         MediaController controller = null;
-        for (NotificationEntry entry : allNotifications) {
-            if (entry.getSbn().getPackageName().toLowerCase().equals(NOWPLAYING_SERVICE)) {
-                mNowPlayingNotificationKey = entry.getSbn().getKey();
-                String notificationText = null;
-                final String title = entry.getSbn().getNotification()
-                        .extras.getString(Notification.EXTRA_TITLE);
-                if (!TextUtils.isEmpty(title)) {
-                    mNowPlayingTrack = title;
-                }
-                break;
-            }
-        }
         for (NotificationEntry entry : allNotifications) {
             Notification notif = entry.getSbn().getNotification();
             if (notif.isMediaNotification()) {
@@ -505,13 +480,6 @@ public class NotificationMediaManager implements Dumpable, TunerService.Tunable 
         }
     }
 
-    public String getNowPlayingTrack() {
-        if (mNowPlayingNotificationKey == null) {
-            mNowPlayingTrack = null;
-        }
-        return mNowPlayingTrack;
-    }
-
     public void clearCurrentMediaNotification() {
         if (notificationMediaManagerBackgroundExecution()) {
             mBackgroundExecutor.execute(this::clearMediaNotification);
@@ -540,7 +508,7 @@ public class NotificationMediaManager implements Dumpable, TunerService.Tunable 
             for (int i = 0; i < callbacks.size(); i++) {
                 callbacks.get(i).onPrimaryMetadataOrStateChanged(mMediaMetadata, state);
                 callbacks.get(i).setMediaNotificationColor(mColorExtractor.getMediaBackgroundColor());
-        }
+            }
         });
     }
 
@@ -567,7 +535,7 @@ public class NotificationMediaManager implements Dumpable, TunerService.Tunable 
                 && state != PlaybackState.STATE_NONE;
     }
 
-    public boolean sameSessions(MediaController a, MediaController b) {
+    private boolean sameSessions(MediaController a, MediaController b) {
         if (a == b) {
             return true;
         }
@@ -577,7 +545,7 @@ public class NotificationMediaManager implements Dumpable, TunerService.Tunable 
         return a.controlsSameSession(b);
     }
 
-    public int getMediaControllerPlaybackState(MediaController controller) {
+    private int getMediaControllerPlaybackState(MediaController controller) {
         if (controller != null) {
             final PlaybackState playbackState = controller.getPlaybackState();
             if (playbackState != null) {

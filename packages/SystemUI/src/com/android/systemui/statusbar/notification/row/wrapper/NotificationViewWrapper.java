@@ -20,7 +20,6 @@ import android.annotation.ColorInt;
 import android.annotation.Nullable;
 import android.app.Notification;
 import android.content.Context;
-import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.ColorMatrix;
@@ -345,15 +344,9 @@ public abstract class NotificationViewWrapper implements TransformableView {
         if (customBackgroundColor != 0) {
             return customBackgroundColor;
         }
-        
-        ColorStateList colorStateList = Utils.getColorAttr(mView.getContext(),
-                com.android.internal.R.attr.materialColorSurfaceContainerHigh);
-        
-        if (colorStateList != null) {
-            return colorStateList.getDefaultColor();
-        } else {
-            return 0;
-        }
+        return Utils.getColorAttr(mView.getContext(),
+                        com.android.internal.R.attr.colorSurface)
+                .getDefaultColor();
     }
 
     public void setLegacy(boolean legacy) {

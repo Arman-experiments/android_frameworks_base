@@ -5,9 +5,9 @@
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
-
-    <!-- ActivityManager -->
-    <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS_FULL" />
+    <!-- DeviceConfig -->
+    <uses-permission android:name="android.permission.READ_DEVICE_CONFIG" />
+    <uses-permission android:name="android.permission.WRITE_DEVICE_CONFIG" />
 
     <application android:allowClearUserData="false"
                  android:label="@string/app_label"
@@ -15,7 +15,7 @@
                  android:backupAgent="SettingsBackupAgent"
                  android:killAfterRestore="false"
                  android:restoreAnyVersion="true"
-                 android:icon="@drawable/ic_launcher_settings"
+                 android:icon="@mipmap/ic_launcher_settings"
                  android:defaultToDeviceProtectedStorage="true"
                  android:forceQueryable="true"
                  android:directBootAware="true">
