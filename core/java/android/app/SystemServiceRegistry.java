@@ -288,6 +288,9 @@ import com.android.internal.os.IDropBoxManagerService;
 import com.android.internal.policy.PhoneLayoutInflater;
 import com.android.internal.util.Preconditions;
 
+import android.os.PerformanceBoosterManager;
+import android.os.IPerformanceBoosterService;
+
 import java.time.InstantSource;
 import java.util.HashMap;
 import java.util.Map;
@@ -338,6 +341,15 @@ public final class SystemServiceRegistry {
             @Override
             public AccessibilityManager createService(ContextImpl ctx) {
                 return AccessibilityManager.getInstance(ctx);
+            }});
+
+        registerService(Context.PERFORMANCE_BOOSTER_SERVICE, PerformanceBoosterManager.class,
+                new CachedServiceFetcher<PerformanceBoosterManager>() {
+            @Override
+            public PerformanceBoosterManager createService(ContextImpl ctx) {
+                IBinder b = ServiceManager.getService(Context.PERFORMANCE_BOOSTER_SERVICE);
+                IPerformanceBoosterService service = IPerformanceBoosterService.Stub.asInterface(b);
+                return new PerformanceBoosterManager(ctx, service);
             }});
 
         registerService(Context.CAPTIONING_SERVICE, CaptioningManager.class,
