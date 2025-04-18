@@ -5528,6 +5528,11 @@ public abstract class Context {
     public static final String FEATURE_FLAGS_SERVICE = "feature_flags";
 
     /**
+     * @hide
+     */
+    public static final String PERFORMANCE_BOOSTER_SERVICE = "performance_booster";
+
+    /**
      * Official published name of the search ui service.
      *
      * <p><b>NOTE: </b> this service is optional; callers of
