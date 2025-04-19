@@ -540,12 +540,6 @@ public class PerformanceBoosterService extends IPerformanceBoosterService.Stub {
     }
     
     @Override
-    public void applyPerformanceProfile() {
-        // This method is exposed via the interface
-        applyPerformanceProfile();
-    }
-    
-    @Override
     public void applyBatteryProfile() {
         // Apply conservative CPU settings and trigger deep sleep
         applyConservativeCpuSettings();
